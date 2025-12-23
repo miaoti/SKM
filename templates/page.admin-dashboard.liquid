@@ -460,7 +460,7 @@
                       </div>
                       <div>
                         <label class="text-xs font-medium text-gray-600 mb-1 block">Product Type</label>
-                        <input type="text" id="edit-type" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500">
+                        <div id="edit-type-container"></div>
                       </div>
                       <div>
                         <label class="text-xs font-medium text-gray-600 mb-1 block">Tags (comma separated)</label>
@@ -731,6 +731,29 @@
                   </div>
                 </div>
                 
+                <!-- Product Types Management -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-gray-900">Product Types</h2>
+                    <button id="btn-refresh-types" class="text-xs text-gray-500 hover:text-gray-700" title="Refresh">
+                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    </button>
+                  </div>
+                  
+                  <!-- Add New Type -->
+                  <div class="flex gap-2 mb-3">
+                    <input type="text" id="new-type-input" class="flex-1 h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="New type name...">
+                    <button id="btn-add-type" class="h-9 px-3 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg">Add</button>
+                  </div>
+                  
+                  <!-- Types List -->
+                  <div id="types-list" class="space-y-1 max-h-48 overflow-y-auto">
+                    <div class="text-xs text-gray-400 text-center py-2">Loading types...</div>
+                  </div>
+                  
+                  <p class="text-[10px] text-gray-400 mt-3">Types in use cannot be deleted. Remove products first.</p>
+                </div>
+                
               </div>
             </div>
             
@@ -782,7 +805,7 @@
                       </div>
                       <div>
                         <label class="text-xs font-medium text-gray-600 mb-1 block">Product Type</label>
-                        <input type="text" id="new-type" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="e.g., Exhaust">
+                        <div id="new-type-container"></div>
                       </div>
                       <div>
                         <label class="text-xs font-medium text-gray-600 mb-1 block">Tags (comma separated)</label>
@@ -1668,6 +1691,7 @@
 <script src="{{ 'admin-orders.js' | asset_url }}" defer></script>
 <script src="{{ 'admin-profile.js' | asset_url }}" defer></script>
 
+<script src="{{ 'admin-categories.js' | asset_url }}"></script>
 </body>
 </html>
 

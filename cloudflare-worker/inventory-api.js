@@ -80,7 +80,7 @@ export default {
     const path = url.pathname;
 
     // Authentication check (skip for health check and B2B storefront endpoints)
-    const publicPaths = ["/health", "/b2b/checkout", "/b2b/cart-preview", "/checkout/create", "/shop/profile"];
+    const publicPaths = ["/health", "/b2b/checkout", "/b2b/cart-preview", "/checkout/create", "/shop/profile", "/categories"];
     if (!publicPaths.includes(path)) {
       const clientKey = request.headers.get("X-Admin-Key");
       if (clientKey !== env.ADMIN_SECRET) {
@@ -143,6 +143,12 @@ export default {
           const untagCustomerId = path.split("/")[2];
           const untagBody = await request.json();
           return jsonResponse(await removeCustomerTags(env, untagCustomerId, untagBody.tags));
+
+        // ==========================================
+        // CATEGORIES ROUTES (Product Types)
+        // ==========================================
+        case path === "/categories" && request.method === "GET":
+          return jsonResponse(await listCategories(env));
 
         // ==========================================
         // PRODUCT ROUTES
@@ -865,6 +871,60 @@ async function removeCustomerTags(env, customerId, tags) {
   }
 
   return { success: true, data: result.tagsRemove.node };
+}
+
+// ============================================
+// CATEGORY OPERATIONS (Product Types)
+// ============================================
+
+async function listCategories(env) {
+  // Fetch all products to extract unique product types
+  const query = `
+    query ListProductTypes($first: Int!, $after: String) {
+      products(first: $first, after: $after) {
+        edges {
+          node {
+            productType
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `;
+
+  const typeCounts = {};
+  let hasNextPage = true;
+  let cursor = null;
+
+  // Paginate through all products to get complete type counts
+  while (hasNextPage) {
+    const result = await shopifyGraphQL(env, query, { first: 250, after: cursor });
+
+    for (const edge of result.products.edges) {
+      const type = edge.node.productType;
+      if (type && type.trim() !== '') {
+        const normalizedType = type.trim();
+        typeCounts[normalizedType] = (typeCounts[normalizedType] || 0) + 1;
+      }
+    }
+
+    hasNextPage = result.products.pageInfo.hasNextPage;
+    cursor = result.products.pageInfo.endCursor;
+  }
+
+  // Convert to array and sort by count (descending)
+  const categories = Object.entries(typeCounts)
+    .map(([name, count]) => ({
+      name,
+      count,
+      handle: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  return { success: true, data: categories, count: categories.length };
 }
 
 // ============================================

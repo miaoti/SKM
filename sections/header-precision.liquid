@@ -233,6 +233,101 @@
   </div>
 </header-precision>
 
+<!-- Category Navigation Bar -->
+<nav id="category-nav" class="fixed top-[116px] left-0 w-full z-[998] bg-[#1a1a1a] border-b border-[#333]">
+  <div class="max-w-[1920px] mx-auto px-4 lg:px-8">
+    <div class="flex items-center justify-center gap-2 h-10 overflow-x-auto scrollbar-hide">
+      <div id="category-links" class="flex items-center gap-1 lg:gap-2">
+        <span class="text-[10px] text-gray-500 uppercase tracking-wider">Loading...</span>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<script>
+(function() {
+  const loadCategories = async () => {
+    try {
+      const res = await fetch('https://skm-inventory-api.miaotingshuo.workers.dev/categories');
+      if (!res.ok) return;
+      const data = await res.json();
+      
+      const container = document.getElementById('category-links');
+      if (!container || !data.data || data.data.length === 0) {
+        container.innerHTML = '<a href="/collections/all" class="category-link">All Products</a>';
+        return;
+      }
+      
+      // Build category links - use type query for products
+      let html = '<a href="/collections/all" class="category-link active">All</a>';
+      data.data.forEach(cat => {
+        // Use Shopify's product type filter in URL
+        const filterUrl = `/collections/all?filter.p.product_type=${encodeURIComponent(cat.name)}`;
+        html += `<a href="${filterUrl}" class="category-link" data-type="${cat.name}">${cat.name} <span class="text-[9px] opacity-60">(${cat.count})</span></a>`;
+      });
+      
+      container.innerHTML = html;
+      
+      // Highlight active category based on current URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const activeType = urlParams.get('filter.p.product_type');
+      if (activeType) {
+        container.querySelectorAll('.category-link').forEach(link => {
+          link.classList.remove('active');
+          if (link.dataset.type === activeType) {
+            link.classList.add('active');
+          }
+        });
+      }
+    } catch (e) {
+      console.error('Failed to load categories:', e);
+    }
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadCategories);
+  } else {
+    loadCategories();
+  }
+})();
+</script>
+
+<style>
+  #category-nav {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  #category-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .category-link {
+    display: inline-block;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.6);
+    white-space: nowrap;
+    transition: all 0.2s;
+    border-radius: 4px;
+  }
+  .category-link:hover {
+    color: white;
+    background: rgba(204, 0, 0, 0.2);
+  }
+  .category-link.active {
+    color: #CC0000;
+    background: rgba(204, 0, 0, 0.1);
+  }
+  @media (max-width: 1024px) {
+    .category-link {
+      padding: 4px 8px;
+      font-size: 10px;
+    }
+  }
+</style>
+
 <!-- Mobile Menu Drawer -->
 <dialog id="mobile-menu-drawer" class="fixed inset-y-0 left-0 z-[1000] w-[85vw] max-w-[400px] h-[100dvh] max-h-[100dvh] bg-white p-0 m-0 border-r border-gray-100 shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm open:animate-slide-in-left outline-none">
   <div class="flex flex-col h-full bg-white">

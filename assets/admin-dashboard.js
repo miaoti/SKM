@@ -309,6 +309,10 @@
     $('edit-description').value = (p.description || '').replace(/<[^>]+>/g, '');
     $('edit-vendor').value = p.vendor || '';
     $('edit-type').value = p.productType || '';
+    // Also refresh product type combo-box if available
+    if (window.AdminCategories) {
+      window.AdminCategories.refreshProductTypeComboBox('edit-type', p.productType || '');
+    }
     $('edit-tags').value = (p.tags || []).join(', ');
     $('edit-price').value = p.price || '';
     $('edit-compare-price').value = p.variants?.[0]?.compareAtPrice || '';
