@@ -1,0 +1,119 @@
+<div class="bg-[#111111] text-white">
+  <div class="flex flex-col md:flex-row min-h-[600px]">
+    <!-- Left: Video Trigger -->
+    <div class="w-full md:w-1/2 relative group cursor-pointer overflow-hidden" onclick="document.getElementById('dyno-modal-{{ section.id }}').showModal()">
+       {%- if section.settings.cover_image != blank -%}
+         {{ section.settings.cover_image | image_url: width: 1200 | image_tag: class: "w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-60 group-hover:opacity-40" }}
+       {%- else -%}
+         {{ 'lifestyle-2' | placeholder_svg_tag: 'w-full h-full object-cover opacity-20' }}
+       {%- endif -%}
+
+       <div class="absolute inset-0 flex items-center justify-center">
+         <div class="w-24 h-24 rounded-full bg-[#CC0000] flex items-center justify-center shadow-[0_0_30px_rgba(204,0,0,0.5)] group-hover:scale-110 transition-transform duration-300">
+           <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-10 h-10 ml-1">
+             <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+           </svg>
+         </div>
+       </div>
+    </div>
+
+    <!-- Right: Specs -->
+    <div class="w-full md:w-1/2 p-12 md:p-24 flex flex-col justify-center">
+      <h2 class="text-4xl md:text-5xl font-bold mb-12 tracking-tight" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">
+        {{ section.settings.heading | default: "HEAR THE POWER." }}
+      </h2>
+
+      <div class="space-y-12">
+        {%- for block in section.blocks -%}
+          <div>
+            <p class="text-3xl md:text-4xl font-mono font-bold text-[#CC0000] mb-2">{{ block.settings.value }}</p>
+            <p class="text-gray-400 text-sm uppercase tracking-widest">{{ block.settings.label }}</p>
+          </div>
+        {%- endfor -%}
+      </div>
+    </div>
+  </div>
+</div>
+
+<dialog id="dyno-modal-{{ section.id }}" class="backdrop:bg-black/90 bg-transparent p-0 w-full max-w-5xl aspect-video m-auto rounded-none">
+  <div class="relative w-full h-full bg-black">
+    <button onclick="document.getElementById('dyno-modal-{{ section.id }}').close()" class="absolute top-4 right-4 z-50 text-white hover:text-[#CC0000]">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+    {%- if section.settings.video_url != blank -%}
+      <video controls class="w-full h-full">
+        <source src="{{ section.settings.video_url }}" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+    {%- else -%}
+       <div class="w-full h-full flex items-center justify-center text-white">No video configured</div>
+    {%- endif -%}
+  </div>
+</dialog>
+
+{% schema %}
+{
+  "name": "Dyno Room Experience",
+  "settings": [
+    {
+      "type": "image_picker",
+      "id": "cover_image",
+      "label": "Cover Image"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "HEAR THE POWER."
+    },
+    {
+      "type": "url",
+      "id": "video_url",
+      "label": "Video URL (MP4)"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "spec",
+      "name": "Spec",
+      "settings": [
+        {
+          "type": "text",
+          "id": "value",
+          "label": "Value",
+          "default": "110dB"
+        },
+        {
+          "type": "text",
+          "id": "label",
+          "label": "Label",
+          "default": "Raw Output"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Dyno Room Experience",
+      "blocks": [
+        {
+          "type": "spec",
+          "settings": {
+            "value": "110dB",
+            "label": "Raw Output"
+          }
+        },
+        {
+          "type": "spec",
+          "settings": {
+            "value": "+25 HP",
+            "label": "Dyno Proven Gain"
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}

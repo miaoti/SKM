@@ -1,0 +1,295 @@
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+  
+  <!-- Dashboard Header -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between mb-12 border-b border-gray-200 pb-8">
+    <div>
+      <h1 class="text-3xl font-bold uppercase tracking-tighter text-[#111111] mb-2">
+        My Garage
+      </h1>
+      <p class="text-gray-500 uppercase tracking-widest text-xs">
+        Driver: {{ customer.name }} // ID: {{ customer.id | slice: -4, 4 }}
+      </p>
+    </div>
+    <div class="mt-4 md:mt-0 flex gap-4">
+      <a href="{{ routes.account_logout_url }}?return_url={{ routes.account_login_url }}?logged_out=true" class="h-10 px-6 border border-gray-200 flex items-center justify-center text-xs font-bold uppercase tracking-wider hover:border-[#CC0000] hover:text-[#CC0000] transition-colors">
+        Log Out
+      </a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
+    
+    <!-- Sidebar (Left Column) -->
+    <div class="lg:col-span-3 space-y-8">
+      
+      <!-- Driver Details -->
+      <div class="bg-gray-50 p-6 border-l-4 border-[#CC0000]">
+        <h2 class="text-sm font-bold uppercase tracking-wide text-[#111111] mb-4">Driver Profile</h2>
+        <div class="space-y-2 text-sm text-gray-600">
+          <p class="font-medium text-black">{{ customer.name }}</p>
+          <p>{{ customer.email }}</p>
+          <div class="pt-4 mt-4 border-t border-gray-200">
+            <p class="text-xs uppercase text-gray-400 mb-2">Primary Address</p>
+            {% if customer.default_address %}
+              {{ customer.default_address | format_address }}
+            {% else %}
+              <p class="italic text-gray-400">No address registered</p>
+            {% endif %}
+          </div>
+        </div>
+        <a href="{{ routes.account_addresses_url }}" class="mt-6 inline-flex items-center text-xs font-bold uppercase tracking-wider text-[#CC0000] hover:text-black transition-colors group">
+          Manage Addresses
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
+          </svg>
+        </a>
+      </div>
+
+      <!-- Upgrade to Dealer / B2B Card -->
+      {% unless customer.tags contains 'b2b' %}
+        <div class="bg-[#111111] p-6 border-l-4 border-red-600 shadow-lg relative overflow-hidden group">
+          <!-- Background Pattern -->
+          <div class="absolute inset-0 opacity-10 bg-[url('https://cdn.shopify.com/s/files/1/0663/6430/9693/files/carbon_pattern.png?v=1')] bg-repeat pointer-events-none"></div>
+          
+          <div class="relative z-10">
+            <h2 class="text-lg font-bold uppercase tracking-wider text-white mb-2">
+              Join The Dealer Network
+            </h2>
+            <p class="text-gray-400 text-xs leading-relaxed mb-6">
+              Unlock exclusive wholesale pricing, bulk order support, and priority shipping.
+            </p>
+
+            {% form 'contact', class: 'w-full' %}
+              {% if form.posted_successfully? %}
+                <div class="flex items-center gap-2 text-green-500 font-bold uppercase text-xs tracking-wide">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>Application Submitted</span>
+                </div>
+                <p class="text-gray-500 text-xs mt-1">Our team is reviewing your profile.</p>
+              {% else %}
+                <input type="hidden" name="contact[body]" value="User {{ customer.email }} (ID: {{ customer.id }}) requests upgrade to B2B Business Account.">
+                <input type="hidden" name="contact[email]" value="{{ customer.email }}">
+                
+                <button type="submit" class="w-full py-3 bg-[#CC0000] text-white text-xs font-bold uppercase tracking-widest hover:bg-red-700 hover:scale-[1.02] transition-all duration-200 shadow-lg shadow-red-900/20">
+                  Apply For Business Account
+                </button>
+              {% endif %}
+            {% endform %}
+          </div>
+        </div>
+      {% endunless %}
+
+    </div>
+
+    <!-- Main Content (Right Column) -->
+    <div class="lg:col-span-9">
+      
+      {% comment %} ==========================================
+         ADMIN COMMAND CENTER ENTRY POINT
+         Only visible to users with 'admin' tag
+         ========================================== {% endcomment %}
+      {% if customer.tags contains 'admin' %}
+        <div class="mb-10 relative group">
+          <!-- Admin Workstation Card -->
+          <div class="relative bg-[#0a0a0a] border-2 border-[#1a1a1a] hover:border-[#CC0000]/50 rounded-sm overflow-hidden transition-all duration-300 shadow-xl hover:shadow-2xl hover:shadow-red-900/20">
+            
+            <!-- Grid Pattern Overlay -->
+            <div class="absolute inset-0 opacity-30 pointer-events-none"
+                 style="background-image: linear-gradient(rgba(204,0,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(204,0,0,0.05) 1px, transparent 1px); background-size: 20px 20px;">
+            </div>
+            
+            <!-- Red Accent Border (Left) -->
+            <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#CC0000] via-[#CC0000] to-[#660000]"></div>
+            
+            <!-- Scan Line Animation -->
+            <div class="absolute inset-0 overflow-hidden pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+              <div class="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[#CC0000]/50 to-transparent" 
+                   style="animation: scan 3s linear infinite;">
+              </div>
+            </div>
+            
+            <div class="relative z-10 p-6 lg:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              
+              <!-- Left: Icon & Info -->
+              <div class="flex items-start gap-5">
+                <!-- Icon Container -->
+                <div class="flex-shrink-0 w-14 h-14 bg-[#111111] border border-[#222222] rounded-sm flex items-center justify-center group-hover:border-[#CC0000]/50 transition-colors">
+                  <!-- Wrench/Dashboard Icon -->
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-[#CC0000]">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+                  </svg>
+                </div>
+                
+                <!-- Text Content -->
+                <div class="space-y-2">
+                  <div class="flex items-center gap-3">
+                    <h3 class="text-lg font-bold uppercase tracking-wider text-white">
+                      Admin Workstation
+                    </h3>
+                    <!-- Status Indicator -->
+                    <div class="flex items-center gap-1.5 px-2 py-0.5 bg-green-500/10 border border-green-500/30 rounded-sm">
+                      <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                      <span class="text-[10px] uppercase tracking-wider text-green-500 font-medium">Online</span>
+                    </div>
+                  </div>
+                  <p class="text-gray-500 text-xs leading-relaxed max-w-md">
+                    Inventory management, vehicle database, and system controls. Full administrative access granted.
+                  </p>
+                  <!-- Access Level Tag -->
+                  <div class="flex items-center gap-3 pt-1">
+                    <span class="text-[10px] uppercase tracking-widest text-gray-600">
+                      Access Level:
+                    </span>
+                    <span class="text-[10px] uppercase tracking-widest text-[#CC0000] font-bold">
+                      Administrator
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Right: Launch Button -->
+              <div class="flex-shrink-0">
+                <a 
+                  href="/pages/admin-dashboard" 
+                  class="group/btn relative inline-flex items-center gap-3 h-12 px-6 bg-[#CC0000] hover:bg-[#990000] text-white text-xs font-bold uppercase tracking-widest transition-all duration-200 shadow-lg shadow-red-900/30 hover:shadow-red-900/50 overflow-hidden"
+                >
+                  <!-- Button Shine Effect -->
+                  <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700"></div>
+                  
+                  <span class="relative">Launch Interface</span>
+                  
+                  <!-- Arrow Icon -->
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="relative w-4 h-4 group-hover/btn:translate-x-1 transition-transform">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                  </svg>
+                </a>
+              </div>
+              
+            </div>
+            
+            <!-- Bottom Status Bar -->
+            <div class="relative z-10 px-6 lg:px-8 py-3 bg-[#0d0d0d] border-t border-[#1a1a1a] flex items-center justify-between">
+              <div class="flex items-center gap-6 text-[10px] uppercase tracking-wider text-gray-600">
+                <span class="flex items-center gap-1.5">
+                  <span class="w-1 h-1 bg-green-500 rounded-full"></span>
+                  Inventory Sync: Active
+                </span>
+                <span class="flex items-center gap-1.5">
+                  <span class="w-1 h-1 bg-green-500 rounded-full"></span>
+                  Database: Connected
+                </span>
+                <span class="hidden sm:flex items-center gap-1.5">
+                  <span class="w-1 h-1 bg-[#CC0000] rounded-full"></span>
+                  Admin: {{ customer.first_name }}
+                </span>
+              </div>
+              <div class="text-[10px] text-gray-700 uppercase tracking-wider">
+                v1.0.0
+              </div>
+            </div>
+            
+          </div>
+        </div>
+        
+        <style>
+          @keyframes scan {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(1000%); }
+          }
+        </style>
+      {% endif %}
+      {% comment %} END ADMIN ENTRY POINT {% endcomment %}
+      
+      <div class="mb-8">
+        <h2 class="text-xl font-bold uppercase tracking-tight text-[#111111] flex items-center gap-3">
+          ORDER HISTORY
+          <span class="bg-[#111111] text-white text-[10px] px-2 py-0.5 rounded-full">{{ customer.orders_count }}</span>
+        </h2>
+        <p class="text-gray-500 text-xs mt-1">Track the status of your performance upgrades.</p>
+      </div>
+
+      {% paginate customer.orders by 20 %}
+        {%- if customer.orders.size > 0 -%}
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b-2 border-black">
+                  <th class="py-4 px-4 text-xs font-bold uppercase tracking-wider text-[#111111]">ORDER #</th>
+                  <th class="py-4 px-4 text-xs font-bold uppercase tracking-wider text-[#111111]">DATE</th>
+                  <th class="py-4 px-4 text-xs font-bold uppercase tracking-wider text-[#111111]">PAYMENT STATUS</th>
+                  <th class="py-4 px-4 text-xs font-bold uppercase tracking-wider text-[#111111]">FULFILLMENT</th>
+                  <th class="py-4 px-4 text-xs font-bold uppercase tracking-wider text-[#111111] text-right">TOTAL</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                {%- for order in customer.orders -%}
+                  <tr class="group hover:bg-gray-50 transition-colors">
+                    <td class="py-4 px-4">
+                      <a href="{{ order.customer_url }}" class="inline-flex items-center gap-1 font-bold text-[#111111] border-b border-transparent group-hover:border-[#CC0000] transition-all">
+                        {{ order.name }}
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3 text-[#CC0000] opacity-0 group-hover:opacity-100 transition-opacity">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
+                        </svg>
+                      </a>
+                    </td>
+                    <td class="py-4 px-4 text-sm text-gray-600 font-mono">
+                      {{ order.created_at | time_tag: format: 'date' }}
+                    </td>
+                    <td class="py-4 px-4">
+                      {% assign payment_status_handle = order.financial_status_label | handle %}
+                      <span class="inline-flex items-center px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide border rounded-sm
+                        {% if payment_status_handle == 'paid' %} border-green-600 bg-green-600 text-white
+                        {% elsif payment_status_handle == 'pending' %} border-yellow-200 bg-yellow-50 text-yellow-700
+                        {% else %} border-gray-200 bg-gray-50 text-gray-600 {% endif %}">
+                        {{ order.financial_status_label }}
+                      </span>
+                    </td>
+                    <td class="py-4 px-4">
+                      {% assign fulfillment_status_handle = order.fulfillment_status_label | handle %}
+                      <span class="inline-flex items-center px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide border rounded-sm
+                        {% if fulfillment_status_handle == 'fulfilled' %} border-[#CC0000] bg-[#CC0000] text-white
+                        {% elsif fulfillment_status_handle == 'unfulfilled' %} border-gray-200 bg-gray-100 text-gray-600
+                        {% else %} border-blue-200 bg-blue-50 text-blue-700 {% endif %}">
+                        {{ order.fulfillment_status_label }}
+                      </span>
+                    </td>
+                    <td class="py-4 px-4 text-right font-mono font-medium text-[#111111]">
+                      {{ order.total_price | money }}
+                    </td>
+                  </tr>
+                {%- endfor -%}
+              </tbody>
+            </table>
+          </div>
+          
+          {%- if paginate.pages > 1 -%}
+            <div class="mt-8 flex justify-center">
+               {% render 'pagination', paginate: paginate %}
+            </div>
+          {%- endif -%}
+
+        {%- else -%}
+          
+          <!-- Empty State -->
+          <div class="bg-gray-50 border border-dashed border-gray-300 rounded-sm p-12 text-center">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 text-gray-300 mb-6">
+               <!-- Empty Garage / Box Icon -->
+               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                 <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3.251l4.135 4.136a.75.75 0 01-1.06 1.06L12 13.06l-3.075 3.076a.75.75 0 01-1.06-1.06l4.136-4.136zM3 7.5h18m-16.5 0V5.25A2.25 2.25 0 016.75 3h10.5a2.25 2.25 0 012.25 2.25V7.5" />
+               </svg>
+            </div>
+            <h3 class="text-lg font-bold uppercase tracking-wide text-[#111111] mb-2">NO ORDERS YET</h3>
+            <p class="text-gray-500 max-w-sm mx-auto mb-8">Your garage is currently empty. Ready to start your build? Find the perfect system for your vehicle.</p>
+            <a href="/collections/all" class="inline-flex items-center justify-center h-10 px-8 bg-[#CC0000] text-white font-bold uppercase tracking-wider hover:bg-red-700 transition-colors shadow-sm rounded-sm text-sm">
+              BROWSE EXHAUSTS
+            </a>
+          </div>
+
+        {%- endif -%}
+      {% endpaginate %}
+    </div>
+
+  </div>
+</div>

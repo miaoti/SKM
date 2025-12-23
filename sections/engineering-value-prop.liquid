@@ -1,0 +1,104 @@
+<div class="py-24 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16">
+      <h2 class="text-4xl font-bold text-gray-900 tracking-tight mb-4" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">
+        {{ section.settings.heading | default: "PRECISION ENGINEERED" }}
+      </h2>
+      <p class="text-xl text-gray-500 font-mono">
+        {{ section.settings.subtext | default: "304 Stainless Steel. Mandrel Bent. Dyno Proven." }}
+      </p>
+    </div>
+
+    <div class="flex flex-wrap justify-center gap-16 md:gap-24">
+      {%- for block in section.blocks -%}
+        <div class="flex flex-col items-center text-center group flex-1 min-w-[280px] max-w-sm">
+          <div class="w-20 h-20 mb-8 text-[#CC0000] transition-transform duration-300 group-hover:scale-110">
+            {%- if block.settings.icon_svg != blank -%}
+              {{ block.settings.icon_svg }}
+            {%- else -%}
+              <!-- Default Placeholder Icon -->
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-full h-full">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+              </svg>
+            {%- endif -%}
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-4 uppercase tracking-wide">{{ block.settings.title }}</h3>
+          <p class="text-gray-500 leading-relaxed text-lg">{{ block.settings.text }}</p>
+        </div>
+      {%- endfor -%}
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Value Proposition",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "PRECISION ENGINEERED"
+    },
+    {
+      "type": "text",
+      "id": "subtext",
+      "label": "Subtext",
+      "default": "304 Stainless Steel. Mandrel Bent. Dyno Proven."
+    }
+  ],
+  "blocks": [
+    {
+      "type": "feature",
+      "name": "Feature",
+      "settings": [
+        {
+          "type": "html",
+          "id": "icon_svg",
+          "label": "Icon SVG Code"
+        },
+        {
+          "type": "text",
+          "id": "title",
+          "label": "Title",
+          "default": "Feature Title"
+        },
+        {
+          "type": "textarea",
+          "id": "text",
+          "label": "Text",
+          "default": "Short description of the feature."
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Value Proposition",
+      "blocks": [
+        {
+          "type": "feature",
+          "settings": {
+            "title": "304 Stainless Steel",
+            "text": "High-grade materials for maximum durability and corrosion resistance."
+          }
+        },
+        {
+          "type": "feature",
+          "settings": {
+            "title": "Mandrel Bent",
+            "text": "Smooth bends ensure unrestricted airflow and optimal performance."
+          }
+        },
+        {
+          "type": "feature",
+          "settings": {
+            "title": "Dyno Proven",
+            "text": "Tested and tuned to deliver real horsepower and torque gains."
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}

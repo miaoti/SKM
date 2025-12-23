@@ -1,0 +1,11 @@
+# Ignore the skm-pricing submodule folder
+skm-pricing/
+
+# Ignore other common files
+node_modules/
+.env
+.env.local
+.DS_Store
+*.log
+.kiro/
+.trae/

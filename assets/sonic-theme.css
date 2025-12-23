@@ -1,0 +1,68 @@
+/* Sonic Architect Theme - Global Micro-interactions */
+
+/* 1. Smooth Scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 2. Global Button Hover Effect (Red Fill) */
+/* Applied to buttons with class .sonic-button or standard .button that we want to override */
+.button, .shopify-payment-button__button--unbranded {
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+
+.button::before, .shopify-payment-button__button--unbranded::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 100%;
+  background-color: #CC0000; /* Adrenaline Red */
+  z-index: -1;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.button:hover::before, .shopify-payment-button__button--unbranded:hover::before {
+  width: 100%;
+}
+
+.button:hover, .shopify-payment-button__button--unbranded:hover {
+  color: #FFFFFF !important;
+  border-color: #CC0000 !important;
+}
+
+/* 3. Top Loading Bar Animation */
+/* A pure CSS loading bar that runs on page load */
+.sonic-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background-color: #CC0000;
+  z-index: 9999;
+  animation: sonic-load 1.5s ease-in-out forwards;
+  width: 0;
+}
+
+@keyframes sonic-load {
+  0% { width: 0; opacity: 1; }
+  50% { width: 70%; opacity: 1; }
+  100% { width: 100%; opacity: 0; }
+}
+
+/* Utility: Glassmorphism Helper (if not already in header) */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Utility: Text Selection */
+::selection {
+  background: #CC0000;
+  color: #FFFFFF;
+}

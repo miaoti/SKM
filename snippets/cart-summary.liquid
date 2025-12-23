@@ -1,0 +1,494 @@
+{%- doc -%}
+  Renders the cart summary totals with B2B and Discount pricing support.
+
+  @param {string} [accelerated_checkout_buttons_layout] - { 'vertical' } Forced layout of the additional checkout buttons, instead of relying on platform's layout.
+{%- enddoc -%}
+
+{%- liquid
+  # Calculate effective cart total based on B2B/Discount pricing
+  # Check if user is B2B (case-insensitive, supports multiple tag variations)
+  assign is_b2b_user = false
+  if customer
+    for tag in customer.tags
+      assign tag_downcase = tag | downcase | strip
+      if tag_downcase == 'b2b' or tag_downcase == 'wholesale' or tag_downcase == 'business'
+        assign is_b2b_user = true
+        break
+      endif
+    endfor
+  endif
+  
+  assign effective_total = 0
+  assign retail_total = 0
+  assign total_savings = 0
+  
+  for item in cart.items
+    assign product = item.product
+    assign variant_price = item.variant.price
+    assign effective_price = variant_price
+    
+    # Get prices from line item properties (set when adding to cart)
+    assign stored_effective_price = nil
+    assign addon_price = 0
+    
+    for property in item.properties
+      if property.first == '_addon_price'
+        assign addon_price = property.last | times: 100 | round
+      elsif property.first == '_effective_price'
+        assign stored_effective_price = property.last
+      endif
+    endfor
+    
+    # Use stored effective price if available
+    if stored_effective_price != blank and stored_effective_price != empty
+      assign effective_price = stored_effective_price | times: 100 | round
+    else
+      # Fallback: Try to get prices from metafields
+      assign variant_discount_price_raw = item.variant.metafields.custom.discount_price.value
+      assign product_discount_price_raw = product.metafields.custom.discount_price.value
+      assign variant_b2b_price_raw = item.variant.metafields.custom.b2b_price.value
+      assign product_b2b_price_raw = product.metafields.custom.b2b_price.value
+      
+      assign discount_price_raw = variant_discount_price_raw
+      if discount_price_raw == blank or discount_price_raw == empty
+        assign discount_price_raw = product_discount_price_raw
+      endif
+      
+      assign b2b_price_raw = variant_b2b_price_raw
+      if b2b_price_raw == blank or b2b_price_raw == empty
+        assign b2b_price_raw = product_b2b_price_raw
+      endif
+      
+      assign discount_price = nil
+      assign b2b_price = nil
+      
+      if discount_price_raw != blank and discount_price_raw != empty
+        assign discount_price = discount_price_raw | times: 100 | round
+      endif
+      
+      if b2b_price_raw != blank and b2b_price_raw != empty
+        assign b2b_price = b2b_price_raw | times: 100 | round
+      endif
+      
+      # Calculate effective price
+      if is_b2b_user
+        if discount_price != nil and b2b_price != nil
+          if b2b_price <= discount_price
+            assign effective_price = b2b_price
+          else
+            assign effective_price = discount_price
+          endif
+        elsif b2b_price != nil
+          assign effective_price = b2b_price
+        elsif discount_price != nil
+          assign effective_price = discount_price
+        endif
+      else
+        if discount_price != nil
+          assign effective_price = discount_price
+        endif
+      endif
+    endif
+    
+    # Add addon price to effective price
+    assign effective_price_with_addon = effective_price | plus: addon_price
+    
+    assign item_total = effective_price_with_addon | times: item.quantity
+    assign retail_item_total = variant_price | times: item.quantity
+    
+    assign effective_total = effective_total | plus: item_total
+    assign retail_total = retail_total | plus: retail_item_total
+  endfor
+  
+  assign total_savings = retail_total | minus: effective_total
+  assign has_savings = false
+  if total_savings > 0
+    assign has_savings = true
+  endif
+-%}
+
+<div class="cart__summary-totals">
+  {% # We need to keep this node in place to allow morphing to work properly # %}
+  <div class="cart__original-total-container cart-primary-typography">
+    {%- if cart.cart_level_discount_applications.size > 0 -%}
+      <span class="cart__summary-item cart__original-total">
+        <span class="cart__original-total-label">{{ 'content.cart_subtotal' | t }}</span>
+        <span class="cart__original-total-value cart-secondary-typography">
+          {{- cart.original_total_price | money -}}
+        </span>
+      </span>
+      <div class="cart__summary-discounts">
+        <ul
+          class="discounts list-unstyled"
+          role="list"
+          aria-label="{{ 'content.discounts' | t }}"
+        >
+          {%- for discount in cart.cart_level_discount_applications -%}
+            <li class="cart__summary-item cart__discount">
+              <span class="cart__discount-label">
+                {{- 'icon-discount.svg' | inline_asset_content -}}
+                {{ discount.title | escape }}
+              </span>
+              <span class="cart__discount-value cart-secondary-typography"
+                >-{{ discount.total_allocated_amount | money -}}
+              </span>
+            </li>
+          {%- endfor -%}
+        </ul>
+      </div>
+    {%- endif -%}
+    
+    {%- comment -%} Show savings from B2B/Discount pricing {%- endcomment -%}
+    {% if has_savings %}
+      <div class="cart__pricing-savings" style="margin-top: 0.5rem; padding: 0.75rem; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 0.5rem; border: 1px solid #86efac;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.75rem; color: #166534; font-weight: 500;">
+            {% if is_b2b_user %}
+              🏷️ Wholesale Pricing Applied
+            {% else %}
+              🎉 Sale Pricing Applied
+            {% endif %}
+          </span>
+          <span style="font-size: 0.875rem; color: #166534; font-weight: 700;">
+            Save {{ total_savings | money }}
+          </span>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if settings.show_cart_note or settings.show_add_discount_code %}
+    <div class="cart-actions">
+      {% if settings.show_cart_note %}
+        {% render 'cart-note' %}
+      {% endif %}
+      {% if settings.show_cart_note and settings.show_add_discount_code %}
+        <div class="cart-actions__divider"></div>
+      {% endif %}
+      {% if settings.show_add_discount_code %}
+        {% render 'cart-discount', section_id: section.id %}
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {%- liquid
+    if settings.currency_code_enabled_cart_total
+      assign effective_total_formatted = effective_total | money_with_currency
+      assign retail_total_formatted = retail_total | money_with_currency
+    else
+      assign effective_total_formatted = effective_total | money
+      assign retail_total_formatted = retail_total | money
+    endif
+  -%}
+
+  <div class="cart__total-container{% if settings.show_installments %} cart__total-container--has-installments{% endif %}">
+    <span
+      class="cart__summary-item cart__total"
+      role="status"
+    >
+      <span class="cart__total-label cart-primary-typography">{{ 'content.cart_estimated_total' | t }}</span>
+      <div style="text-align: right;">
+        {% if has_savings %}
+          <span style="display: block; font-size: 0.75rem; color: #9ca3af; text-decoration: line-through;">
+            {{ retail_total_formatted }}
+          </span>
+        {% endif %}
+        <text-component
+          ref="cartTotal"
+          value="{{ effective_total_formatted | strip_html }}"
+          class="cart__total-value cart-secondary-typography"
+          style="{% if has_savings %}color: #CC0000; font-weight: 700;{% endif %}"
+          {% comment %} Used by payment_terms web component {% endcomment %}
+          data-cart-subtotal
+          data-effective-total="{{ effective_total }}"
+        >
+          {{ effective_total_formatted }}
+        </text-component>
+      </div>
+    </span>
+    {% if settings.show_installments %}
+      <span class="cart__summary-item cart__installments">
+        {% form 'cart', cart %}
+          {{ form | payment_terms }}
+        {% endform %}
+      </span>
+    {% endif %}
+    <div class="cart__summary-item tax-note cart-primary-typography">
+      {% render 'tax-info', has_discounts_enabled: settings.show_add_discount_code %}
+    </div>
+  </div>
+</div>
+
+{%- comment -%} Check if cart has addon pricing that needs custom checkout {%- endcomment -%}
+{%- assign has_addon_pricing = false -%}
+{%- for item in cart.items -%}
+  {%- for property in item.properties -%}
+    {%- if property.first == '_addon_price' -%}
+      {%- assign has_addon_pricing = true -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if has_addon_pricing -%}{%- break -%}{%- endif -%}
+{%- endfor -%}
+
+<div class="cart__ctas">
+  {%- comment -%} B2B customers always use custom checkout {%- endcomment -%}
+  {% if is_b2b_user %}
+    {% render 'b2b-checkout-button' %}
+    
+    <details style="margin-top: 0.75rem;">
+      <summary style="font-size: 0.75rem; color: #6b7280; cursor: pointer;">
+        Or use standard checkout (retail prices)
+      </summary>
+      <button
+        type="submit"
+        id="checkout"
+        class="cart__checkout-button button"
+        name="checkout"
+        {% if cart == empty %}disabled{% endif %}
+        form="cart-form"
+        style="margin-top: 0.5rem; opacity: 0.7;"
+      >
+        {{ 'content.checkout' | t }} (Retail)
+      </button>
+    </details>
+    
+  {% elsif has_addon_pricing %}
+    {%- comment -%} Regular customer with addons: Use custom checkout to preserve addon pricing {%- endcomment -%}
+    <button
+      type="button"
+      id="addon-checkout-btn"
+      class="cart__checkout-button button"
+      {% if cart == empty %}disabled{% endif %}
+      onclick="handleAddonCheckout()"
+    >
+      {{ 'content.checkout' | t }}
+    </button>
+    <p style="font-size: 0.7rem; color: #6b7280; margin-top: 0.5rem; text-align: center;">
+      Add-on options will be applied at checkout
+    </p>
+    
+  {% elsif has_savings %}
+    <button
+      type="button"
+      id="discount-checkout-btn"
+      class="cart__checkout-button button"
+      {% if cart == empty %}disabled{% endif %}
+      onclick="handleDiscountCheckout()"
+    >
+      {{ 'content.checkout' | t }}
+    </button>
+
+  {% else %}
+    {%- comment -%} Regular customer without addons: Standard checkout {%- endcomment -%}
+    <button
+      type="submit"
+      id="checkout"
+      class="cart__checkout-button button"
+      name="checkout"
+      {% if cart == empty %}disabled{% endif %}
+      form="cart-form"
+    >
+      {{ 'content.checkout' | t }}
+    </button>
+  {% endif %}
+
+  {% if additional_checkout_buttons and settings.show_accelerated_checkout_buttons %}
+    {% unless has_addon_pricing or has_savings or is_b2b_user %}
+      <div
+        class="
+          additional-checkout-buttons
+          {% if accelerated_checkout_buttons_layout == 'vertical' %}additional-checkout-buttons--vertical{% endif %}
+        "
+      >
+        {{ content_for_additional_checkout_buttons }}
+      </div>
+    {% endunless %}
+  {% endif %}
+</div>
+
+{% stylesheet %}
+  .cart-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-sm);
+    border-block: 1px solid var(--color-border);
+    padding-block: var(--padding-sm);
+    margin-block-start: var(--margin-3xs);
+  }
+
+  .cart-actions__divider {
+    border-block-start: 1px solid var(--color-border);
+  }
+
+  .cart__summary-totals:not(:has(.cart-actions)) {
+    margin-block-start: var(--margin-3xs);
+    border-block-start: 1px solid var(--color-border);
+    padding-block-start: var(--margin-xl);
+  }
+
+  .cart__installments {
+    color: var(--color-foreground);
+  }
+{% endstylesheet %}
+
+{% if has_addon_pricing %}
+<script>
+async function handleAddonCheckout() {
+  const btn = document.getElementById('addon-checkout-btn');
+  if (!btn) return;
+  
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+  
+  try {
+    // Build line items from cart
+    const cartItems = [
+      {% for item in cart.items %}
+      {
+        variantId: "{{ item.variant_id }}",
+        quantity: {{ item.quantity }},
+        properties: {
+          {% for property in item.properties %}
+          "{{ property.first | escape }}": "{{ property.last | escape }}"{% unless forloop.last %},{% endunless %}
+          {% endfor %}
+        }
+      }{% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    ];
+    
+    const payload = {
+      lineItems: cartItems,
+      {% if customer %}
+      customerId: "{{ customer.id }}",
+      {% endif %}
+      note: "Order with add-on options"
+    };
+    
+    console.log('[Addon Checkout] Sending payload:', JSON.stringify(payload, null, 2));
+    
+    const response = await fetch('https://skm-inventory-api.miaotingshuo.workers.dev/checkout/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    console.log('[Addon Checkout] Response status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Addon Checkout] Error response:', errorText);
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
+    }
+    
+    const result = await response.json();
+    console.log('[Addon Checkout] Result:', result);
+    
+    if (result.success && result.data?.checkoutUrl) {
+      // Clear cart before redirecting
+      await fetch('/cart/clear.js', { method: 'POST' });
+      
+      // Also clear the localStorage saved cart for this customer
+      {% if customer %}
+        localStorage.removeItem('skm_customer_cart_{{ customer.id }}');
+        console.log('[Addon Checkout] Cleared saved cart from localStorage');
+      {% endif %}
+      
+      // Set a flag to indicate checkout was initiated
+      sessionStorage.setItem('skm_checkout_initiated', 'true');
+      
+      // Redirect to the draft order checkout
+      window.location.href = result.data.checkoutUrl;
+    } else {
+      throw new Error(result.error || 'Failed to create checkout');
+    }
+  } catch (error) {
+    console.error('Checkout error:', error);
+    alert('Error creating checkout: ' + error.message + '\n\nPlease try again or contact support.');
+    btn.disabled = false;
+    btn.textContent = '{{ 'content.checkout' | t }}';
+  }
+}
+</script>
+{% endif %}
+
+{% if has_savings and has_addon_pricing == false and is_b2b_user == false %}
+<script>
+async function handleDiscountCheckout() {
+  const btn = document.getElementById('discount-checkout-btn');
+  if (!btn) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+
+  try {
+    const cartResponse = await fetch('/cart.js');
+    const cart = await cartResponse.json();
+
+    if (!cart.items || cart.items.length === 0) {
+      alert('Your cart is empty');
+      return;
+    }
+
+    const lineItems = cart.items.map(item => ({
+      variantId: item.variant_id.toString(),
+      quantity: item.quantity,
+      properties: item.properties || {}
+    }));
+
+    const payload = {
+      lineItems,
+      note: 'Sale pricing checkout'
+    };
+
+    {% if customer %}
+    const customerId = {{ customer.id | json }};
+    {% else %}
+    const customerId = null;
+    {% endif %}
+    if (customerId) {
+      payload.customerId = customerId.toString();
+    }
+
+    console.log('[Discount Checkout] Sending payload:', JSON.stringify(payload, null, 2));
+
+    const response = await fetch('https://skm-inventory-api.miaotingshuo.workers.dev/checkout/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Discount Checkout] Error response:', errorText);
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('[Discount Checkout] Result:', result);
+
+    if (result.success && result.data?.checkoutUrl) {
+      await fetch('/cart/clear.js', { method: 'POST' });
+      
+      // Also clear the localStorage saved cart for this customer
+      {% if customer %}
+        localStorage.removeItem('skm_customer_cart_{{ customer.id }}');
+        console.log('[Discount Checkout] Cleared saved cart from localStorage');
+      {% endif %}
+      
+      // Set a flag to indicate checkout was initiated
+      sessionStorage.setItem('skm_checkout_initiated', 'true');
+      
+      window.location.href = result.data.checkoutUrl;
+    } else {
+      throw new Error(result.error || 'Failed to create checkout');
+    }
+  } catch (error) {
+    console.error('Checkout error:', error);
+    alert('Error creating checkout: ' + error.message + '\n\nPlease try again or contact support.');
+    btn.disabled = false;
+    btn.textContent = '{{ 'content.checkout' | t }}';
+  }
+}
+</script>
+{% endif %}

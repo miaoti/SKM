@@ -1,0 +1,143 @@
+<!-- Refund Modal -->
+<div id="refund-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div class="p-5 border-b border-gray-100">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900">Process Refund</h3>
+        <button id="btn-close-refund" class="p-1 text-gray-400 hover:text-gray-600 rounded">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+    </div>
+    
+    <div class="p-5">
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <!-- Left Column: Items & Options -->
+        <div class="lg:col-span-3 space-y-4">
+          <!-- Fulfillment Status Badge -->
+          <div id="refund-fulfillment-status" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+            Fulfilled
+          </div>
+          
+          <!-- Info Banner -->
+          <div class="flex items-start gap-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+            <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>Once an item is refunded, you can't start a return for it.</span>
+          </div>
+          
+          <!-- Line Items -->
+          <div id="refund-line-items" class="space-y-3">
+            <!-- Will be populated dynamically -->
+          </div>
+          
+          <!-- Reason for Refund -->
+          <div class="border-t border-gray-100 pt-4">
+            <label class="text-sm font-medium text-gray-900 mb-2 block">Reason for refund</label>
+            <select id="refund-reason" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg">
+              <option value="">Select reason...</option>
+              <option value="Customer Return">Customer Return</option>
+              <option value="Damaged Item">Damaged Item</option>
+              <option value="Wrong Item Shipped">Wrong Item Shipped</option>
+              <option value="Customer Changed Mind">Customer Changed Mind</option>
+              <option value="Duplicate Order">Duplicate Order</option>
+              <option value="Fraudulent Order">Fraudulent Order</option>
+              <option value="Other">Other</option>
+            </select>
+            <input type="text" id="refund-reason-notes" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg mt-2" placeholder="Additional notes (optional)...">
+            <p class="text-xs text-gray-400 mt-1">Only you and other staff can see this reason</p>
+          </div>
+        </div>
+        
+        <!-- Right Column: Summary -->
+        <div class="lg:col-span-2 space-y-4">
+          <div class="bg-gray-50 rounded-lg p-4 space-y-4">
+            <h4 class="text-sm font-semibold text-gray-900">Summary</h4>
+            
+            <p id="refund-items-selected" class="text-sm text-gray-600">No items selected</p>
+            
+            <!-- Refund Method -->
+            <div>
+              <label class="text-xs text-gray-600 mb-1 block">Refund method</label>
+              <select id="refund-method" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg bg-white">
+                <option value="original">Original payment method</option>
+                <option value="store_credit">Store credit</option>
+              </select>
+            </div>
+            
+            <!-- Refund Amount -->
+            <div>
+              <label class="text-xs text-gray-600 mb-1 block">Refund amount</label>
+              <p id="refund-payment-info" class="text-xs text-gray-500 mb-2"></p>
+              <div class="flex items-center gap-2">
+                <span class="text-gray-500">$</span>
+                <input type="number" id="refund-amount" class="flex-1 h-9 px-3 text-sm border border-gray-200 rounded-lg" value="0.00" step="0.01" min="0">
+              </div>
+              <p id="refund-available" class="text-xs text-gray-500 mt-1"></p>
+            </div>
+            
+            <!-- Shipping Refund -->
+            <div>
+              <label class="text-xs text-gray-600 mb-1 block">Shipping refund</label>
+              <div class="flex items-center gap-2">
+                <span class="text-gray-500">$</span>
+                <input type="number" id="refund-shipping" class="flex-1 h-9 px-3 text-sm border border-gray-200 rounded-lg" value="0.00" step="0.01" min="0">
+              </div>
+            </div>
+            
+            <!-- Restock Type Selector -->
+            <div class="space-y-2">
+              <label class="text-sm font-medium text-gray-700">Restock type</label>
+              <select id="refund-restock-type" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg">
+                <option value="return">Return to inventory (restock items)</option>
+                <option value="no_restock">Don't restock (keep inventory as-is)</option>
+                <option value="cancel">Cancel order (restock and cancel)</option>
+              </select>
+              <p id="restock-type-description" class="text-xs text-gray-500">Items will be returned to inventory at the original location.</p>
+            </div>
+            
+            <!-- Notify Customer -->
+            <div class="flex items-center gap-2">
+              <input type="checkbox" id="refund-notify" class="rounded border-gray-300 text-red-600 focus:ring-red-500" checked>
+              <label for="refund-notify" class="text-sm text-gray-700">Send notification once refund is finalized</label>
+            </div>
+            
+            <!-- Calculated Summary (shown after calculation) -->
+            <div id="refund-calculation-summary" class="hidden border-t border-gray-200 pt-3 space-y-2">
+              <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Subtotal</span>
+                <span id="refund-calc-subtotal" class="text-gray-900">$0.00</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Tax</span>
+                <span id="refund-calc-tax" class="text-gray-900">$0.00</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Shipping</span>
+                <span id="refund-calc-shipping" class="text-gray-900">$0.00</span>
+              </div>
+              <div class="flex justify-between text-sm font-semibold border-t border-gray-200 pt-2">
+                <span class="text-gray-900">Total refund</span>
+                <span id="refund-calc-total" class="text-gray-900">$0.00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="p-5 border-t border-gray-100 flex justify-between items-center">
+      <button id="btn-cancel-refund" class="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+      <div class="flex gap-2">
+        <button id="btn-calculate-refund" class="h-9 px-4 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Calculate</button>
+        <button id="btn-confirm-refund" class="h-9 px-4 text-sm font-medium text-white bg-gray-400 rounded-lg cursor-not-allowed" disabled>
+          <span id="refund-btn-text">Refund $0.00</span>
+          <span id="refund-btn-loading" class="hidden">
+            <svg class="animate-spin h-4 w-4 inline" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            Processing...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

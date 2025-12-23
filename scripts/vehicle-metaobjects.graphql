@@ -1,0 +1,43 @@
+# Create metaobject definition for vehicles
+mutation CreateVehicleDefinition {
+  metaobjectDefinitionCreate(
+    definition: {
+      name: "Vehicle"
+      type: "vehicle"
+      fieldDefinitions: [
+        { name: "Year", key: "year", type: "integer", required: true, validations: [{ name: "min", value: "1900" }] }
+        { name: "Make", key: "make", type: "single_line_text_field", required: true }
+        { name: "Model", key: "model", type: "single_line_text_field", required: true }
+        { name: "Submodel", key: "submodel", type: "single_line_text_field", required: false }
+        { name: "Engine", key: "engine", type: "single_line_text_field", required: false }
+      ]
+      capabilities: { admin: true, storefront: true, publishable: true }
+    }
+  ) {
+    metaobjectDefinition {
+      id
+      name
+      type
+    }
+    userErrors { field message }
+  }
+}
+
+# Create a vehicle metaobject entry example
+mutation CreateVehicleExample {
+  metaobjectCreate(
+    metaobject: {
+      type: "vehicle"
+      fields: [
+        { key: "year", value: "2021" }
+        { key: "make", value: "Porsche" }
+        { key: "model", value: "911" }
+        { key: "submodel", value: "Carrera S" }
+        { key: "engine", value: "3.0L Twin-Turbo H6" }
+      ]
+    }
+  ) {
+    metaobject { id handle type }
+    userErrors { field message }
+  }
+}

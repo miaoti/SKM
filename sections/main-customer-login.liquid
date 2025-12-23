@@ -1,0 +1,184 @@
+<div class="min-h-[80vh] flex items-center justify-center bg-white px-4 py-24">
+  <div class="w-full max-w-md">
+    
+    <!-- Header -->
+    <div class="text-center mb-12">
+      <h1 class="text-3xl font-bold uppercase tracking-tighter text-[#111111] mb-2">
+        Access Terminal
+      </h1>
+      <p class="text-gray-500 uppercase tracking-widest text-xs">
+        Secure Entry // My Garage
+      </p>
+    </div>
+
+    <!-- Login Form Container -->
+    <div id="login-form-container" class="bg-white">
+      
+      <!-- Activation Message (from Register redirect) -->
+      <div id="activation-message" style="display: none;" class="mb-6 bg-blue-50 border border-blue-200 p-4 text-blue-800 text-sm font-medium flex items-start gap-3">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 mt-0.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+        </svg>
+        <div>
+          <p class="uppercase tracking-wide font-bold mb-1">Action Required</p>
+          <p>We've sent an activation link to your email. Please verify your account before logging in.</p>
+        </div>
+      </div>
+
+      <!-- Error Handling (Red Alert Box) -->
+      {%- if form.errors -%}
+        <div class="mb-6 bg-[#CC0000] p-4 text-white text-sm font-medium flex items-start gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 mt-0.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+          <div>
+            <p class="uppercase tracking-wide font-bold mb-1">Access Denied</p>
+            {{ form.errors | default_errors }}
+            <p class="mt-2 text-xs opacity-80 border-t border-white/20 pt-2">
+              If you just registered, ensure you have activated your account via the email we sent you.
+            </p>
+          </div>
+        </div>
+      {%- endif -%}
+
+      {% form 'customer_login' %}
+        <!-- Redirect to Account Dashboard after login -->
+        <input type="hidden" name="return_to" value="{{ routes.account_url }}">
+
+        <div class="space-y-6">
+          
+          <!-- Email Field -->
+          <div class="relative group">
+            <input 
+              id="CustomerEmail" 
+              type="email" 
+              name="customer[email]" 
+              class="peer w-full h-12 bg-gray-50 border-b-2 border-gray-200 text-[#111111] placeholder-transparent focus:outline-none focus:border-[#CC0000] focus:bg-white transition-all px-4" 
+              placeholder="Email" 
+              autocomplete="email" 
+              required
+            >
+            <label 
+              for="CustomerEmail" 
+              class="absolute left-4 -top-3.5 text-xs text-gray-500 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-focus:-top-3.5 peer-focus:text-[#CC0000] peer-focus:text-xs font-bold uppercase tracking-wide"
+            >
+              Email Address
+            </label>
+          </div>
+
+          <!-- Password Field -->
+          <div class="relative group">
+            <input 
+              id="CustomerPassword" 
+              type="password" 
+              name="customer[password]" 
+              class="peer w-full h-12 bg-gray-50 border-b-2 border-gray-200 text-[#111111] placeholder-transparent focus:outline-none focus:border-[#CC0000] focus:bg-white transition-all px-4" 
+              placeholder="Password" 
+              autocomplete="current-password" 
+              required
+            >
+            <label 
+              for="CustomerPassword" 
+              class="absolute left-4 -top-3.5 text-xs text-gray-500 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-focus:-top-3.5 peer-focus:text-[#CC0000] peer-focus:text-xs font-bold uppercase tracking-wide"
+            >
+              Password
+            </label>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" class="w-full h-14 bg-[#111111] hover:bg-[#CC0000] text-white font-bold uppercase tracking-widest transition-colors duration-300 flex items-center justify-center gap-2 group/btn">
+            <span>Initialize Session</span>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 group-hover/btn:translate-x-1 transition-transform">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </button>
+
+          <!-- Footer Links -->
+          <div class="flex items-center justify-between text-xs uppercase tracking-wider font-bold mt-8">
+            <a href="{{ routes.account_register_url }}" class="text-gray-500 hover:text-[#111111] transition-colors">
+              Start New Build
+            </a>
+            <button type="button" onclick="document.getElementById('recover-password-container').style.display='block'; document.getElementById('login-form-container').style.display='none';" class="text-gray-500 hover:text-[#CC0000] transition-colors">
+              Reset Protocol
+            </button>
+          </div>
+
+        </div>
+      {% endform %}
+    </div>
+
+    <!-- Recover Password Container (Hidden by default) -->
+    <div id="recover-password-container" style="display: none;" class="bg-white">
+      
+      <div class="mb-8">
+        <h2 class="text-lg font-bold uppercase tracking-wide text-[#111111] mb-2">Reset Credentials</h2>
+        <p class="text-sm text-gray-500">Enter your email to receive recovery instructions.</p>
+      </div>
+
+      {% form 'recover_customer_password' %}
+        
+        {% if form.posted_successfully? %}
+           <div class="mb-6 bg-green-50 border border-green-200 p-4 text-green-800 text-sm font-medium flex items-start gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p>Recovery protocol initiated. Check your inbox.</p>
+           </div>
+        {% endif %}
+
+        {%- if form.errors -%}
+          <div class="mb-6 bg-[#CC0000] p-4 text-white text-sm font-medium flex items-start gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 mt-0.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            <div>
+              {{ form.errors | default_errors }}
+            </div>
+          </div>
+        {%- endif -%}
+
+        <div class="space-y-6">
+           <div class="relative group">
+            <input 
+              id="RecoverEmail" 
+              type="email" 
+              name="email" 
+              class="peer w-full h-12 bg-gray-50 border-b-2 border-gray-200 text-[#111111] placeholder-transparent focus:outline-none focus:border-[#CC0000] focus:bg-white transition-all px-4" 
+              placeholder="Email" 
+              required
+            >
+            <label 
+              for="RecoverEmail" 
+              class="absolute left-4 -top-3.5 text-xs text-gray-500 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-focus:-top-3.5 peer-focus:text-[#CC0000] peer-focus:text-xs font-bold uppercase tracking-wide"
+            >
+              Email Address
+            </label>
+          </div>
+
+          <button type="submit" class="w-full h-14 bg-[#111111] hover:bg-[#CC0000] text-white font-bold uppercase tracking-widest transition-colors duration-300">
+            Send Reset Link
+          </button>
+
+          <button type="button" onclick="document.getElementById('recover-password-container').style.display='none'; document.getElementById('login-form-container').style.display='block';" class="w-full text-center text-xs uppercase tracking-wider font-bold text-gray-500 hover:text-[#111111] transition-colors">
+            Return to Login
+          </button>
+        </div>
+      {% endform %}
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // Check url hash to open recover password if needed
+  if (window.location.hash === '#recover') {
+    document.getElementById('recover-password-container').style.display = 'block';
+    document.getElementById('login-form-container').style.display = 'none';
+  }
+  
+  // Check url params for activation status
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('status') === 'verification_sent') {
+    document.getElementById('activation-message').style.display = 'flex';
+  }
+</script>

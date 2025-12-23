@@ -1,0 +1,72 @@
+{{ 'ymm.css' | asset_url | stylesheet_tag }}
+
+<div class="hero-ymm-section relative h-screen w-full overflow-hidden" data-section-id="{{ section.id }}">
+  {%- if section.settings.video != blank -%}
+    <div class="absolute inset-0 z-0">
+      {{ section.settings.video | video_tag: autoplay: true, loop: true, muted: true, controls: false, class: "w-full h-full object-cover" }}
+      <div class="absolute inset-0 bg-black/40"></div>
+    </div>
+  {%- else -%}
+    <div class="absolute inset-0 z-0 bg-gray-900">
+      {{ 'lifestyle-1' | placeholder_svg_tag: 'w-full h-full object-cover opacity-50' }}
+    </div>
+  {%- endif -%}
+
+  {%- liquid
+    assign sf_token = section.settings.storefront_access_token | default: 'c9e546201d3f991f9c3f576e0d1cf4ee'
+  -%}
+
+  <div class="relative z-10 flex flex-col items-center justify-center h-full px-4 text-center">
+    {% if sf_token == blank %}
+      <div class="bg-red-500 text-white p-4 mb-4 rounded font-bold">
+        ⚠️ CONFIGURATION REQUIRED: Please add a Storefront Access Token in the section settings.
+      </div>
+    {% endif %}
+    <h1 class="text-5xl md:text-7xl font-bold text-white mb-8 tracking-tight uppercase" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">
+      {{ section.settings.heading | default: "UNLEASH THE SOUND" }}
+    </h1>
+
+    {% render 'hero-ymm-search', section: section, is_modal: false %}
+  </div>
+
+  {% comment %} 
+    The config is now inside the snippet, but we keep the script reference here or in the snippet.
+    The snippet includes 'ymm.js' only if not modal, or we rely on main theme loading it.
+  {% endcomment %}
+</div>
+
+{% schema %}
+{
+  "name": "Hero YMM Centerpiece",
+  "settings": [
+    {
+      "type": "video",
+      "id": "video",
+      "label": "Background Video"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "UNLEASH THE SOUND"
+    },
+    {
+      "type": "text",
+      "id": "collection_handle",
+      "label": "Destination Collection",
+      "default": "all"
+    },
+    {
+      "type": "text",
+      "id": "storefront_access_token",
+      "label": "Storefront Access Token",
+      "default": "c9e546201d3f991f9c3f576e0d1cf4ee"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Hero YMM Centerpiece"
+    }
+  ]
+}
+{% endschema %}

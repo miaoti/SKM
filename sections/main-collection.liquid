@@ -1,0 +1,624 @@
+
+
+<script
+  src="{{ 'results-list.js' | asset_url }}"
+  type="module"
+  fetchpriority="low"
+></script>
+
+{% javascript %}
+  const url = new URL(window.location.href);
+  if (url.hash) {
+    document.addEventListener(
+      'DOMContentLoaded',
+      () => {
+        const card = document.getElementById(url.hash.slice(1));
+        if (card) {
+          card.scrollIntoView({ behavior: 'instant' });
+        }
+      },
+      { once: true }
+    );
+  }
+{% endjavascript %}
+
+{% comment %} We always render this full-width, as the child blocks have width: page/full settings {% endcomment %}
+<div class="section-background color-{{ section.settings.color_scheme }}"></div>
+
+<!-- Reset Vehicle Button - OUTSIDE the grid -->
+<div class="ymm-vehicle-selector">
+  <button onclick="document.getElementById('ymm-reset-modal').showModal()" class="ymm-vehicle-button">
+    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+    </svg>
+    <span>Select Different Vehicle</span>
+  </button>
+</div>
+
+<!-- YMM Reset Modal -->
+<dialog id="ymm-reset-modal" class="ymm-modal-dialog">
+  <div class="ymm-modal-content" data-section-id="{{ section.id }}-modal">
+    <div class="ymm-modal-header">
+      <h3 class="ymm-modal-title">
+        <span class="ymm-modal-indicator"></span>
+        Configure Vehicle
+      </h3>
+      <button onclick="document.getElementById('ymm-reset-modal').close()" class="ymm-modal-close">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div class="ymm-modal-body">
+      {% render 'hero-ymm-search', is_modal: true %}
+    </div>
+  </div>
+</dialog>
+<script src="{{ 'ymm.js' | asset_url }}" defer="defer"></script>
+
+<results-list
+  class="section product-grid-container color-{{ section.settings.color_scheme }}"
+  style="--padding-block-start: {{ section.settings.padding-block-start }}px; --padding-block-end: {{ section.settings.padding-block-end }}px;"
+  section-id="{{ section.id }}"
+  infinite-scroll="{{ section.settings.enable_infinite_scroll }}"
+>
+  {% render 'skip-to-content-link', href: '#ResultsList', text: 'accessibility.skip_to_results_list' %}
+
+  <div
+    class="collection-wrapper grid gap-style{% if section.settings.product_grid_width == 'full-width' %} collection-wrapper--grid-full-width{% endif %}"
+  >
+
+    {% content_for 'block',
+      type: 'filters',
+      id: 'filters',
+      results: collection,
+      results_size: collection.products_count
+    %}
+
+    {% assign products_per_page = 24 %}
+
+    {% if section.settings.enable_infinite_scroll == false %}
+      {% assign products_per_page = section.settings.products_per_page %}
+    {% endif %}
+
+    {% paginate collection.products by products_per_page %}
+      {%- comment -%} Check if YMM filter is active {%- endcomment -%}
+      {%- assign ymm_active = false -%}
+      {%- for filter in collection.filters -%}
+        {%- if filter.param_name == 'filter.p.m.custom.fits_vehicles' and filter.active_values.size > 0 -%}
+          {%- assign ymm_active = true -%}
+          {%- break -%}
+        {%- endif -%}
+      {%- endfor -%}
+
+      <div id="ymm-filter-status" data-active="{{ ymm_active }}" data-count="{{ collection.products_count }}"></div>
+      
+      <!-- No Results Message (Valid Search, No Products) -->
+      <div id="ymm-no-results" class="hidden py-16 md:py-32 px-4 text-center" style="grid-column: 1 / -1;">
+        <h2 class="text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">No products found.</h2>
+        <p class="text-sm md:text-base text-gray-600">We don't have any parts for this vehicle configuration yet.</p>
+      </div>
+
+      <!-- Admin Configuration Warning (Invalid Search) -->
+      <div id="ymm-admin-warning" class="hidden py-8 md:py-12 px-4 text-center border border-red-200 rounded-lg bg-red-50 mx-4 md:mx-0 my-4 md:my-8" style="grid-column: 1 / -1;">
+        <h3 class="text-lg md:text-xl font-bold text-red-600 mb-2">Configuration Required</h3>
+        <p class="text-sm md:text-base text-gray-700 mb-4">The vehicle filter is active in the URL but was ignored by Shopify.</p>
+        <div class="text-xs md:text-sm text-gray-600 bg-white p-3 md:p-4 rounded border border-gray-200 inline-block text-left max-w-full overflow-x-auto">
+          <p class="mb-2"><strong>Action Required:</strong></p>
+          <ol class="list-decimal pl-4 md:pl-5 space-y-1">
+            <li>Go to Shopify Admin > <strong>Search & Discovery</strong> App > <strong>Filters</strong>.</li>
+            <li>Click <strong>Add filter</strong>.</li>
+            <li>Select <strong>Product metafields</strong>.</li>
+            <li>Choose <strong>Fits Vehicles</strong> (custom.fits_vehicles).</li>
+            <li>Save.</li>
+          </ol>
+        </div>
+      </div>
+
+      <script>
+        document.addEventListener('DOMContentLoaded', function() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const hasYmmParam = urlParams.has('filter.p.m.custom.fits_vehicles');
+          const isActive = document.getElementById('ymm-filter-status').dataset.active === 'true';
+          const productCount = parseInt(document.getElementById('ymm-filter-status').dataset.count || '0');
+          
+          if (hasYmmParam) {
+            if (productCount === 0) {
+              // Valid search, but no results found
+              const results = document.querySelector('.collection-wrapper');
+              if(results) {
+                 // Target only the real product grid, excluding our custom messages
+                 const grid = results.querySelector('.main-collection-grid') || results;
+                 grid.style.display = 'none';
+              }
+              document.getElementById('ymm-no-results').classList.remove('hidden');
+            } else if (!isActive) {
+              // Results found but filter NOT active = Configuration Error
+              const results = document.querySelector('.collection-wrapper');
+              if(results) {
+                 const grid = results.querySelector('.main-collection-grid') || results;
+                 grid.style.display = 'none';
+              }
+              document.getElementById('ymm-admin-warning').classList.remove('hidden');
+            }
+          }
+        });
+      </script>
+
+      {% capture children %}
+        {% for product in collection.products %}
+          <li
+            id="{{ section.id }}-{{ product.id }}"
+            class="product-grid__item product-grid__item--{{ forloop.index0 }}"
+            data-page="{{ paginate.current_page }}"
+            data-product-id="{{ product.id }}"
+            ref="cards[]"
+          >
+            {% # theme-check-disable %}
+            {% content_for 'block', type: '_product-card', id: 'product-card', closest.product: product %}
+            {% # theme-check-enable %}
+          </li>
+        {% endfor %}
+
+        {% comment %}
+        {%- if ymm_active and paginate.current_page == 1 -%}
+          {%- assign universal_products = collections['universal'].products -%}
+          {%- if universal_products.size > 0 -%}
+             <li class="col-span-full py-8 text-center text-xl font-bold uppercase tracking-wider text-[#CC0000] border-t border-b border-gray-100 my-8">
+                Universal Parts
+             </li>
+             {%- for product in universal_products limit: 4 -%}
+              <li
+                class="product-grid__item"
+                data-product-id="{{ product.id }}"
+              >
+                {% content_for 'block', type: '_product-card', id: 'universal-card', closest.product: product %}
+              </li>
+             {%- endfor -%}
+          {%- endif -%}
+        {%- endif -%}
+        {% endcomment %}
+      {% endcapture %}
+
+      {% render 'product-grid',
+        section: section,
+        children: children,
+        products: collection.products,
+        paginate: paginate,
+        enable_infinite_scroll: section.settings.enable_infinite_scroll
+      %}
+    {% endpaginate %}
+  </div>
+</results-list>
+
+{% stylesheet %}
+  /* YMM Vehicle Selector - Full Width Bar */
+  .ymm-vehicle-selector {
+    width: 100%;
+    background: #111111;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+
+  .ymm-vehicle-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.8);
+    font-family: monospace;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .ymm-vehicle-button:hover {
+    color: white;
+    border-color: #CC0000;
+    box-shadow: 0 0 15px rgba(204, 0, 0, 0.5);
+  }
+
+  @media screen and (min-width: 750px) {
+    .ymm-vehicle-selector {
+      padding: 16px 24px;
+      justify-content: flex-end;
+    }
+
+    .ymm-vehicle-button {
+      font-size: 12px;
+      padding: 10px 20px;
+    }
+  }
+
+  /* YMM Modal Styles */
+  .ymm-modal-dialog {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: auto;
+    width: calc(100% - 2rem);
+    max-width: 900px;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .ymm-modal-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+  }
+
+  .ymm-modal-content {
+    background: #111111;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .ymm-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  .ymm-modal-title {
+    color: white;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+  }
+
+  .ymm-modal-indicator {
+    width: 8px;
+    height: 8px;
+    background: #CC0000;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .ymm-modal-close {
+    color: rgba(255, 255, 255, 0.5);
+    padding: 0.25rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+
+  .ymm-modal-close:hover {
+    color: #CC0000;
+  }
+
+  .ymm-modal-body {
+    padding: 1rem;
+  }
+
+  @media screen and (min-width: 750px) {
+    .ymm-modal-dialog {
+      width: 90%;
+    }
+
+    .ymm-modal-header {
+      padding: 1.5rem;
+    }
+
+    .ymm-modal-title {
+      font-size: 1.125rem;
+    }
+
+    .ymm-modal-body {
+      padding: 2rem;
+    }
+  }
+
+  /* Product Grid Alignment Fix - Ensure all cards align properly */
+  .product-grid__item {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .product-grid__item .product-card,
+  .product-grid__item product-card,
+  .product-grid__item product-card-link {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .product-grid__item .product-card__content,
+  .product-grid__item .product-grid__card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  /* Force consistent image aspect ratio */
+  .product-grid__item .card-gallery,
+  .product-grid__item .product-media-container {
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+  }
+
+  .product-grid__item .card-gallery img,
+  .product-grid__item .product-media-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  /* Push title and price to bottom, align them across cards */
+  .product-grid__item .product-card__content > *:not(.card-gallery):not([class*="gallery"]) {
+    margin-top: auto;
+  }
+
+  .main-collection-grid {
+    grid-column: var(--grid-column--mobile);
+
+    @media screen and (min-width: 750px) {
+      grid-column: var(--grid-column--desktop);
+    }
+  }
+
+  .collection-wrapper {
+    @media screen and (min-width: 750px) {
+      grid-template-columns:
+        1fr repeat(
+          var(--centered-column-number),
+          minmax(0, calc((var(--page-width) - var(--page-margin) * 2) / var(--centered-column-number)))
+        )
+        1fr;
+    }
+  }
+
+  .collection-wrapper:has(.facets-block-wrapper--full-width),
+  .collection-wrapper:has(.collection-wrapper--full-width) {
+    @media screen and (min-width: 750px) {
+      grid-column: 1 / -1;
+      grid-template-columns:
+        minmax(var(--page-margin), 1fr) repeat(
+          var(--centered-column-number),
+          minmax(0, calc((var(--page-width) - var(--page-margin) * 2) / var(--centered-column-number)))
+        )
+        minmax(var(--page-margin), 1fr);
+    }
+  }
+
+  .collection-wrapper:has(.facets--vertical) .facets-block-wrapper--vertical:not(.hidden) ~ .main-collection-grid {
+    @media screen and (min-width: 750px) {
+      grid-column: var(--facets-vertical-col-width) / var(--full-width-column-number);
+    }
+  }
+
+  .collection-wrapper:has(.facets-block-wrapper--vertical:not(#filters-drawer)):has(.collection-wrapper--full-width) {
+    @media screen and (min-width: 750px) {
+      grid-column: 1 / -1;
+      grid-template-columns: 0fr repeat(var(--centered-column-number), minmax(0, 1fr)) 0fr;
+    }
+  }
+
+  :is(.collection-wrapper--full-width, .collection-wrapper--full-width-on-mobile)
+    [product-grid-view='default']
+    .product-grid__card {
+    @media screen and (max-width: 749px) {
+      padding-inline-start: max(var(--padding-xs), var(--padding-inline-start));
+      padding-inline-end: max(var(--padding-xs), var(--padding-inline-end));
+    }
+  }
+
+  :is(.collection-wrapper--full-width, .collection-wrapper--full-width-on-mobile)
+    [product-grid-view='mobile-single']
+    .product-grid__card {
+    @media screen and (max-width: 749px) {
+      padding-inline-start: max(var(--padding-xs), var(--padding-inline-start));
+      padding-inline-end: max(var(--padding-xs), var(--padding-inline-end));
+    }
+  }
+
+  /* Make product media go edge-to-edge by using negative margins */
+  :is(.collection-wrapper--full-width) .card-gallery,
+  :is(.collection-wrapper--full-width-on-mobile) .card-gallery {
+    @media screen and (max-width: 749px) {
+      margin-inline-start: calc(-1 * max(var(--padding-xs), var(--padding-inline-start)));
+      margin-inline-end: calc(-1 * max(var(--padding-xs), var(--padding-inline-end)));
+    }
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "t:names.collection_container",
+  "enabled_on": {
+    "templates": ["collection"]
+  },
+  "settings": [
+    {
+      "type": "select",
+      "id": "layout_type",
+      "label": "t:settings.type",
+      "options": [
+        {
+          "value": "grid",
+          "label": "t:options.grid"
+        },
+        {
+          "value": "organic",
+          "label": "t:options.editorial"
+        }
+      ],
+      "default": "grid"
+    },
+    {
+      "type": "select",
+      "id": "product_card_size",
+      "label": "t:settings.card_size",
+      "options": [
+        {
+          "value": "small",
+          "label": "t:options.small"
+        },
+        {
+          "value": "medium",
+          "label": "t:options.medium"
+        },
+        {
+          "value": "large",
+          "label": "t:options.large"
+        },
+        {
+          "value": "extra-large",
+          "label": "t:options.extra_large"
+        }
+      ],
+      "default": "medium",
+      "visible_if": "{{ section.settings.layout_type == 'grid' }}"
+    },
+    {
+      "type": "select",
+      "id": "mobile_product_card_size",
+      "label": "t:settings.mobile_card_size",
+      "options": [
+        {
+          "value": "small",
+          "label": "t:options.small"
+        },
+        {
+          "value": "large",
+          "label": "t:options.large"
+        }
+      ],
+      "default": "small"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_infinite_scroll",
+      "label": "t:settings.auto_load_products",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "products_per_page",
+      "label": "t:settings.products_per_page",
+      "min": 8,
+      "max": 36,
+      "step": 4,
+      "default": 24,
+      "visible_if": "{{ section.settings.enable_infinite_scroll == false }}"
+    },
+    {
+      "type": "header",
+      "content": "t:content.layout"
+    },
+    {
+      "type": "select",
+      "id": "product_grid_width",
+      "label": "t:settings.width",
+      "options": [
+        {
+          "value": "centered",
+          "label": "t:options.page"
+        },
+        {
+          "value": "full-width",
+          "label": "t:options.full"
+        }
+      ],
+      "default": "centered"
+    },
+    {
+      "type": "checkbox",
+      "id": "full_width_on_mobile",
+      "label": "t:settings.full_width_on_mobile",
+      "default": true,
+      "visible_if": "{{ section.settings.product_grid_width != 'full-width' }}"
+    },
+    {
+      "type": "range",
+      "id": "columns_gap_horizontal",
+      "label": "t:settings.horizontal_gap",
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "columns_gap_vertical",
+      "label": "t:settings.vertical_gap",
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "padding-inline-start",
+      "label": "t:settings.left_padding",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding-inline-end",
+      "label": "t:settings.right_padding",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "t:content.section_layout"
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:settings.color_scheme",
+      "default": "scheme-1"
+    },
+    {
+      "type": "range",
+      "id": "padding-block-start",
+      "label": "t:settings.top_padding",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "padding-block-end",
+      "label": "t:settings.bottom_padding",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    }
+  ],
+  "presets": []
+}
+{% endschema %}

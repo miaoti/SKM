@@ -1,0 +1,1684 @@
+﻿{% layout none %}
+{% comment %}
+  SKM INVENTORY MANAGER - Full Product & Vehicle Management
+{% endcomment %}
+
+{% liquid
+  assign is_admin = false
+  if customer and customer.tags contains 'admin'
+    assign is_admin = true
+  endif
+%}
+
+{% if is_admin %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Inventory Manager | {{ shop.name }}</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } } }</script>
+  
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { animation: spin 0.6s linear infinite; }
+    .tab-active { border-color: #dc2626; color: #dc2626; }
+    
+    /* Mobile Responsive Styles */
+    @media (max-width: 1024px) {
+      .desktop-sidebar { display: none; }
+      .mobile-sidebar { 
+        position: fixed; 
+        top: 56px; 
+        left: 0; 
+        bottom: 0; 
+        z-index: 40; 
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+      }
+      .mobile-sidebar.open { transform: translateX(0); }
+      .sidebar-overlay {
+        position: fixed;
+        inset: 0;
+        top: 56px;
+        background: rgba(0,0,0,0.5);
+        z-index: 35;
+        display: none;
+      }
+      .sidebar-overlay.open { display: block; }
+    }
+    @media (min-width: 1025px) {
+      .mobile-menu-btn { display: none !important; }
+      .mobile-sidebar { display: none; }
+      .sidebar-overlay { display: none !important; }
+    }
+    @media (max-width: 768px) {
+      .header-email { display: none; }
+      .header-account { display: none; }
+    }
+    
+    /* Vehicles Tab Mobile Styles */
+    @media (max-width: 1024px) {
+      .vehicles-grid { grid-template-columns: 1fr !important; }
+      .vehicles-grid > .vehicle-create-panel { display: none; }
+      .vehicles-grid > .vehicle-list-panel { grid-column: span 1 !important; }
+      .vehicle-filters-grid { grid-template-columns: repeat(2, 1fr) !important; }
+      .vehicle-table-wrapper { overflow-x: auto; }
+      .vehicle-table-wrapper table { min-width: 500px; }
+      .btn-create-vehicle-mobile { display: flex !important; }
+    }
+    @media (min-width: 1025px) {
+      .btn-create-vehicle-mobile { display: none !important; }
+    }
+    
+    /* Vehicle Modal Styles */
+    .vehicle-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .vehicle-modal-overlay.open { display: flex; }
+    .vehicle-modal {
+      background: white;
+      border-radius: 1rem;
+      width: 100%;
+      max-width: 400px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    /* Customers Tab Mobile Styles */
+    @media (max-width: 1024px) {
+      .customers-grid { grid-template-columns: 1fr !important; }
+      .customers-grid > div { grid-column: span 1 !important; }
+    }
+  </style>
+  {{ content_for_header }}
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+  
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <div class="h-14 px-4 flex items-center justify-between max-w-[1600px] mx-auto">
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Mobile Menu Button -->
+        <button id="mobile-menu-btn" class="mobile-menu-btn p-2 -ml-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg lg:hidden">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <svg class="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        </svg>
+        <span class="font-semibold text-gray-900 text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">{{ shop.name }}</span>
+        <span class="text-gray-300 hidden sm:inline">|</span>
+        <span class="text-sm text-gray-600 hidden sm:inline">Inventory Manager</span>
+      </div>
+      <div class="flex items-center gap-2 sm:gap-3">
+        <span class="header-email text-sm text-gray-500 hidden md:inline">{{ customer.email }}</span>
+        <a href="/account" class="header-account text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 hover:bg-gray-100 rounded hidden md:inline">Account</a>
+        <a href="{{ routes.account_logout_url }}" class="text-sm text-white bg-gray-800 px-2 sm:px-3 py-1.5 rounded hover:bg-gray-700">Logout</a>
+      </div>
+    </div>
+  </header>
+  
+  <!-- Mobile Sidebar Overlay -->
+  <div id="sidebar-overlay" class="sidebar-overlay"></div>
+  
+  <!-- Vehicle Create Modal (Mobile) -->
+  <div id="vehicle-modal-overlay" class="vehicle-modal-overlay">
+    <div class="vehicle-modal">
+      <div class="p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-gray-900">Create New Vehicle</h2>
+          <button id="btn-close-vehicle-modal" class="p-1 text-gray-400 hover:text-gray-600 rounded">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div class="p-3 bg-gray-50 rounded-lg mb-4">
+          <span class="text-xs text-gray-500">Preview:</span>
+          <p id="vehicle-preview-modal" class="text-sm font-medium text-gray-900">Select options below...</p>
+        </div>
+        <div class="space-y-3 mb-4">
+          <div>
+            <label class="text-xs text-gray-600 mb-1 block">Year *</label>
+            <select id="vm-year" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg">
+              <option value="">Select</option><option value="__new">+ New Year</option>
+            </select>
+            <input type="text" id="vm-year-input" class="hidden w-full h-9 px-2 text-sm border border-gray-200 rounded-lg mt-1" placeholder="e.g., 2024">
+          </div>
+          <div>
+            <label class="text-xs text-gray-600 mb-1 block">Make *</label>
+            <select id="vm-make" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg" disabled>
+              <option value="">Select Year first</option>
+            </select>
+            <input type="text" id="vm-make-input" class="hidden w-full h-9 px-2 text-sm border border-gray-200 rounded-lg mt-1" placeholder="e.g., Audi">
+          </div>
+          <div>
+            <label class="text-xs text-gray-600 mb-1 block">Model *</label>
+            <select id="vm-model" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg" disabled>
+              <option value="">Select Make first</option>
+            </select>
+            <input type="text" id="vm-model-input" class="hidden w-full h-9 px-2 text-sm border border-gray-200 rounded-lg mt-1" placeholder="e.g., RS7">
+          </div>
+          <div>
+            <label class="text-xs text-gray-600 mb-1 block">Submodel</label>
+            <select id="vm-submodel" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg" disabled>
+              <option value="">Select Model first</option>
+            </select>
+            <input type="text" id="vm-submodel-input" class="hidden w-full h-9 px-2 text-sm border border-gray-200 rounded-lg mt-1" placeholder="e.g., Performance">
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button id="btn-create-vehicle-modal" class="flex-1 h-9 px-4 text-sm font-medium text-white bg-red-600 rounded-lg disabled:opacity-50" disabled>Create Vehicle</button>
+          <button id="btn-reset-vehicle-modal" class="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg">Reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Package Management Modal -->
+  <div id="package-modal-overlay" class="vehicle-modal-overlay">
+    <div class="vehicle-modal" style="max-width: 500px;">
+      <div class="p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-gray-900">Manage Packages</h2>
+          <button id="btn-close-package-modal" class="p-1 text-gray-400 hover:text-gray-600 rounded">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        
+        <!-- Tabs: Custom / Carrier -->
+        <div class="flex gap-2 mb-4 border-b border-gray-200">
+          <button class="pkg-tab text-sm font-medium px-3 py-2 border-b-2 border-red-600 text-red-600" data-tab="custom">Custom Packages</button>
+          <button class="pkg-tab text-sm font-medium px-3 py-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="carrier">Carrier Packages</button>
+        </div>
+        
+        <!-- Custom Packages Tab -->
+        <div id="pkg-tab-custom">
+          <!-- Existing Custom Packages -->
+          <div id="custom-packages-list" class="space-y-2 mb-4 max-h-40 overflow-y-auto">
+            <p class="text-sm text-gray-400 text-center py-2">No custom packages</p>
+          </div>
+          
+          <!-- Create New Package Form -->
+          <div class="border-t border-gray-100 pt-4">
+            <h3 class="text-xs font-semibold text-gray-700 mb-3">Create New Package</h3>
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs text-gray-600 mb-1 block">Package Name *</label>
+                <input type="text" id="pkg-name" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg" placeholder="e.g., Small Box">
+              </div>
+              <div>
+                <label class="text-xs text-gray-600 mb-1 block">Package Type *</label>
+                <select id="pkg-type" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg">
+                  <option value="box">Box</option>
+                  <option value="envelope">Envelope</option>
+                  <option value="soft_package">Soft Package</option>
+                </select>
+              </div>
+              <div class="grid grid-cols-4 gap-2">
+                <div>
+                  <label class="text-xs text-gray-600 mb-1 block">Length</label>
+                  <input type="number" step="0.1" id="pkg-length" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg" placeholder="0">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-600 mb-1 block">Width</label>
+                  <input type="number" step="0.1" id="pkg-width" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg" placeholder="0">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-600 mb-1 block">Height</label>
+                  <input type="number" step="0.1" id="pkg-height" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg" placeholder="0">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-600 mb-1 block">Unit</label>
+                  <select id="pkg-size-unit" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg">
+                    <option value="in">in</option>
+                    <option value="cm">cm</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs text-gray-600 mb-1 block">Empty Weight</label>
+                  <input type="number" step="0.1" id="pkg-weight" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg" placeholder="0">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-600 mb-1 block">Weight Unit</label>
+                  <select id="pkg-weight-unit" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg">
+                    <option value="oz">oz</option>
+                    <option value="lb">lb</option>
+                    <option value="g">g</option>
+                    <option value="kg">kg</option>
+                  </select>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="pkg-default" class="rounded border-gray-300 text-red-600 focus:ring-red-500">
+                <label for="pkg-default" class="text-xs text-gray-600">Use as default package</label>
+              </div>
+              <button id="btn-create-package" class="w-full h-9 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg">Create Package</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Carrier Packages Tab -->
+        <div id="pkg-tab-carrier" class="hidden">
+          <div id="carrier-packages-list" class="space-y-2 max-h-64 overflow-y-auto">
+            <p class="text-sm text-gray-400 text-center py-2">Loading carrier packages...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Main Layout -->
+  <div class="flex h-[calc(100vh-56px)] max-w-[1600px] mx-auto">
+    
+    <!-- Desktop Sidebar -->
+    <aside class="desktop-sidebar w-72 bg-white border-r border-gray-200 flex-col flex-shrink-0 hidden lg:flex">
+      <div class="p-4 border-b border-gray-100">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-gray-900">Products</h2>
+          <button id="btn-new-product" class="text-xs text-white bg-red-600 hover:bg-red-700 px-2.5 py-1 rounded">+ New</button>
+        </div>
+        <input type="text" id="product-search" placeholder="Search by title..." class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 mb-2">
+        
+        <!-- YMM Filter -->
+        <details id="ymm-filter-details" class="border border-gray-200 rounded-lg">
+          <summary class="px-3 py-2 text-xs font-medium text-gray-600 cursor-pointer hover:bg-gray-50 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 17h14M7 13h.01M17 13h.01M6 9h12l-1.5-4.5a1 1 0 00-.95-.5H8.45a1 1 0 00-.95.5L6 9z"></path></svg>
+              Filter by Vehicle
+            </span>
+            <span id="ymm-filter-badge" class="hidden bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">Active</span>
+          </summary>
+          <div class="p-2 space-y-2 border-t border-gray-100">
+            <select id="ymm-year" class="w-full h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-red-500">
+              <option value="">All Years</option>
+            </select>
+            <select id="ymm-make" class="w-full h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-red-500">
+              <option value="">All Makes</option>
+            </select>
+            <select id="ymm-model" class="w-full h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-red-500">
+              <option value="">All Models</option>
+            </select>
+            <button id="btn-clear-ymm" class="w-full h-7 text-xs text-gray-600 hover:text-red-600 hover:bg-red-50 rounded border border-gray-200">
+              Clear Filter
+            </button>
+          </div>
+        </details>
+      </div>
+      <div id="product-list" class="flex-1 overflow-y-auto">
+        <div class="flex items-center justify-center h-20">
+          <div class="w-5 h-5 border-2 border-gray-200 border-t-red-600 rounded-full spinner"></div>
+        </div>
+      </div>
+      <div class="p-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500">
+        <span id="product-count">Loading...</span>
+      </div>
+    </aside>
+    
+    <!-- Mobile Sidebar -->
+    <aside id="mobile-sidebar" class="mobile-sidebar w-72 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 lg:hidden">
+      <div class="p-4 border-b border-gray-100">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-gray-900">Products</h2>
+          <button id="btn-new-product-mobile" class="text-xs text-white bg-red-600 hover:bg-red-700 px-2.5 py-1 rounded">+ New</button>
+        </div>
+        <input type="text" id="product-search-mobile" placeholder="Search by title..." class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 mb-2">
+        
+        <!-- YMM Filter Mobile -->
+        <details id="ymm-filter-details-mobile" class="border border-gray-200 rounded-lg">
+          <summary class="px-3 py-2 text-xs font-medium text-gray-600 cursor-pointer hover:bg-gray-50 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 17h14M7 13h.01M17 13h.01M6 9h12l-1.5-4.5a1 1 0 00-.95-.5H8.45a1 1 0 00-.95.5L6 9z"></path></svg>
+              Filter by Vehicle
+            </span>
+            <span id="ymm-filter-badge-mobile" class="hidden bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">Active</span>
+          </summary>
+          <div class="p-2 space-y-2 border-t border-gray-100">
+            <select id="ymm-year-mobile" class="w-full h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-red-500">
+              <option value="">All Years</option>
+            </select>
+            <select id="ymm-make-mobile" class="w-full h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-red-500">
+              <option value="">All Makes</option>
+            </select>
+            <select id="ymm-model-mobile" class="w-full h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-red-500">
+              <option value="">All Models</option>
+            </select>
+            <button id="btn-clear-ymm-mobile" class="w-full h-7 text-xs text-gray-600 hover:text-red-600 hover:bg-red-50 rounded border border-gray-200">
+              Clear Filter
+            </button>
+          </div>
+        </details>
+      </div>
+      <div id="product-list-mobile" class="flex-1 overflow-y-auto">
+        <div class="flex items-center justify-center h-20">
+          <div class="w-5 h-5 border-2 border-gray-200 border-t-red-600 rounded-full spinner"></div>
+        </div>
+      </div>
+      <div class="p-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500">
+        <span id="product-count-mobile">Loading...</span>
+      </div>
+    </aside>
+    
+    <!-- Main Content -->
+    <main class="flex-1 overflow-hidden flex flex-col min-w-0">
+      
+      <!-- Tabs -->
+      <div class="bg-white border-b border-gray-200 px-3 sm:px-6 flex-shrink-0 overflow-x-auto">
+        <div class="flex gap-4 sm:gap-6 h-11 min-w-max">
+          <button class="tab text-sm font-medium text-gray-500 hover:text-gray-900 border-b-2 border-transparent tab-active whitespace-nowrap" data-tab="product">Products</button>
+          <button class="tab text-sm font-medium text-gray-500 hover:text-gray-900 border-b-2 border-transparent whitespace-nowrap" data-tab="orders">Orders</button>
+          <button class="tab text-sm font-medium text-gray-500 hover:text-gray-900 border-b-2 border-transparent whitespace-nowrap" data-tab="vehicles">Vehicles</button>
+          <button class="tab text-sm font-medium text-gray-500 hover:text-gray-900 border-b-2 border-transparent whitespace-nowrap" data-tab="customers">Customers</button>
+          <button class="tab text-sm font-medium text-gray-500 hover:text-gray-900 border-b-2 border-transparent whitespace-nowrap" data-tab="profile">Profile</button>
+        </div>
+      </div>
+      
+      <!-- Tab Content -->
+      <div class="flex-1 overflow-y-auto p-3 sm:p-6">
+        
+        <!-- PROFILE TAB -->
+        {% render 'admin-profile-tab' %}
+        
+        <!-- PRODUCT TAB -->
+        <div id="tab-product">
+          
+          <!-- Empty State -->
+          <div id="product-empty" class="bg-white rounded-xl border border-gray-200 p-16 text-center">
+            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-1">Select a Product</h3>
+            <p class="text-sm text-gray-500 mb-4">Choose from the sidebar or create a new one</p>
+            <button id="btn-new-product-2" class="text-sm text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg">+ Create New Product</button>
+          </div>
+          
+          <!-- Product Editor -->
+          <div id="product-editor" class="hidden space-y-4 sm:space-y-6">
+            
+            <!-- Header -->
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div class="min-w-0">
+                <h1 id="editor-title" class="text-lg sm:text-xl font-semibold text-gray-900 truncate">Product Name</h1>
+                <p id="editor-handle" class="text-sm text-gray-500 truncate">/products/handle</p>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <select id="editor-status" class="h-9 px-3 text-sm border border-gray-200 rounded-lg">
+                  <option value="ACTIVE">Active</option>
+                  <option value="DRAFT">Draft</option>
+                  <option value="ARCHIVED">Archived</option>
+                </select>
+                <button id="btn-save-product" class="h-9 px-3 sm:px-4 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg flex items-center gap-2">
+                  <span class="hidden sm:inline">Save Changes</span>
+                  <span class="sm:hidden">Save</span>
+                  <svg id="save-spinner" class="hidden w-4 h-4 spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                </button>
+                <button id="btn-delete-product" class="h-9 px-3 text-sm text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded-lg">Delete</button>
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              
+              <!-- Left Column: Basic Info & Description -->
+              <div class="lg:col-span-2 space-y-4 sm:space-y-6">
+                
+                <!-- Basic Info -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-4">Basic Information</h2>
+                  <div class="space-y-4">
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Title</label>
+                      <input type="text" id="edit-title" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500">
+                    </div>
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Description</label>
+                      <textarea id="edit-description" rows="6" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 resize-none"></textarea>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">Vendor</label>
+                        <input type="text" id="edit-vendor" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500">
+                      </div>
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">Product Type</label>
+                        <input type="text" id="edit-type" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500">
+                      </div>
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">Tags (comma separated)</label>
+                        <input type="text" id="edit-tags" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Media -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-gray-900">Media</h2>
+                    <button id="btn-add-media" class="text-xs text-red-600 hover:text-red-700 font-medium">+ Add Media</button>
+                  </div>
+                  <div id="media-grid" class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
+                    <div class="aspect-square bg-gray-50 border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center text-gray-400 text-xs">No media</div>
+                  </div>
+                  
+                  <!-- Media Upload Panel -->
+                  <div id="media-upload" class="hidden mt-4 p-4 bg-gray-50 rounded-lg space-y-4">
+                    
+                    <!-- File Upload -->
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-2 block">Upload Files</label>
+                      <div id="media-dropzone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-red-400 hover:bg-red-50 transition-colors">
+                        <svg class="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p class="text-sm text-gray-600">Drag & drop images/videos here</p>
+                        <p class="text-xs text-gray-400 mt-1">or click to browse</p>
+                        <input type="file" id="media-file-input" multiple accept="image/*,video/*" class="hidden">
+                      </div>
+                      <div id="media-upload-progress" class="hidden mt-3">
+                        <div class="flex items-center justify-between text-xs text-gray-600 mb-1">
+                          <span id="upload-filename">Uploading...</span>
+                          <span id="upload-percent">0%</span>
+                        </div>
+                        <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div id="upload-bar" class="h-full bg-red-600 transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- OR Divider -->
+                    <div class="flex items-center gap-3">
+                      <div class="flex-1 h-px bg-gray-200"></div>
+                      <span class="text-xs text-gray-400">OR</span>
+                      <div class="flex-1 h-px bg-gray-200"></div>
+                    </div>
+                    
+                    <!-- URL Input -->
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Add from URL</label>
+                      <div class="flex gap-2">
+                        <input type="text" id="media-url" placeholder="https://..." class="flex-1 h-9 px-3 text-sm border border-gray-200 rounded-lg">
+                        <button id="btn-upload-url" class="h-9 px-3 text-sm text-white bg-gray-800 rounded-lg hover:bg-gray-700">Add</button>
+                      </div>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                      <button id="btn-cancel-media" class="h-9 px-3 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100">Cancel</button>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Vehicle Fitment -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-4">Vehicle Fitment</h2>
+                  
+                  <div class="mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                      <label class="text-xs font-medium text-gray-600">Current Fitments</label>
+                      <span id="current-fitments-count" class="text-xs text-gray-400">0 vehicles</span>
+                    </div>
+                    <div id="current-fitments" class="max-h-32 overflow-y-auto flex flex-wrap gap-2 p-2 border border-gray-100 rounded-lg bg-gray-50">
+                      <span class="text-sm text-gray-400">No fitments</span>
+                    </div>
+                  </div>
+                  
+                  <div class="border-t border-gray-100 pt-4">
+                    <label class="text-xs font-medium text-gray-600 mb-2 block">Add Vehicles</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                      <select id="fit-year" class="h-9 px-2 text-sm border border-gray-200 rounded-lg"><option value="">Year</option></select>
+                      <select id="fit-make" class="h-9 px-2 text-sm border border-gray-200 rounded-lg"><option value="">Make</option></select>
+                      <select id="fit-model" class="h-9 px-2 text-sm border border-gray-200 rounded-lg"><option value="">Model</option></select>
+                      <select id="fit-submodel" class="h-9 px-2 text-sm border border-gray-200 rounded-lg"><option value="">Submodel</option></select>
+                    </div>
+                    <div id="vehicle-checkboxes" class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                      <div class="p-3 text-sm text-gray-400 text-center">Select filters above</div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between">
+                      <span id="fit-count" class="text-xs text-gray-500">0 selected</span>
+                      <button id="btn-add-fitments" class="h-8 px-3 text-xs font-medium text-white bg-red-600 rounded-lg disabled:opacity-50" disabled>Add Selected</button>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Product Options & Variants -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-gray-900">Product Options & Variants</h2>
+                    <button id="btn-add-option" class="text-xs text-red-600 hover:text-red-700 font-medium">+ Add Option</button>
+                  </div>
+                  
+                  <!-- Options Editor -->
+                  <div id="options-editor" class="space-y-3 mb-4">
+                    <p class="text-sm text-gray-400 text-center py-2">No options defined. Add options like "Material" or "Size" to create variants.</p>
+                  </div>
+                  
+                  <!-- Variants Table -->
+                  <div id="variants-section" class="hidden border-t border-gray-100 pt-4">
+                    <div class="flex items-center justify-between mb-3">
+                      <h3 class="text-xs font-semibold text-gray-700">Variants (<span id="variants-count">0</span>)</h3>
+                      <button id="btn-save-variants" class="h-8 px-3 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg">Save Variants</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-sm" id="variants-table">
+                        <thead class="bg-gray-50 text-left">
+                          <tr>
+                            <th class="px-3 py-2 font-medium text-gray-600 text-xs">Variant</th>
+                            <th class="px-3 py-2 font-medium text-gray-600 text-xs w-24">Price</th>
+                            <th class="px-3 py-2 font-medium text-gray-600 text-xs w-24">B2B Price</th>
+                            <th class="px-3 py-2 font-medium text-gray-600 text-xs w-28">Discount</th>
+                            <th class="px-3 py-2 font-medium text-gray-600 text-xs w-28">SKU</th>
+                            <th class="px-3 py-2 font-medium text-gray-600 text-xs w-20">Inventory</th>
+                          </tr>
+                        </thead>
+                        <tbody id="variants-tbody" class="divide-y divide-gray-100">
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Media-Option Mapping -->
+                <div id="media-option-mapping" class="bg-white rounded-xl border border-gray-200 p-5 hidden">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-4">Media-Option Mapping</h2>
+                  <p class="text-xs text-gray-500 mb-3">Tag images with option values to filter them when customers select options.</p>
+                  <div id="media-mapping-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  </div>
+                </div>
+                
+              </div>
+              
+              <!-- Right Column: Pricing & Inventory -->
+              <div class="space-y-4 sm:space-y-6">
+                
+                <!-- Pricing -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-4">Pricing</h2>
+                  <div class="space-y-4">
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Price</label>
+                      <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                        <input type="number" step="0.01" id="edit-price" class="w-full h-10 pl-7 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Compare at Price</label>
+                      <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                        <input type="number" step="0.01" id="edit-compare-price" class="w-full h-10 pl-7 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">B2B Price <span class="text-gray-400 font-normal">(Wholesale)</span></label>
+                      <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                        <input type="number" step="0.01" id="edit-b2b-price" class="w-full h-10 pl-7 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="Leave empty for no B2B price">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Discount Price <span class="text-gray-400 font-normal">(Sale)</span></label>
+                      <div class="flex gap-2">
+                        <div class="relative flex-1">
+                          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                          <input type="number" step="0.01" id="edit-discount-price" class="w-full h-10 pl-7 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="Leave empty for no discount">
+                        </div>
+                        <button type="button" id="btn-remove-discount" class="h-10 px-3 text-xs text-red-600 hover:text-white border border-red-200 hover:bg-red-600 rounded-lg transition-colors whitespace-nowrap hidden" title="Remove discount and restore original price">
+                          âœ• Remove
+                        </button>
+                      </div>
+                      <p id="discount-active" class="hidden text-xs text-green-600 mt-1">âœ“ Discount active</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Inventory -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-4">Inventory</h2>
+                  
+                  <!-- Not Tracked Warning -->
+                  <div id="inventory-not-tracked" class="hidden mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p class="text-sm text-yellow-800 mb-2">âš ï¸ Inventory tracking is disabled for this product.</p>
+                    <button id="btn-enable-tracking" class="text-xs text-white bg-yellow-600 hover:bg-yellow-700 px-3 py-1.5 rounded">Enable Tracking</button>
+                  </div>
+                  
+                  <div id="inventory-tracked-section" class="space-y-4">
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">SKU</label>
+                      <input type="text" id="edit-sku" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg bg-gray-50" readonly>
+                    </div>
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Quantity</label>
+                      <div class="flex gap-2">
+                        <input type="number" id="edit-inventory" class="flex-1 h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500">
+                        <button id="btn-update-inventory" class="h-10 px-3 text-sm text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">Update</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Shipping -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-gray-900">Shipping</h2>
+                    <button id="btn-manage-packages" class="text-xs text-red-600 hover:text-red-700 font-medium">Manage Packages</button>
+                  </div>
+                  
+                  <div class="space-y-4">
+                    <!-- Requires Shipping Toggle -->
+                    <div class="flex items-center gap-2">
+                      <input type="checkbox" id="edit-requires-shipping" class="rounded border-gray-300 text-red-600 focus:ring-red-500" checked>
+                      <label for="edit-requires-shipping" class="text-xs text-gray-600">This is a physical product</label>
+                    </div>
+                    
+                    <!-- Weight -->
+                    <div id="shipping-weight-section">
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Weight</label>
+                      <div class="flex gap-2">
+                        <input type="number" step="0.01" id="edit-weight" class="flex-1 h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="0">
+                        <select id="edit-weight-unit" class="h-10 px-2 text-sm border border-gray-200 rounded-lg">
+                          <option value="GRAMS">g</option>
+                          <option value="KILOGRAMS">kg</option>
+                          <option value="OUNCES">oz</option>
+                          <option value="POUNDS">lb</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <!-- Package Selection -->
+                    <div id="shipping-package-section">
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Package</label>
+                      <select id="edit-package" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg">
+                        <option value="">Select a package...</option>
+                      </select>
+                      <p id="package-dimensions" class="text-xs text-gray-400 mt-1"></p>
+                    </div>
+                    
+                    <button id="btn-save-shipping" class="w-full h-9 text-sm font-medium text-white bg-gray-800 hover:bg-gray-700 rounded-lg">Save Shipping</button>
+                  </div>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-4">Quick Actions</h2>
+                  <div class="space-y-2">
+                    <a id="link-shopify" href="#" target="_blank" class="flex items-center gap-2 p-3 text-sm text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100">
+                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      Edit in Shopify
+                    </a>
+                    <a id="link-view" href="#" target="_blank" class="flex items-center gap-2 p-3 text-sm text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100">
+                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                      View on Store
+                    </a>
+                  </div>
+                </div>
+                
+              </div>
+            </div>
+            
+          </div>
+          
+          <!-- New Product Form (Full Featured) -->
+          <div id="new-product-form" class="hidden space-y-4 sm:space-y-6">
+            
+            <!-- Header -->
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div>
+                <h1 class="text-lg sm:text-xl font-semibold text-gray-900">Create New Product</h1>
+                <p class="text-sm text-gray-500">Fill in the details below.</p>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <select id="new-status" class="h-9 px-3 text-sm border border-gray-200 rounded-lg">
+                  <option value="DRAFT">Draft</option>
+                  <option value="ACTIVE">Active</option>
+                </select>
+                <button id="btn-create-product" class="h-9 px-3 sm:px-4 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg flex items-center gap-2">
+                  <span>Create</span>
+                  <svg id="create-spinner" class="hidden w-4 h-4 spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                </button>
+                <button id="btn-cancel-create" class="h-9 px-3 text-sm text-gray-600 border border-gray-200 rounded-lg">Cancel</button>
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              
+              <!-- Left Column: Basic Info & Media -->
+              <div class="lg:col-span-2 space-y-4 sm:space-y-6">
+                
+                <!-- Basic Info -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-4">Basic Information</h2>
+                  <div class="space-y-4">
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Title *</label>
+                      <input type="text" id="new-title" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="Product title">
+                    </div>
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Description</label>
+                      <textarea id="new-description" rows="6" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 resize-none" placeholder="Product description..."></textarea>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">Vendor</label>
+                        <input type="text" id="new-vendor" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="Brand name">
+                      </div>
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">Product Type</label>
+                        <input type="text" id="new-type" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="e.g., Exhaust">
+                      </div>
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">Tags (comma separated)</label>
+                        <input type="text" id="new-tags" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="tag1, tag2">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Media (Pending) -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-gray-900">Media</h2>
+                    <span class="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">Pending - will upload on create</span>
+                  </div>
+                  <div id="new-media-grid" class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3 mb-4">
+                    <div class="aspect-square bg-gray-50 border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center text-gray-400 text-xs">No media</div>
+                  </div>
+                  <div id="new-media-dropzone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-red-400 hover:bg-red-50 transition-colors">
+                    <input type="file" id="new-media-file-input" multiple accept="image/*,video/*" class="hidden">
+                    <p class="text-sm text-gray-600">Drag & drop files here, or <span class="text-red-600 font-medium">click to browse</span></p>
+                    <p class="text-xs text-gray-400 mt-1">Images (JPG, PNG, GIF) or Videos (MP4, MOV)</p>
+                  </div>
+                </div>
+                
+                <!-- Vehicle Fitment (Pending) -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-4">Vehicle Fitment</h2>
+                  
+                  <div class="mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                      <label class="text-xs font-medium text-gray-600">Selected Vehicles</label>
+                      <span id="new-fitments-count" class="text-xs text-gray-400">0 vehicles</span>
+                    </div>
+                    <div id="new-fitments-list" class="max-h-32 overflow-y-auto flex flex-wrap gap-2 p-2 border border-gray-100 rounded-lg bg-gray-50">
+                      <span class="text-sm text-gray-400">No vehicles selected</span>
+                    </div>
+                  </div>
+                  
+                  <div class="border-t border-gray-100 pt-4">
+                    <label class="text-xs font-medium text-gray-600 mb-2 block">Add Vehicles</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                      <select id="new-fit-year" class="h-9 px-2 text-sm border border-gray-200 rounded-lg"><option value="">Year</option></select>
+                      <select id="new-fit-make" class="h-9 px-2 text-sm border border-gray-200 rounded-lg"><option value="">Make</option></select>
+                      <select id="new-fit-model" class="h-9 px-2 text-sm border border-gray-200 rounded-lg"><option value="">Model</option></select>
+                      <select id="new-fit-submodel" class="h-9 px-2 text-sm border border-gray-200 rounded-lg"><option value="">Submodel</option></select>
+                    </div>
+                    <div id="new-filtered-vehicles" class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                      <div class="p-3 text-sm text-gray-400 text-center">Select filters above</div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between">
+                      <span id="new-fit-count" class="text-xs text-gray-500">0 selected</span>
+                      <button id="btn-add-new-fitments" class="h-8 px-3 text-xs font-medium text-white bg-red-600 rounded-lg disabled:opacity-50" disabled>Add Selected</button>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Product Options & Variants (New Product) -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-gray-900">Product Options & Variants</h2>
+                    <button id="btn-add-new-option" class="text-xs text-red-600 hover:text-red-700 font-medium">+ Add Option</button>
+                  </div>
+                  
+                  <!-- Options Editor -->
+                  <div id="new-options-editor" class="space-y-3 mb-4">
+                    <p class="text-sm text-gray-400 text-center py-2">No options defined. Add options like "Material" or "Size" to create variants.</p>
+                  </div>
+                  
+                  <!-- Variants Preview Table -->
+                  <div id="new-variants-section" class="hidden border-t border-gray-100 pt-4">
+                    <div class="flex items-center justify-between mb-3">
+                      <h3 class="text-xs font-semibold text-gray-700">Variants Preview (<span id="new-variants-count">0</span>)</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-sm" id="new-variants-table">
+                        <thead class="bg-gray-50 text-left">
+                          <tr>
+                            <th class="px-3 py-2 font-medium text-gray-600 text-xs">Variant</th>
+                            <th class="px-3 py-2 font-medium text-gray-600 text-xs w-24">Price</th>
+                            <th class="px-3 py-2 font-medium text-gray-600 text-xs w-24">B2B Price</th>
+                            <th class="px-3 py-2 font-medium text-gray-600 text-xs w-28">SKU</th>
+                            <th class="px-3 py-2 font-medium text-gray-600 text-xs w-20">Inventory</th>
+                          </tr>
+                        </thead>
+                        <tbody id="new-variants-tbody" class="divide-y divide-gray-100">
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Media-Option Mapping (New Product) -->
+                <div id="new-media-option-mapping" class="bg-white rounded-xl border border-gray-200 p-5 hidden">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-4">Media-Option Mapping</h2>
+                  <p class="text-xs text-gray-500 mb-3">Tag images with option values to filter them when customers select options. (Will be applied after product creation)</p>
+                  <div id="new-media-mapping-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  </div>
+                </div>
+                
+              </div>
+              
+              <!-- Right Column: Pricing & Inventory -->
+              <div class="space-y-4 sm:space-y-6">
+                
+                <!-- Pricing -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-4">Pricing</h2>
+                  <div class="space-y-4">
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Price *</label>
+                      <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                        <input type="number" step="0.01" id="new-price" class="w-full h-10 pl-7 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="0.00">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Compare at Price</label>
+                      <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                        <input type="number" step="0.01" id="new-compare-price" class="w-full h-10 pl-7 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="Original price">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">B2B Price <span class="text-gray-400 font-normal">(Wholesale)</span></label>
+                      <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                        <input type="number" step="0.01" id="new-b2b-price" class="w-full h-10 pl-7 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="Wholesale price">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Discount Price <span class="text-gray-400 font-normal">(Sale)</span></label>
+                      <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                        <input type="number" step="0.01" id="new-discount-price" class="w-full h-10 pl-7 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="Sale price">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Inventory -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-4">Inventory</h2>
+                  <div class="space-y-4">
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">SKU</label>
+                      <input type="text" id="new-sku" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="Stock keeping unit">
+                    </div>
+                    <div>
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Quantity</label>
+                      <input type="number" id="new-inventory" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="0" value="0">
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <input type="checkbox" id="new-track-inventory" class="rounded border-gray-300 text-red-600 focus:ring-red-500" checked>
+                      <label for="new-track-inventory" class="text-xs text-gray-600">Track inventory</label>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Shipping -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-4">Shipping</h2>
+                  <div class="space-y-4">
+                    <div class="flex items-center gap-2">
+                      <input type="checkbox" id="new-requires-shipping" class="rounded border-gray-300 text-red-600 focus:ring-red-500" checked>
+                      <label for="new-requires-shipping" class="text-xs text-gray-600">This is a physical product</label>
+                    </div>
+                    <div id="new-shipping-weight-section">
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Weight</label>
+                      <div class="flex gap-2">
+                        <input type="number" step="0.01" id="new-weight" class="flex-1 h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="0">
+                        <select id="new-weight-unit" class="h-10 px-2 text-sm border border-gray-200 rounded-lg">
+                          <option value="GRAMS">g</option>
+                          <option value="KILOGRAMS">kg</option>
+                          <option value="OUNCES">oz</option>
+                          <option value="POUNDS" selected>lb</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Summary -->
+                <div class="bg-gray-50 rounded-xl border border-gray-200 p-5">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-3">Pending Summary</h2>
+                  <div class="space-y-2 text-xs text-gray-600">
+                    <div class="flex justify-between">
+                      <span>Media files:</span>
+                      <span id="new-media-count" class="font-medium">0</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span>Vehicle fitments:</span>
+                      <span id="new-fitment-count" class="font-medium">0</span>
+                    </div>
+                  </div>
+                </div>
+                
+              </div>
+            </div>
+            
+          </div>
+          
+        </div>
+        
+        <!-- ORDERS TAB -->
+        <div id="tab-orders" class="hidden">
+          <div class="space-y-4">
+            
+            <!-- Orders Header & Filters -->
+            <div class="bg-white rounded-xl border border-gray-200 p-4">
+              <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div class="flex items-center gap-3">
+                  <h2 class="text-lg font-semibold text-gray-900">Orders</h2>
+                  <button id="btn-refresh-orders" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg" title="Refresh">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  </button>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <input type="text" id="order-search" placeholder="Search orders..." class="h-9 px-3 text-sm border border-gray-200 rounded-lg w-48">
+                  <select id="order-filter-status" class="h-9 px-3 text-sm border border-gray-200 rounded-lg">
+                    <option value="">All Status</option>
+                    <option value="open">Open</option>
+                    <option value="closed">Closed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                  <select id="order-filter-fulfillment" class="h-9 px-3 text-sm border border-gray-200 rounded-lg">
+                    <option value="">All Fulfillment</option>
+                    <option value="unfulfilled">Unfulfilled</option>
+                    <option value="partial">Partially Fulfilled</option>
+                    <option value="fulfilled">Fulfilled</option>
+                  </select>
+                  <select id="order-filter-financial" class="h-9 px-3 text-sm border border-gray-200 rounded-lg">
+                    <option value="">All Payment</option>
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="refunded">Refunded</option>
+                    <option value="partially_refunded">Partially Refunded</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Orders List / Detail Split View -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              
+              <!-- Orders List -->
+              <div class="lg:col-span-1 bg-white rounded-xl border border-gray-200 flex flex-col" style="max-height: calc(100vh - 280px);">
+                <div class="p-3 border-b border-gray-100 flex items-center justify-between">
+                  <span id="orders-count" class="text-xs text-gray-500">0 orders</span>
+                  <div class="flex items-center gap-1">
+                    <button id="orders-prev" class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30" disabled>
+                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <button id="orders-next" class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30" disabled>
+                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                  </div>
+                </div>
+                <div id="orders-list" class="flex-1 overflow-y-auto divide-y divide-gray-100">
+                  <div class="p-8 text-center">
+                    <div class="w-5 h-5 border-2 border-gray-200 border-t-red-600 rounded-full spinner mx-auto"></div>
+                    <p class="text-sm text-gray-400 mt-2">Loading orders...</p>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Order Detail -->
+              <div class="lg:col-span-2">
+                
+                <!-- Empty State -->
+                <div id="order-empty" class="bg-white rounded-xl border border-gray-200 p-16 text-center">
+                  <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                  </div>
+                  <h3 class="text-lg font-semibold text-gray-900 mb-1">Select an Order</h3>
+                  <p class="text-sm text-gray-500">Choose from the list to view details and manage fulfillment</p>
+                </div>
+                
+                <!-- Order Detail View -->
+                <div id="order-detail" class="hidden space-y-4">
+                  
+                  <!-- Order Header -->
+                  <div class="bg-white rounded-xl border border-gray-200 p-5">
+                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                      <div>
+                        <div class="flex items-center gap-2">
+                          <h1 id="order-name" class="text-xl font-semibold text-gray-900">#1001</h1>
+                          <span id="order-test-badge" class="hidden px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded">TEST</span>
+                        </div>
+                        <p id="order-date" class="text-sm text-gray-500">December 20, 2024</p>
+                      </div>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span id="order-financial-badge" class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-700">PAID</span>
+                        <span id="order-fulfillment-badge" class="px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-700">UNFULFILLED</span>
+                      </div>
+                    </div>
+                    
+                    <!-- Order Actions -->
+                    <div class="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
+                      <div class="relative">
+                        <div class="flex">
+                          <button id="btn-fulfill-order" class="h-8 px-3 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-l-lg flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                            Mark as fulfilled
+                          </button>
+                          <button id="btn-fulfill-dropdown" class="h-8 px-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-r-lg border-l border-red-500 flex items-center">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                          </button>
+                        </div>
+                        <div id="fulfill-dropdown" class="hidden absolute left-0 top-9 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[180px]">
+                          <button class="fulfill-status-action w-full px-3 py-2 text-left text-sm hover:bg-gray-50" data-status="ON_HOLD">Put on hold</button>
+                          <button class="fulfill-status-action w-full px-3 py-2 text-left text-sm hover:bg-gray-50" data-status="RELEASE_HOLD">Release hold</button>
+                        </div>
+                      </div>
+                      <button id="btn-add-tracking" class="h-8 px-3 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        Add Tracking
+                      </button>
+                      <button id="btn-send-receipt" class="h-8 px-3 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        Send Receipt
+                      </button>
+                      <button id="btn-create-label" class="h-8 px-3 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                        Create Shipping Label
+                      </button>
+                      <button id="btn-print-packing" class="h-8 px-3 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                        Print Packing Slip
+                      </button>
+                      <div class="relative">
+                        <button id="btn-more-actions" class="h-8 px-3 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
+                          More
+                        </button>
+                        <div id="order-more-dropdown" class="hidden absolute right-0 top-9 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[160px]">
+                          <button class="order-action w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2" data-action="mark-paid">
+                            <svg class="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            Mark as Paid
+                          </button>
+                          <button class="order-action w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2" data-action="edit-note">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            Edit Note
+                          </button>
+                          <button class="order-action w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2" data-action="view-shopify">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                            View in Shopify
+                          </button>
+                          <div class="border-t border-gray-100 my-1"></div>
+                          <button class="order-action w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2" data-action="refund">
+                            <svg class="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                            Refund
+                          </button>
+                          <button class="order-action w-full px-3 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2" data-action="cancel">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            Cancel Order
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    
+                    <!-- Left Column: Line Items & Fulfillments -->
+                    <div class="lg:col-span-2 space-y-4">
+                      
+                      <!-- Line Items -->
+                      <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <h2 class="text-sm font-semibold text-gray-900 mb-4">Line Items</h2>
+                        <div id="order-line-items" class="space-y-3">
+                          <!-- Line items will be rendered here -->
+                        </div>
+                        
+                        <!-- Order Summary -->
+                        <div class="mt-4 pt-4 border-t border-gray-100 space-y-2">
+                          <div class="flex justify-between text-sm">
+                            <span class="text-gray-500">Subtotal</span>
+                            <span id="order-subtotal" class="text-gray-900">$0.00</span>
+                          </div>
+                          <div class="flex justify-between text-sm">
+                            <span class="text-gray-500">Shipping</span>
+                            <span id="order-shipping" class="text-gray-900">$0.00</span>
+                          </div>
+                          <div class="flex justify-between text-sm">
+                            <span class="text-gray-500">Tax</span>
+                            <span id="order-tax" class="text-gray-900">$0.00</span>
+                          </div>
+                          <div id="order-discounts-row" class="hidden flex justify-between text-sm">
+                            <span class="text-gray-500">Discounts</span>
+                            <span id="order-discounts" class="text-green-600">-$0.00</span>
+                          </div>
+                          <div class="flex justify-between text-sm font-semibold pt-2 border-t border-gray-100">
+                            <span class="text-gray-900">Total</span>
+                            <span id="order-total" class="text-gray-900">$0.00</span>
+                          </div>
+                          <div id="order-refunded-row" class="hidden flex justify-between text-sm">
+                            <span class="text-gray-500">Refunded</span>
+                            <span id="order-refunded" class="text-red-600">-$0.00</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <!-- Fulfillments -->
+                      <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <h2 class="text-sm font-semibold text-gray-900 mb-4">Fulfillments</h2>
+                        <div id="order-fulfillments" class="space-y-3">
+                          <p class="text-sm text-gray-400">No fulfillments yet</p>
+                        </div>
+                      </div>
+                      
+                      <!-- Timeline -->
+                      <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <h2 class="text-sm font-semibold text-gray-900 mb-4">Timeline</h2>
+                        
+                        <!-- Comment Input -->
+                        <div class="flex gap-3 mb-4 pb-4 border-b border-gray-100">
+                          <div class="w-8 h-8 bg-green-400 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            {{ customer.first_name | default: 'A' | slice: 0 | upcase }}{{ customer.last_name | default: 'D' | slice: 0 | upcase }}
+                          </div>
+                          <div class="flex-1">
+                            <input type="text" id="timeline-comment-input" placeholder="Leave a comment..." class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                            <p class="text-xs text-gray-400 mt-1">Only you and other staff can see comments</p>
+                          </div>
+                          <button id="btn-post-comment" class="h-9 px-4 text-xs font-medium text-gray-400 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50">Post</button>
+                        </div>
+                        
+                        <div id="order-timeline" class="space-y-1 max-h-80 overflow-y-auto">
+                          <p class="text-sm text-gray-400">Loading timeline...</p>
+                        </div>
+                      </div>
+                      
+                    </div>
+                    
+                    <!-- Right Column: Customer & Addresses -->
+                    <div class="space-y-4">
+                      
+                      <!-- Customer Info -->
+                      <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <h2 class="text-sm font-semibold text-gray-900 mb-4">Customer</h2>
+                        <div id="order-customer" class="space-y-2">
+                          <p id="order-customer-name" class="text-sm font-medium text-gray-900">-</p>
+                          <p id="order-customer-email" class="text-sm text-gray-500">-</p>
+                          <p id="order-customer-phone" class="text-sm text-gray-500">-</p>
+                          <div id="order-customer-tags" class="flex flex-wrap gap-1 mt-2"></div>
+                          <div class="pt-2 mt-2 border-t border-gray-100">
+                            <p class="text-xs text-gray-400">Orders: <span id="order-customer-orders">0</span></p>
+                            <p class="text-xs text-gray-400">Total Spent: <span id="order-customer-spent">$0.00</span></p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <!-- Shipping Address -->
+                      <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <div class="flex items-center justify-between mb-4">
+                          <h2 class="text-sm font-semibold text-gray-900">Shipping Address</h2>
+                          <button id="btn-edit-shipping-addr" class="text-xs text-red-600 hover:text-red-700">Edit</button>
+                        </div>
+                        <div id="order-shipping-address" class="text-sm text-gray-600 font-mono leading-relaxed">
+                          <p>-</p>
+                        </div>
+                      </div>
+                      
+                      <!-- Billing Address -->
+                      <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <h2 class="text-sm font-semibold text-gray-900 mb-4">Billing Address</h2>
+                        <div id="order-billing-address" class="text-sm text-gray-600 font-mono leading-relaxed">
+                          <p>-</p>
+                        </div>
+                      </div>
+                      
+                      <!-- Order Note -->
+                      <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <div class="flex items-center justify-between mb-4">
+                          <h2 class="text-sm font-semibold text-gray-900">Order Note</h2>
+                          <button id="btn-edit-order-note" class="text-xs text-red-600 hover:text-red-700">Edit</button>
+                        </div>
+                        <p id="order-note" class="text-sm text-gray-600 italic">No note</p>
+                      </div>
+                      
+                      <!-- Tags -->
+                      <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <h2 class="text-sm font-semibold text-gray-900 mb-4">Tags</h2>
+                        <div id="order-tags" class="flex flex-wrap gap-1">
+                          <span class="text-sm text-gray-400">No tags</span>
+                        </div>
+                      </div>
+                      
+                    </div>
+                  </div>
+                  
+                </div>
+              </div>
+              
+            </div>
+            
+          </div>
+        </div>
+        
+        <!-- Fulfillment Modal -->
+        <div id="fulfillment-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div class="p-5 border-b border-gray-100">
+              <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900">Create Fulfillment</h3>
+                <button id="btn-close-fulfillment" class="p-1 text-gray-400 hover:text-gray-600 rounded">
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            </div>
+            <div class="p-5 space-y-4">
+              <!-- Fulfillment Order Selection -->
+              <div id="fulfillment-orders-select" class="space-y-2">
+                <!-- Will be populated dynamically -->
+              </div>
+              
+              <!-- Tracking Info -->
+              <div class="border-t border-gray-100 pt-4">
+                <h4 class="text-sm font-medium text-gray-900 mb-3">Tracking Information (Optional)</h4>
+                <div class="space-y-3">
+                  <div>
+                    <label class="text-xs text-gray-600 mb-1 block">Carrier</label>
+                    <select id="fulfillment-carrier" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg">
+                      <option value="">Select carrier...</option>
+                      <option value="UPS">UPS</option>
+                      <option value="USPS">USPS</option>
+                      <option value="FedEx">FedEx</option>
+                      <option value="DHL">DHL</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-600 mb-1 block">Tracking Number</label>
+                    <input type="text" id="fulfillment-tracking" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg" placeholder="Enter tracking number...">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-600 mb-1 block">Tracking URL (Optional)</label>
+                    <input type="url" id="fulfillment-url" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg" placeholder="https://...">
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Notify Customer -->
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="fulfillment-notify" class="rounded border-gray-300 text-red-600 focus:ring-red-500" checked>
+                <label for="fulfillment-notify" class="text-sm text-gray-700">Send shipment notification to customer</label>
+              </div>
+            </div>
+            <div class="p-5 border-t border-gray-100 flex justify-end gap-2">
+              <button id="btn-cancel-fulfillment" class="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+              <button id="btn-create-fulfillment" class="h-9 px-4 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg">Create Fulfillment</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Add Tracking Modal -->
+        <div id="tracking-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div class="p-5 border-b border-gray-100">
+              <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900">Add Tracking Information</h3>
+                <button id="btn-close-tracking" class="p-1 text-gray-400 hover:text-gray-600 rounded">
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            </div>
+            <div class="p-5 space-y-4">
+              <!-- Select Fulfillment -->
+              <div>
+                <label class="text-xs text-gray-600 mb-1 block">Select Fulfillment</label>
+                <select id="tracking-fulfillment-select" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg">
+                  <!-- Will be populated dynamically -->
+                </select>
+              </div>
+              
+              <!-- Carrier -->
+              <div>
+                <label class="text-xs text-gray-600 mb-1 block">Carrier <span class="text-red-500">*</span></label>
+                <select id="tracking-carrier" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg">
+                  <option value="">Select carrier...</option>
+                  <option value="UPS">UPS</option>
+                  <option value="USPS">USPS</option>
+                  <option value="FedEx">FedEx</option>
+                  <option value="DHL">DHL</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              
+              <!-- Tracking Number -->
+              <div>
+                <label class="text-xs text-gray-600 mb-1 block">Tracking Number <span class="text-red-500">*</span></label>
+                <input type="text" id="tracking-number" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg" placeholder="Enter tracking number...">
+              </div>
+              
+              <!-- Tracking URL -->
+              <div>
+                <label class="text-xs text-gray-600 mb-1 block">Tracking URL (Optional)</label>
+                <input type="url" id="tracking-url" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg" placeholder="https://...">
+              </div>
+              
+              <!-- Notify Customer -->
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="tracking-notify" class="rounded border-gray-300 text-red-600 focus:ring-red-500" checked>
+                <label for="tracking-notify" class="text-sm text-gray-700">Notify customer about tracking update</label>
+              </div>
+            </div>
+            <div class="p-5 border-t border-gray-100 flex justify-end gap-2">
+              <button id="btn-cancel-tracking" class="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+              <button id="btn-save-tracking" class="h-9 px-4 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg">Save Tracking</button>
+            </div>
+          </div>
+        </div>
+        
+        {% render 'admin-refund-modal' %}
+        
+        <!-- VEHICLES TAB -->
+        <div id="tab-vehicles" class="hidden">
+          <div class="vehicles-grid grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            
+            <!-- Create Vehicle Panel (Desktop) -->
+            <div class="vehicle-create-panel bg-white rounded-xl border border-gray-200 p-5">
+              <h2 class="text-sm font-semibold text-gray-900 mb-4">Create New Vehicle</h2>
+              <div class="p-3 bg-gray-50 rounded-lg mb-4">
+                <span class="text-xs text-gray-500">Preview:</span>
+                <p id="vehicle-preview" class="text-sm font-medium text-gray-900">Select options below...</p>
+              </div>
+              <div class="space-y-3 mb-4">
+                <div>
+                  <label class="text-xs text-gray-600 mb-1 block">Year *</label>
+                  <select id="v-year" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg">
+                    <option value="">Select</option><option value="__new">+ New Year</option>
+                  </select>
+                  <input type="text" id="v-year-input" class="hidden w-full h-9 px-2 text-sm border border-gray-200 rounded-lg mt-1" placeholder="e.g., 2024">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-600 mb-1 block">Make *</label>
+                  <select id="v-make" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg" disabled>
+                    <option value="">Select Year first</option>
+                  </select>
+                  <input type="text" id="v-make-input" class="hidden w-full h-9 px-2 text-sm border border-gray-200 rounded-lg mt-1" placeholder="e.g., Audi">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-600 mb-1 block">Model *</label>
+                  <select id="v-model" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg" disabled>
+                    <option value="">Select Make first</option>
+                  </select>
+                  <input type="text" id="v-model-input" class="hidden w-full h-9 px-2 text-sm border border-gray-200 rounded-lg mt-1" placeholder="e.g., RS7">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-600 mb-1 block">Submodel</label>
+                  <select id="v-submodel" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg" disabled>
+                    <option value="">Select Model first</option>
+                  </select>
+                  <input type="text" id="v-submodel-input" class="hidden w-full h-9 px-2 text-sm border border-gray-200 rounded-lg mt-1" placeholder="e.g., Performance">
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button id="btn-create-vehicle" class="h-9 px-4 text-sm font-medium text-white bg-red-600 rounded-lg disabled:opacity-50" disabled>Create Vehicle</button>
+                <button id="btn-reset-vehicle" class="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg">Reset</button>
+              </div>
+            </div>
+            
+            <!-- Vehicle List with Filters -->
+            <div class="vehicle-list-panel lg:col-span-2 bg-white rounded-xl border border-gray-200 p-5">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-sm font-semibold text-gray-900">All Vehicles</h2>
+                <div class="flex items-center gap-2">
+                  <button id="btn-create-vehicle-mobile" class="btn-create-vehicle-mobile hidden text-xs text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                    New
+                  </button>
+                  <span id="vehicle-count" class="text-xs text-gray-500">0 vehicles</span>
+                </div>
+              </div>
+              
+              <!-- Filters -->
+              <div class="vehicle-filters-grid grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+                <select id="vf-year" class="h-9 px-2 text-sm border border-gray-200 rounded-lg">
+                  <option value="">All Years</option>
+                </select>
+                <select id="vf-make" class="h-9 px-2 text-sm border border-gray-200 rounded-lg">
+                  <option value="">All Makes</option>
+                </select>
+                <select id="vf-model" class="h-9 px-2 text-sm border border-gray-200 rounded-lg">
+                  <option value="">All Models</option>
+                </select>
+                <button id="btn-clear-vfilters" class="h-9 px-3 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Clear Filters</button>
+              </div>
+              
+              <!-- Vehicle Table -->
+              <div class="vehicle-table-wrapper border border-gray-200 rounded-lg overflow-hidden">
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-50 text-left">
+                    <tr>
+                      <th class="px-4 py-2 font-medium text-gray-600">Year</th>
+                      <th class="px-4 py-2 font-medium text-gray-600">Make</th>
+                      <th class="px-4 py-2 font-medium text-gray-600">Model</th>
+                      <th class="px-4 py-2 font-medium text-gray-600">Submodel</th>
+                      <th class="px-4 py-2 font-medium text-gray-600 w-24">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="vehicle-table" class="divide-y divide-gray-100">
+                    <tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div id="vehicle-pagination" class="mt-3 text-xs text-gray-500 text-right"></div>
+            </div>
+            
+          </div>
+        </div>
+        
+        <!-- CUSTOMERS TAB -->
+        <div id="tab-customers" class="hidden">
+          <div class="customers-grid grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            
+            <!-- Customer List -->
+            <div class="col-span-1 bg-white rounded-xl border border-gray-200 flex flex-col" style="max-height: calc(100vh - 180px);">
+              <div class="p-4 border-b border-gray-100">
+                <h2 class="text-sm font-semibold text-gray-900 mb-3">Customers</h2>
+                <input type="text" id="customer-search" placeholder="Search by name or email..." class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg">
+              </div>
+              <div class="p-2 border-b border-gray-100 flex gap-2">
+                <select id="cf-tag" class="flex-1 h-8 px-2 text-xs border border-gray-200 rounded">
+                  <option value="">All Customers</option>
+                  <option value="b2b">B2B Only</option>
+                  <option value="admin">Admins Only</option>
+                </select>
+              </div>
+              <div id="customer-list" class="flex-1 overflow-y-auto divide-y divide-gray-100">
+                <div class="p-4 text-center text-sm text-gray-400">Loading...</div>
+              </div>
+              <div class="p-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500">
+                <span id="customer-count">0 customers</span>
+              </div>
+            </div>
+            
+            <!-- Customer Details -->
+            <div class="lg:col-span-2">
+              
+              <!-- Empty State -->
+              <div id="customer-empty" class="bg-white rounded-xl border border-gray-200 p-16 text-center">
+                <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg class="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-1">Select a Customer</h3>
+                <p class="text-sm text-gray-500">Choose from the list to view details</p>
+              </div>
+              
+              <!-- Customer Editor -->
+              <div id="customer-editor" class="hidden space-y-6">
+                
+                <!-- Header -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <div class="flex items-start justify-between mb-4">
+                    <div>
+                      <h1 id="cust-name" class="text-xl font-semibold text-gray-900">Customer Name</h1>
+                      <p id="cust-email" class="text-sm text-gray-500">email@example.com</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span id="cust-state" class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-700">ENABLED</span>
+                      <button id="btn-save-customer" class="h-9 px-4 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg">Save Changes</button>
+                    </div>
+                  </div>
+                  
+                  <!-- Tags -->
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-xs text-gray-500">Tags:</span>
+                    <div id="cust-tags" class="flex flex-wrap gap-1"></div>
+                    <div class="relative">
+                      <button id="btn-add-tag" class="text-xs text-red-600 hover:text-red-700">+ Add Tag</button>
+                      <div id="tag-dropdown" class="hidden absolute top-6 left-0 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10">
+                        <button class="tag-option w-full px-3 py-1.5 text-left text-sm hover:bg-gray-50" data-tag="b2b">B2B (Wholesale)</button>
+                        <button class="tag-option w-full px-3 py-1.5 text-left text-sm hover:bg-gray-50" data-tag="admin">Admin</button>
+                        <button class="tag-option w-full px-3 py-1.5 text-left text-sm hover:bg-gray-50" data-tag="vip">VIP</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  
+                  <!-- Contact Info -->
+                  <div class="bg-white rounded-xl border border-gray-200 p-5">
+                    <h2 class="text-sm font-semibold text-gray-900 mb-4">Contact Information</h2>
+                    <div class="space-y-4">
+                      <div class="grid grid-cols-2 gap-4">
+                        <div>
+                          <label class="text-xs font-medium text-gray-600 mb-1 block">First Name</label>
+                          <input type="text" id="cust-firstname" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg">
+                        </div>
+                        <div>
+                          <label class="text-xs font-medium text-gray-600 mb-1 block">Last Name</label>
+                          <input type="text" id="cust-lastname" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg">
+                        </div>
+                      </div>
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">Email</label>
+                        <input type="email" id="cust-email-edit" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg">
+                      </div>
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">Phone</label>
+                        <input type="tel" id="cust-phone" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg">
+                      </div>
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">Note</label>
+                        <textarea id="cust-note" rows="3" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none"></textarea>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Address & Stats -->
+                  <div class="space-y-6">
+                    
+                    <!-- Default Address -->
+                    <div class="bg-white rounded-xl border border-gray-200 p-5">
+                      <h2 class="text-sm font-semibold text-gray-900 mb-4">Default Address</h2>
+                      <div id="cust-address" class="text-sm text-gray-600">
+                        <p class="text-gray-400">No address on file</p>
+                      </div>
+                    </div>
+                    
+                    <!-- Stats -->
+                    <div class="bg-white rounded-xl border border-gray-200 p-5">
+                      <h2 class="text-sm font-semibold text-gray-900 mb-4">Customer Stats</h2>
+                      <div class="grid grid-cols-2 gap-4">
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                          <p class="text-xs text-gray-500">Total Orders</p>
+                          <p id="cust-orders" class="text-lg font-semibold text-gray-900">0</p>
+                        </div>
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                          <p class="text-xs text-gray-500">Total Spent</p>
+                          <p id="cust-spent" class="text-lg font-semibold text-gray-900">$0.00</p>
+                        </div>
+                      </div>
+                      <div class="mt-4 pt-4 border-t border-gray-100">
+                        <p class="text-xs text-gray-500">Member Since</p>
+                        <p id="cust-since" class="text-sm text-gray-700">-</p>
+                      </div>
+                    </div>
+                    
+                  </div>
+                </div>
+                
+                <!-- Recent Orders -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <h2 class="text-sm font-semibold text-gray-900 mb-4">Recent Orders</h2>
+                  <div id="cust-recent-orders" class="space-y-2">
+                    <p class="text-sm text-gray-400">No orders yet</p>
+                  </div>
+                </div>
+                
+              </div>
+            </div>
+            
+          </div>
+        </div>
+        
+      </div>
+    </main>
+  </div>
+  
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-4 right-4 z-50"></div>
+  
+  <!-- Auth Modal -->
+  <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 hidden">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+      <h3 class="text-lg font-semibold mb-4">API Authentication</h3>
+      <input type="password" id="auth-key" placeholder="Enter API key..." class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg mb-4">
+      <div id="auth-error" class="hidden text-sm text-red-600 mb-4"></div>
+      <button id="auth-submit" class="w-full h-10 text-sm font-medium text-white bg-red-600 rounded-lg">Authenticate</button>
+    </div>
+  </div>
+
+<script src="{{ 'admin-orders.js' | asset_url }}"></script>
+<script src="{{ 'admin-dashboard.js' | asset_url }}"></script>
+
+<script src="{{ 'admin-orders.js' | asset_url }}" defer></script>
+<script src="{{ 'admin-profile.js' | asset_url }}" defer></script>
+
+</body>
+</html>
+
+{% else %}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="0;url=/account">
+  <script>window.location.replace('/account');</script>
+</head>
+<body></body>
+</html>
+{% endif %}

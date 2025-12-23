@@ -1,0 +1,24 @@
+<div id="PrecisionAlertLine" class="bg-[#CC0000] min-h-[36px] flex items-center justify-center px-4 py-2 text-center relative z-10">
+  <p class="text-white text-[11px] font-bold uppercase tracking-[0.2em] leading-tight">
+    {{ section.settings.text | default: "FREE SHIPPING ON ORDERS OVER $500 | LIFETIME WARRANTY INCLUDED" }}
+  </p>
+</div>
+
+{% schema %}
+{
+  "name": "Precision Alert Line",
+  "settings": [
+    {
+      "type": "text",
+      "id": "text",
+      "label": "Announcement Text",
+      "default": "FREE SHIPPING ON ORDERS OVER $500 | LIFETIME WARRANTY INCLUDED"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Precision Alert Line"
+    }
+  ]
+}
+{% endschema %}

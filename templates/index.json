@@ -1,0 +1,132 @@
+/*
+ * ------------------------------------------------------------
+ * IMPORTANT: The contents of this file are auto-generated.
+ *
+ * This file may be updated by the Shopify admin theme editor
+ * or related systems. Please exercise caution as any changes
+ * made to this file may be overwritten.
+ * ------------------------------------------------------------
+ */
+{
+  "sections": {
+    "hero_ymm": {
+      "type": "hero-ymm",
+      "settings": {
+        "video": "shopify://files/videos/3752531-hd_1920_1080_24fps.mp4",
+        "heading": "UNLEASH THE SOUND.",
+        "collection_handle": "all",
+        "storefront_access_token": ""
+      }
+    },
+    "engineering_prop": {
+      "type": "engineering-value-prop",
+      "blocks": {
+        "feature_1": {
+          "type": "feature",
+          "settings": {
+            "icon_svg": "",
+            "title": "304 Stainless Steel",
+            "text": "High-grade materials for maximum durability and corrosion resistance."
+          }
+        },
+        "feature_2": {
+          "type": "feature",
+          "settings": {
+            "icon_svg": "",
+            "title": "Mandrel Bent",
+            "text": "Smooth bends ensure unrestricted airflow and optimal performance."
+          }
+        },
+        "feature_3": {
+          "type": "feature",
+          "settings": {
+            "icon_svg": "",
+            "title": "Dyno Proven",
+            "text": "Tested and tuned to deliver real horsepower and torque gains."
+          }
+        }
+      },
+      "block_order": [
+        "feature_1",
+        "feature_2",
+        "feature_3"
+      ],
+      "settings": {
+        "heading": "PRECISION ENGINEERED",
+        "subtext": "304 Stainless Steel. Mandrel Bent. Dyno Proven."
+      }
+    },
+    "showroom": {
+      "type": "showroom-masonry",
+      "settings": {
+        "heading": "The Redline Collection",
+        "collection": "all",
+        "products_to_show": 8
+      }
+    },
+    "dyno_room": {
+      "type": "dyno-room",
+      "blocks": {
+        "spec_1": {
+          "type": "spec",
+          "settings": {
+            "value": "110dB",
+            "label": "Raw Output"
+          }
+        },
+        "spec_2": {
+          "type": "spec",
+          "settings": {
+            "value": "+25 HP",
+            "label": "Dyno Proven Gain"
+          }
+        }
+      },
+      "block_order": [
+        "spec_1",
+        "spec_2"
+      ],
+      "settings": {
+        "heading": "HEAR THE POWER.",
+        "video_url": ""
+      }
+    },
+    "garage_hotspots": {
+      "type": "garage-hotspots",
+      "blocks": {
+        "hotspot_1": {
+          "type": "hotspot",
+          "settings": {
+            "top": 40,
+            "left": 60,
+            "title": "Anti-Drone Tech",
+            "text": "Cancels out specific frequencies to eliminate cabin drone."
+          }
+        },
+        "hotspot_2": {
+          "type": "hotspot",
+          "settings": {
+            "top": 65,
+            "left": 30,
+            "title": "TIG Welded",
+            "text": "Hand-welded joints for superior strength and aesthetics."
+          }
+        }
+      },
+      "block_order": [
+        "hotspot_1",
+        "hotspot_2"
+      ],
+      "settings": {
+        "heading": "THE GARAGE"
+      }
+    }
+  },
+  "order": [
+    "hero_ymm",
+    "engineering_prop",
+    "showroom",
+    "dyno_room",
+    "garage_hotspots"
+  ]
+}

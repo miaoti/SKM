@@ -1,0 +1,176 @@
+{%- doc -%}
+  B2B Checkout Button
+  
+  For B2B customers, this replaces the standard checkout with a special
+  checkout that creates a draft order with wholesale pricing.
+  
+  Include this snippet after the standard checkout button on the cart page.
+{%- enddoc -%}
+
+{%- liquid
+  assign is_b2b = false
+  if customer
+    for tag in customer.tags
+      assign tag_downcase = tag | downcase | strip
+      if tag_downcase == 'b2b' or tag_downcase == 'wholesale' or tag_downcase == 'business'
+        assign is_b2b = true
+        break
+      endif
+    endfor
+  endif
+-%}
+
+{% if is_b2b and cart.item_count > 0 %}
+<div id="b2b-checkout-container" style="margin-top: 1rem;">
+  
+  <!-- B2B Notice Removed -->
+  
+  <!-- B2B Checkout Button -->
+  <button 
+    type="button"
+    id="b2b-checkout-btn"
+    style="
+      width: 100%;
+      padding: 1rem 2rem;
+      background: linear-gradient(135deg, #CC0000 0%, #990000 100%);
+      color: white;
+      font-weight: 700;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: none;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    "
+    onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(204,0,0,0.4)';"
+    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';"
+  >
+    <svg style="width: 1.25rem; height: 1.25rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+    <span id="b2b-btn-text">Wholesale Checkout</span>
+    <span id="b2b-btn-spinner" style="display: none;">
+      <svg style="width: 1.25rem; height: 1.25rem; animation: spin 1s linear infinite;" fill="none" viewBox="0 0 24 24">
+        <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+    </span>
+  </button>
+  
+  <p style="font-size: 0.75rem; color: #6b7280; text-align: center; margin-top: 0.5rem;">
+    Secure wholesale checkout • Invoice will be emailed
+  </p>
+</div>
+
+<style>
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+
+<script>
+(function() {
+  const API_BASE = 'https://skm-inventory-api.miaotingshuo.workers.dev';
+  const ADMIN_KEY = sessionStorage.getItem('skm_admin_key') || '';
+  
+  const btn = document.getElementById('b2b-checkout-btn');
+  const btnText = document.getElementById('b2b-btn-text');
+  const btnSpinner = document.getElementById('b2b-btn-spinner');
+  
+  if (!btn) return;
+  
+  btn.addEventListener('click', async function() {
+    // Disable button and show spinner
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    btnText.style.display = 'none';
+    btnSpinner.style.display = 'inline';
+    
+    try {
+      // Get current cart
+      const cartResponse = await fetch('/cart.js');
+      const cart = await cartResponse.json();
+      
+      if (!cart.items || cart.items.length === 0) {
+        alert('Your cart is empty');
+        return;
+      }
+      
+      // Prepare line items with properties (for addon pricing)
+      const lineItems = cart.items.map(item => ({
+        variantId: item.variant_id.toString(),
+        quantity: item.quantity,
+        properties: item.properties || {}
+      }));
+      
+      // Get customer ID from Shopify's customer object
+      const customerId = {{ customer.id | json }};
+      
+      if (!customerId) {
+        alert('Please log in to use B2B checkout');
+        window.location.href = '/account/login?checkout_url=/cart';
+        return;
+      }
+      
+      // Create B2B checkout via our API
+      const response = await fetch(`${API_BASE}/b2b/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Key': ADMIN_KEY || 'public-b2b-access' // Fallback for public B2B access
+        },
+        body: JSON.stringify({
+          customerId: customerId.toString(),
+          lineItems: lineItems,
+          note: 'B2B Order from {{ shop.name }}'
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success && result.data.checkoutUrl) {
+        // Log debug info
+        console.log('[B2B Checkout] Draft order created:', result.data);
+        console.log('[B2B Checkout] Price debug:', result.data.priceDebug);
+        console.log('[B2B Checkout] Line items:', result.data.lineItems);
+        console.log('[B2B Checkout] Total:', result.data.total);
+        
+        // Clear the cart before redirecting
+        await fetch('/cart/clear.js', { method: 'POST' });
+        
+        // Also clear the localStorage saved cart for this customer
+        const customerId = {{ customer.id | json }};
+        if (customerId) {
+          localStorage.removeItem('skm_customer_cart_' + customerId);
+          console.log('[B2B Checkout] Cleared saved cart from localStorage');
+        }
+        
+        // Set a flag to indicate checkout was initiated (for post-checkout cleanup)
+        sessionStorage.setItem('skm_checkout_initiated', 'true');
+        
+        // Redirect to the draft order checkout
+        window.location.href = result.data.checkoutUrl;
+      } else {
+        throw new Error(result.error || 'Failed to create wholesale checkout');
+      }
+      
+    } catch (error) {
+      console.error('B2B checkout error:', error);
+      alert('Error creating wholesale checkout: ' + error.message + '\n\nPlease contact support or use standard checkout.');
+      
+      // Re-enable button
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btnText.style.display = 'inline';
+      btnSpinner.style.display = 'none';
+    }
+  });
+})();
+</script>
+{% endif %}
+

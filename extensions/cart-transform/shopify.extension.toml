@@ -1,0 +1,26 @@
+# Learn more about configuring your Cart Transform Function extension:
+# https://shopify.dev/docs/api/functions/reference/cart-transform
+
+api_version = "2024-01"
+
+[[extensions]]
+name = "SKM B2B & Discount Pricing"
+handle = "skm-pricing"
+type = "cart_transform"
+
+[extensions.build]
+command = ""
+path = "dist/function.wasm"
+
+[extensions.ui]
+enable_create = true
+
+[extensions.input.variables]
+namespace = "skm-pricing"
+key = "function-configuration"
+
+[[extensions.targeting]]
+target = "purchase.cart-transform.run"
+input_query = "src/run.graphql"
+export = "run"
+

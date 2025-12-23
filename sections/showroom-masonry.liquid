@@ -1,0 +1,83 @@
+<div class="py-24 bg-white">
+  <div class="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="mb-12">
+      <h2 class="text-4xl font-bold text-gray-900 tracking-tight" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">
+        {{ section.settings.heading | default: "The Redline Collection" }}<span class="text-[#CC0000]">.</span>
+      </h2>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {%- for product in section.settings.collection.products limit: section.settings.products_to_show -%}
+        <div class="group relative bg-[#F5F5F5] aspect-square overflow-hidden transition-all duration-300 hover:border-4 hover:border-[#CC0000]">
+          <a href="{{ product.url }}" class="block w-full h-full relative flex items-center justify-center">
+            <div class="w-3/4 h-3/4 transition-transform duration-500 group-hover:scale-110">
+              {%- if product.featured_image != blank -%}
+                {{ product.featured_image | image_url: width: 800 | image_tag: class: "w-full h-full object-contain mix-blend-multiply", loading: 'lazy' }}
+              {%- else -%}
+                {{ 'product-1' | placeholder_svg_tag: 'w-full h-full object-contain opacity-50' }}
+              {%- endif -%}
+            </div>
+            
+            <div class="absolute top-4 left-4">
+              {%- if product.available -%}
+                <span class="text-xs font-bold text-[#CC0000] uppercase tracking-wider bg-white/80 px-2 py-1 backdrop-blur-sm">In Stock</span>
+              {%- else -%}
+                 <span class="text-xs font-bold text-gray-500 uppercase tracking-wider bg-white/80 px-2 py-1 backdrop-blur-sm">Sold Out</span>
+              {%- endif -%}
+            </div>
+
+            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300"></div>
+
+            <div class="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm px-6 py-4 opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
+               <h3 class="text-lg font-bold text-gray-900 mb-1">{{ product.title }}</h3>
+               <div class="text-[#CC0000] font-mono font-bold">
+                 {% render 'price', product_resource: product %}
+               </div>
+            </div>
+          </a>
+        </div>
+      {%- else -%}
+        {%- for i in (1..4) -%}
+           <div class="group relative bg-[#F5F5F5] aspect-square overflow-hidden transition-all duration-300 hover:border-4 hover:border-[#CC0000]">
+             <div class="w-full h-full flex items-center justify-center">
+               {{ 'product-' | append: i | placeholder_svg_tag: 'w-1/2 h-1/2 opacity-20' }}
+             </div>
+           </div>
+        {%- endfor -%}
+      {%- endfor -%}
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Showroom Masonry",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "The Redline Collection"
+    },
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "Collection"
+    },
+    {
+      "type": "range",
+      "id": "products_to_show",
+      "min": 4,
+      "max": 12,
+      "step": 4,
+      "default": 8,
+      "label": "Products to show"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Showroom Masonry"
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,386 @@
+{%- comment -%}Precision Buy Buttons - Updated Dec 19 2024{%- endcomment -%}
+<div class="buy-buttons-precision w-full" {{ block.shopify_attributes }}>
+  {%- form 'product', product, id: product_form_id, class: 'form', novalidate: 'novalidate', data-type: 'add-to-cart-form' -%}
+    <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}" class="product-variant-id" data-variant-id>
+    {%- unless product.has_only_default_variant -%}
+      <div class="variant-options mb-4 space-y-3">
+        {%- for option in product.options_with_values -%}
+          {%- assign option_index = forloop.index0 -%}
+          <fieldset class="variant-option-group" data-option-name="{{ option.name }}" data-option-index="{{ option_index }}">
+            <legend class="text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">{{ option.name }}</legend>
+            <div class="flex flex-wrap gap-2">
+              {%- for value in option.values -%}
+                {%- assign option_available = false -%}
+                {%- for variant in product.variants -%}
+                  {%- assign variant_option_value = variant.options[option_index] -%}
+                  {%- if variant.available and variant_option_value == value -%}
+                    {%- assign option_available = true -%}
+                    {%- break -%}
+                  {%- endif -%}
+                {%- endfor -%}
+                <label class="variant-option-label relative cursor-pointer {% unless option_available %}opacity-50{% endunless %}">
+                  <input type="radio" name="option{{ option.position }}" value="{{ value | escape }}" class="sr-only peer" {% if option.selected_value == value %}checked{% endif %} {% unless option_available %}disabled{% endunless %}>
+                  <span class="block px-4 py-2 text-sm font-mono border border-gray-300 rounded-sm bg-white peer-checked:border-black peer-checked:bg-black peer-checked:text-white hover:border-gray-500 transition-colors {% unless option_available %}cursor-not-allowed{% endunless %}">{{ value }}</span>
+                </label>
+              {%- endfor -%}
+            </div>
+          </fieldset>
+        {%- endfor -%}
+      </div>
+    {%- endunless -%}
+    {%- comment -%} Render add-on options directly from Liquid {%- endcomment -%}
+    {% assign addon_meta = product.metafields.custom.add_on_options %}
+    {% if addon_meta and addon_meta.value != blank %}
+      <div id="addon-options-container" class="addon-options mb-4 space-y-3">
+        {% for addon in addon_meta.value %}
+          <fieldset class="addon-option-group" data-addon-name="{{ addon.name }}">
+            <legend class="text-xs font-bold uppercase tracking-wider text-blue-600 mb-2">
+              {{ addon.name }} <span class="text-gray-400 font-normal">(optional)</span>
+            </legend>
+            <div class="flex flex-wrap gap-2">
+              {%- comment -%} None option - default selected {%- endcomment -%}
+              <label class="addon-option-label relative cursor-pointer">
+                <input type="radio" 
+                       name="addon_{{ addon.name | handleize }}" 
+                       value="" 
+                       data-price-modifier="0" 
+                       class="sr-only peer addon-input"
+                       checked>
+                <span class="block px-4 py-2 text-sm font-mono border border-gray-300 rounded-sm bg-white peer-checked:border-black peer-checked:bg-black peer-checked:text-white hover:border-gray-500 transition-colors">
+                  None
+                </span>
+              </label>
+              {%- comment -%} Add-on value options {%- endcomment -%}
+              {% for val in addon.values %}
+                {% assign price_mod = addon.priceModifiers[val] | default: 0 %}
+                <label class="addon-option-label relative cursor-pointer">
+                  <input type="radio" 
+                         name="addon_{{ addon.name | handleize }}" 
+                         value="{{ val }}" 
+                         data-price-modifier="{{ price_mod }}" 
+                         class="sr-only peer addon-input">
+                  <span class="block px-4 py-2 text-sm font-mono border border-blue-300 rounded-sm bg-white peer-checked:border-blue-600 peer-checked:bg-blue-600 peer-checked:text-white hover:border-blue-500 transition-colors">
+                    {{ val }}{% if price_mod > 0 %}<span class="text-xs opacity-75 ml-1">(+${{ price_mod }})</span>{% endif %}
+                  </span>
+                </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div id="addon-options-container" class="addon-options mb-4 space-y-3"></div>
+    {% endif %}
+    <div id="addon-properties"></div>
+    <div class="flex flex-col sm:flex-row gap-4">
+      <div class="flex items-center border border-gray-300 rounded-sm h-[56px] w-[120px] bg-white">
+        <button type="button" name="minus" class="w-10 h-full flex items-center justify-center text-gray-500 hover:text-black hover:bg-gray-100 transition-colors border-r border-gray-200" onclick="this.nextElementSibling.stepDown()"><span class="text-xl font-light">-</span></button>
+        <input type="number" name="quantity" value="1" min="1" class="w-full h-full bg-transparent text-center text-black font-mono border-none focus:ring-0 p-0 appearance-none">
+        <button type="button" name="plus" class="w-10 h-full flex items-center justify-center text-gray-500 hover:text-black hover:bg-gray-100 transition-colors border-l border-gray-200" onclick="this.previousElementSibling.stepUp()"><span class="text-xl font-light">+</span></button>
+      </div>
+      <button type="submit" name="add" class="flex-1 h-[56px] relative overflow-hidden group bg-black text-white hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded-sm" {% if product.selected_or_first_available_variant.available == false %}disabled{% endif %}>
+        <div class="absolute inset-0 bg-[#CC0000] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-out will-change-transform"></div>
+        <span class="relative z-10 flex items-center justify-center gap-3 font-bold uppercase tracking-[0.15em] text-sm">
+          {%- if product.selected_or_first_available_variant.available -%}
+            <span class="group-hover:hidden">Add to Cart</span><span class="hidden group-hover:inline">Initiate Build</span>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
+          {%- else -%}Sold Out{%- endif -%}
+        </span>
+      </button>
+    </div>
+    {%- if product.selected_or_first_available_variant.available == false -%}
+      <div class="mt-2 text-center"><span class="text-xs text-red-500 font-bold uppercase tracking-wider">Currently Unavailable</span></div>
+    {%- endif -%}
+  {%- endform -%}
+</div>
+<style>input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}</style>
+
+<script>
+(function() {
+  var productJson = {{ product | json }};
+  var form = document.getElementById('{{ product_form_id }}');
+  if (!form) return;
+  var variantInput = form.querySelector('[data-variant-id]');
+  var addButton = form.querySelector('[name="add"]');
+  var optionInputs = form.querySelectorAll('input[name^="option"]');
+  var addonContainer = document.getElementById('addon-options-container');
+  var addonPropertiesContainer = document.getElementById('addon-properties');
+  var currentVariantPrice = productJson.variants[0] ? productJson.variants[0].price : 0;
+  
+  // B2B pricing data
+  var isB2BUser = {% assign is_b2b = false %}{% if customer %}{% for tag in customer.tags %}{% assign tag_downcase = tag | downcase | strip %}{% if tag_downcase == 'b2b' or tag_downcase == 'wholesale' or tag_downcase == 'business' %}{% assign is_b2b = true %}{% break %}{% endif %}{% endfor %}{% endif %}{{ is_b2b }};
+  var productB2bPrice = {{ product.metafields.custom.b2b_price.value | default: 'null' }};
+  var productDiscountPrice = {{ product.metafields.custom.discount_price.value | default: 'null' }};
+  
+  // Variant-level B2B prices (built from Liquid)
+  var variantB2bPrices = {
+    {%- for variant in product.variants -%}
+      "{{ variant.id }}": {{ variant.metafields.custom.b2b_price.value | default: 'null' }}{% unless forloop.last %},{% endunless %}
+    {%- endfor -%}
+  };
+  
+  // Variant-level discount prices (built from Liquid)
+  var variantDiscountPrices = {
+    {%- for variant in product.variants -%}
+      "{{ variant.id }}": {{ variant.metafields.custom.discount_price.value | default: 'null' }}{% unless forloop.last %},{% endunless %}
+    {%- endfor -%}
+  };
+  
+  // Calculate effective price (in cents) for a specific variant
+  function getEffectivePrice(variantPrice, variantId) {
+    // Get variant-specific prices, fall back to product-level
+    var variantB2b = variantId ? variantB2bPrices[variantId] : null;
+    var variantDiscount = variantId ? variantDiscountPrices[variantId] : null;
+    
+    var b2bPrice = (variantB2b !== null && variantB2b !== undefined) ? variantB2b : productB2bPrice;
+    var discountPrice = (variantDiscount !== null && variantDiscount !== undefined) ? variantDiscount : productDiscountPrice;
+    
+    if (!isB2BUser) {
+      // Standard user - use discount price if available
+      if (discountPrice !== null) {
+        var discountCents = discountPrice * 100;
+        var percentOff = Math.round((variantPrice - discountCents) / variantPrice * 100);
+        return { 
+          price: discountCents, 
+          badge: percentOff > 0 ? percentOff + '% OFF' : 'ON SALE', 
+          badgeColor: 'bg-green-600',
+          showCrossed: true, 
+          crossedPrice: variantPrice 
+        };
+      }
+      return { price: variantPrice, badge: null, showCrossed: false, crossedPrice: null };
+    }
+    
+    // B2B user pricing logic - compare B2B price vs discount price, show lower
+    var b2bCents = b2bPrice !== null ? b2bPrice * 100 : null;
+    var discountCents = discountPrice !== null ? discountPrice * 100 : null;
+    
+    if (b2bCents !== null && discountCents !== null) {
+      if (b2bCents <= discountCents) {
+        return { price: b2bCents, badge: 'WHOLESALE', badgeColor: 'bg-[#CC0000]', showCrossed: true, crossedPrice: variantPrice };
+      } else {
+        var percentOff = Math.round((variantPrice - discountCents) / variantPrice * 100);
+        return { price: discountCents, badge: percentOff + '% OFF', badgeColor: 'bg-green-600', showCrossed: true, crossedPrice: variantPrice };
+      }
+    } else if (b2bCents !== null) {
+      return { price: b2bCents, badge: 'WHOLESALE', badgeColor: 'bg-[#CC0000]', showCrossed: true, crossedPrice: variantPrice };
+    } else if (discountCents !== null) {
+      var percentOff = Math.round((variantPrice - discountCents) / variantPrice * 100);
+      return { price: discountCents, badge: percentOff + '% OFF', badgeColor: 'bg-green-600', showCrossed: true, crossedPrice: variantPrice };
+    }
+    
+    return { price: variantPrice, badge: null, showCrossed: false, crossedPrice: null };
+  }
+  
+  // Add-on options are now rendered via Liquid, just need to bind events
+  function initAddonOptions() {
+    var addonInputs = document.querySelectorAll('#addon-options-container .addon-input');
+    console.log('[Add-on] Found', addonInputs.length, 'addon inputs');
+    if (addonInputs.length === 0) return;
+    
+    addonInputs.forEach(function(inp) {
+      inp.addEventListener('change', function() { 
+        console.log('[Add-on] Selection changed:', this.value, 'Price mod:', this.dataset.priceModifier);
+        updatePriceWithAddons(); 
+        updateAddonProperties(); 
+      });
+    });
+    // Initialize properties on load
+    updateAddonProperties();
+  }
+  
+  function getAddonPriceModifier() {
+    var t = 0;
+    document.querySelectorAll('#addon-options-container .addon-input:checked').forEach(function(i) { 
+      var pm = parseFloat(i.dataset.priceModifier) || 0;
+      t += pm;
+    });
+    return t * 100; // Convert to cents
+  }
+  
+  function updateAddonProperties() {
+    if (!addonPropertiesContainer) return;
+    addonPropertiesContainer.innerHTML = '';
+    form.querySelectorAll('fieldset.addon-option-group').forEach(function(f) {
+      var n = f.dataset.addonName, c = f.querySelector('input:checked');
+      // Only add property if a value is selected (not "None" which has empty value)
+      if (c && n && c.value) {
+        var m = parseFloat(c.dataset.priceModifier) || 0;
+        var inp = document.createElement('input');
+        inp.type = 'hidden'; 
+        inp.name = 'properties[' + n + ']';
+        inp.value = c.value + (m > 0 ? ' (+$' + m.toFixed(2) + ')' : '');
+        addonPropertiesContainer.appendChild(inp);
+      }
+    });
+    var tm = getAddonPriceModifier() / 100;
+    if (tm > 0) {
+      var p = document.createElement('input');
+      p.type = 'hidden'; 
+      p.name = 'properties[_addon_price]'; 
+      p.value = tm.toFixed(2);
+      addonPropertiesContainer.appendChild(p);
+    }
+    
+    // Store effective price for cart display (variant-specific B2B/discount price)
+    var currentVariantId = variantInput ? variantInput.value : null;
+    var pricing = getEffectivePrice(currentVariantPrice, currentVariantId);
+    var effectivePriceDollars = (pricing.price / 100).toFixed(2);
+    
+    // Always store the effective price so cart can use it
+    var effectivePriceInput = document.createElement('input');
+    effectivePriceInput.type = 'hidden';
+    effectivePriceInput.name = 'properties[_effective_price]';
+    effectivePriceInput.value = effectivePriceDollars;
+    addonPropertiesContainer.appendChild(effectivePriceInput);
+    
+    // Store original price for crossed-out display
+    var originalPriceDollars = (currentVariantPrice / 100).toFixed(2);
+    var originalPriceInput = document.createElement('input');
+    originalPriceInput.type = 'hidden';
+    originalPriceInput.name = 'properties[_original_price]';
+    originalPriceInput.value = originalPriceDollars;
+    addonPropertiesContainer.appendChild(originalPriceInput);
+    
+    // Store badge info if applicable
+    if (pricing.badge) {
+      var badgeInput = document.createElement('input');
+      badgeInput.type = 'hidden';
+      badgeInput.name = 'properties[_price_badge]';
+      badgeInput.value = pricing.badge;
+      addonPropertiesContainer.appendChild(badgeInput);
+    }
+  }
+  
+  function updatePriceWithAddons() {
+    var pd = document.getElementById('product-price-display');
+    if (!pd) return;
+    var pe = pd.querySelector('[data-product-price]');
+    var currentVariantId = variantInput ? variantInput.value : null;
+    var pricing = getEffectivePrice(currentVariantPrice, currentVariantId);
+    if (pe) pe.textContent = formatMoney(pricing.price + getAddonPriceModifier());
+  }
+  
+  function getSelectedOptions() {
+    var o = [];
+    form.querySelectorAll('fieldset.variant-option-group').forEach(function(f) {
+      var c = f.querySelector('input:checked');
+      if (c) o.push(c.value);
+    });
+    return o;
+  }
+  
+  function findVariant(o) {
+    return productJson.variants.find(function(v) {
+      return o.every(function(opt, i) { return v.options[i] === opt; });
+    });
+  }
+  
+  function formatMoney(c) {
+    var d = (c / 100).toFixed(2);
+    return String.fromCharCode(36) + d.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+  
+  function updateVariant() {
+    var o = getSelectedOptions();
+    var v = findVariant(o);
+    if (!v) return;
+    variantInput.value = v.id;
+    currentVariantPrice = v.price;
+    try { var u = new URL(window.location); u.searchParams.set('variant', v.id); window.history.replaceState({}, '', u); } catch(e) {}
+    var pd = document.getElementById('product-price-display');
+    if (pd) {
+      var pe = pd.querySelector('[data-product-price]');
+      var ce = pd.querySelector('[data-compare-price]');
+      var badgeEl = pd.querySelector('.price-badge');
+      
+      // Get effective price based on B2B status and variant-specific B2B price
+      var pricing = getEffectivePrice(v.price, v.id);
+      var displayPrice = pricing.price + getAddonPriceModifier();
+      
+      if (pe) {
+        pe.textContent = formatMoney(displayPrice);
+        // Update price color based on whether there's a special price
+        if (pricing.showCrossed) {
+          pe.classList.remove('text-black');
+          pe.classList.add('text-[#CC0000]');
+        } else {
+          pe.classList.remove('text-[#CC0000]');
+          pe.classList.add('text-black');
+        }
+      }
+      
+      // Update crossed out price
+      if (pricing.showCrossed && pricing.crossedPrice) {
+        if (ce) {
+          ce.textContent = formatMoney(pricing.crossedPrice);
+          ce.style.display = '';
+        }
+      } else if (v.compare_at_price && v.compare_at_price > v.price && !pricing.showCrossed) {
+        if (ce) { ce.textContent = formatMoney(v.compare_at_price); ce.style.display = ''; }
+      } else if (ce) {
+        ce.style.display = 'none';
+      }
+      
+      // Update or create badge
+      if (pricing.badge) {
+        if (!badgeEl) {
+          badgeEl = document.createElement('span');
+          badgeEl.className = 'price-badge ml-2 inline-block text-white text-[10px] px-2 py-0.5 uppercase tracking-wider font-bold';
+          badgeEl.style.clipPath = 'polygon(0 0, 100% 0, 95% 50%, 100% 100%, 0 100%, 5% 50%)';
+          pd.appendChild(badgeEl);
+        }
+        // Update badge color based on pricing type
+        badgeEl.classList.remove('bg-[#CC0000]', 'bg-green-600');
+        badgeEl.classList.add(pricing.badgeColor || 'bg-[#CC0000]');
+        badgeEl.textContent = pricing.badge;
+        badgeEl.style.display = '';
+      } else if (badgeEl) {
+        badgeEl.style.display = 'none';
+      }
+    }
+    var sd = document.getElementById('product-sku-display');
+    if (sd) sd.innerHTML = v.sku ? 'SKU: <span class="text-black font-bold">' + v.sku + '</span>' : '';
+    var ad = document.getElementById('product-availability-display');
+    if (ad) {
+      var q = v.inventory_quantity || '1+';
+      ad.innerHTML = v.available ? 'Availability: <span class="text-green-600 font-bold uppercase">In Stock (' + q + ')</span>' : 'Availability: <span class="text-red-600 font-bold uppercase">Out of Stock</span>';
+    }
+    if (v.available) {
+      addButton.disabled = false;
+      addButton.querySelector('span').innerHTML = '<span class="group-hover:hidden">Add to Cart</span><span class="hidden group-hover:inline">Initiate Build</span><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>';
+    } else {
+      addButton.disabled = true;
+      addButton.querySelector('span').textContent = 'Sold Out';
+    }
+    var oo = {};
+    form.querySelectorAll('fieldset.variant-option-group').forEach(function(f) { var n = f.dataset.optionName; var c = f.querySelector('input:checked'); if (c) oo[n] = c.value; });
+    document.dispatchEvent(new CustomEvent('variant:change', { detail: { variant: v, options: oo } }));
+  }
+  
+  optionInputs.forEach(function(i) { i.addEventListener('change', updateVariant); });
+  var up = new URLSearchParams(window.location.search);
+  var vi = up.get('variant');
+  if (vi) {
+    var vf = productJson.variants.find(function(v) { return String(v.id) === vi; });
+    if (vf) {
+      vf.options.forEach(function(o, i) { var inp = form.querySelector('input[name="option' + (i + 1) + '"][value="' + o + '"]'); if (inp) inp.checked = true; });
+      variantInput.value = vf.id;
+      currentVariantPrice = vf.price;
+    }
+  }
+  
+  // Initialize add-on options (rendered via Liquid, just bind events)
+  initAddonOptions();
+  
+  // Trigger initial variant update to ensure correct pricing on page load
+  updateVariant();
+  
+  // Debug logging for variant prices
+  console.log('[Pricing Debug] isB2BUser:', isB2BUser);
+  console.log('[Pricing Debug] productB2bPrice:', productB2bPrice);
+  console.log('[Pricing Debug] productDiscountPrice:', productDiscountPrice);
+  console.log('[Pricing Debug] variantB2bPrices:', variantB2bPrices);
+  console.log('[Pricing Debug] variantDiscountPrices:', variantDiscountPrices);
+})();
+</script>

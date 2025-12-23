@@ -1,0 +1,73 @@
+{{ 'ymm.css' | asset_url | stylesheet_tag }}
+
+{%- liquid
+  assign sf_token = section.settings.storefront_access_token | default: 'c9e546201d3f991f9c3f576e0d1cf4ee'
+  assign collection_handle = section.settings.collection_handle | default: 'all'
+  assign unique_id = 'modal-' | append: section.id
+-%}
+
+<div class="ymm-search-container {% if is_modal %}ymm-search-container--modal{% endif %}">
+   {% unless is_modal %}
+   <div class="ymm-search-accent"></div>
+   {% endunless %}
+   
+   <div class="ymm-search-grid">
+      <div class="ymm-search-field">
+        <label for="ymm-year-{{ unique_id }}" class="ymm-search-label">Year</label>
+        <div class="ymm-search-select-wrapper">
+          <select id="ymm-year-{{ unique_id }}" data-role="ymm-year" class="ymm-search-select"></select>
+          <div class="ymm-search-select-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+          </div>
+        </div>
+      </div>
+      <div class="ymm-search-field">
+        <label for="ymm-make-{{ unique_id }}" class="ymm-search-label">Make</label>
+        <div class="ymm-search-select-wrapper">
+          <select id="ymm-make-{{ unique_id }}" data-role="ymm-make" disabled class="ymm-search-select"></select>
+          <div class="ymm-search-select-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+          </div>
+        </div>
+      </div>
+      <div class="ymm-search-field">
+        <label for="ymm-model-{{ unique_id }}" class="ymm-search-label">Model</label>
+        <div class="ymm-search-select-wrapper">
+          <select id="ymm-model-{{ unique_id }}" data-role="ymm-model" disabled class="ymm-search-select"></select>
+          <div class="ymm-search-select-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+          </div>
+        </div>
+      </div>
+      <div class="ymm-search-field" data-role="ymm-submodel-container">
+        <label for="ymm-submodel-{{ unique_id }}" class="ymm-search-label">Submodel</label>
+        <div class="ymm-search-select-wrapper">
+          <select id="ymm-submodel-{{ unique_id }}" data-role="ymm-submodel" disabled class="ymm-search-select"></select>
+          <div class="ymm-search-select-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+          </div>
+        </div>
+      </div>
+      <div class="ymm-search-field ymm-search-field--button">
+        <button type="button" data-role="ymm-submit" class="ymm-search-button">
+          Build Setup
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+   </div>
+   <div class="ymm-status" aria-live="polite"></div>
+</div>
+
+<script type="application/json" id="ymm-config-{{ unique_id }}">
+  {
+    "collectionHandle": {{ collection_handle | json }},
+    "showSubmodel": true,
+    "showEngine": false,
+    "storefrontAccessToken": {{ sf_token | json }},
+    "apiVersion": "2025-01",
+    "rootId": {{ unique_id | json }}
+  }
+</script>
+{% unless is_modal %}
+<script src="{{ 'ymm.js' | asset_url }}" defer="defer"></script>
+{% endunless %}

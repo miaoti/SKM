@@ -1,0 +1,343 @@
+<!doctype html>
+<html
+  class="no-js{% if request.design_mode %} shopify-design-mode{% endif %}"
+  lang="{{ request.locale.iso_code }}"
+>
+  <head>
+    {%- if settings.favicon != blank -%}
+      <link
+        rel="icon"
+        type="image/png"
+        href="{{ settings.favicon | image_url: width: 32, height: 32 }}"
+      >
+    {%- endif -%}
+
+    {% comment %} This a way to wait for main content to load when navigating to a new page so that the view transitions can work consistently {% endcomment %}
+    <link
+      rel="expect"
+      href="#MainContent"
+      blocking="render"
+      id="view-transition-render-blocker"
+    >
+
+    {%- render 'meta-tags' -%}
+    <script src="https://cdn.tailwindcss.com"></script>
+    {%- render 'stylesheets' -%}
+    <link rel="stylesheet" href="{{ 'sonic-theme.css' | asset_url }}" media="print" onload="this.media='all'">
+    {%- render 'fonts' -%}
+    {%- render 'scripts' -%}
+    {%- render 'theme-styles-variables' -%}
+    {%- render 'color-schemes' -%}
+
+    {% if request.design_mode %}
+      {%- render 'theme-editor' -%}
+    {% endif %}
+
+    {{ content_for_header }}
+  </head>
+
+  <body class="w-full min-h-screen flex flex-col page-width-{{ settings.page_width }} card-hover-effect-{{ settings.card_hover_effect }}">
+    <div class="sonic-loader"></div>
+    {% render 'skip-to-content-link', href: '#MainContent', text: 'accessibility.skip_to_text' %}
+    <div id="header-group">
+      {% sections 'header-group' %}
+    </div>
+
+    <script>
+      // Inline header height calculation to prevent layout shift
+      // Note: Updates in calculateHeaderGroupHeight() and updateTransparentHeaderOffset()utilities.js should be kept in sync with this function
+      (function setHeaderHeighCustomProperties() {
+        /*
+         * Header calculation functions for maintaining CSS variables
+         * Mimic calculateHeaderGroupHeight() in utilities.js
+         */
+        const header = document.querySelector('header-component');
+        const headerGroup = document.querySelector('#header-group');
+        const hasHeaderSection = headerGroup?.querySelector('.header-section');
+
+        if (!header || !headerGroup) return;
+
+        const headerHeight = header.offsetHeight;
+
+        // Calculate the total height of the header group
+        let headerGroupHeight = 0;
+        const children = headerGroup.children;
+        for (let i = 0; i < children.length; i++) {
+          const element = children[i];
+          if (element === header || !(element instanceof HTMLElement)) continue;
+          headerGroupHeight += element.offsetHeight;
+        }
+
+        // Check for transparent header special case
+        if (header.hasAttribute('transparent') && header.parentElement?.nextElementSibling) {
+          headerGroupHeight += headerHeight;
+        }
+
+        // Set CSS variables
+        document.body.style.setProperty('--header-height', `${headerHeight}px`);
+        document.body.style.setProperty('--header-group-height', `${headerGroupHeight}px`);
+
+        /**
+         * Updates CSS custom properties for transparent header offset calculation
+         * Mimic updateTransparentHeaderOffset() in utilities.js
+         */
+
+        if (!hasHeaderSection || !header?.hasAttribute('transparent')) {
+          document.body.style.setProperty('--transparent-header-offset-boolean', '0');
+          return;
+        }
+
+        const hasImmediateSection = hasHeaderSection.nextElementSibling?.classList.contains('shopify-section');
+
+        const shouldApplyOffset = !hasImmediateSection ? '1' : '0';
+        document.body.style.setProperty('--transparent-header-offset-boolean', shouldApplyOffset);
+      })();
+    </script>
+
+    <main
+      id="MainContent"
+      class="content-for-layout w-full flex-grow {% unless template.name == 'index' %}pt-[116px]{% endunless %}"
+      role="main"
+      data-page-transition-enabled="{{ settings.page_transition_enabled }}"
+      data-product-transition="{{ settings.transition_to_main_product }}"
+      data-template="{{ template }}"
+    >
+      {{ content_for_layout }}
+    </main>
+
+    {% sections 'footer-group' %}
+
+    {% render 'search-modal' %}
+
+    {% if settings.quick_add or settings.mobile_quick_add %}
+      {% render 'quick-add-modal' %}
+    {% endif %}
+
+    {% comment %} 
+      Customer Cart Persistence System
+      Purpose: Save cart to localStorage when logged in, restore on login, clear session on logout
+      
+      Flow:
+      1. Guest adds items → session cart
+      2. Guest logs in → Shopify merges, we save to localStorage (keyed by customer ID)  
+      3. User logs out → Clear session cart (account cart preserved in localStorage)
+      4. User logs back in → Restore cart from localStorage
+      5. After checkout → Clear both session cart and localStorage saved cart
+    {% endcomment %}
+    <script>
+      (function customerCartPersistence() {
+        const CART_STORAGE_KEY = 'skm_customer_cart_';
+        
+        // Get customer state from Liquid
+        {% if customer %}
+          const customerId = '{{ customer.id }}';
+          const isLoggedIn = true;
+        {% else %}
+          const customerId = null;
+          const isLoggedIn = false;
+        {% endif %}
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const hasLoggedOutFlag = urlParams.get('logged_out') === 'true';
+        const hasJustLoggedIn = urlParams.get('just_logged_in') === 'true';
+        
+        // === SCENARIO 0: User returning from checkout ===
+        // Check if checkout was initiated and clear cart to prevent restoration
+        const checkoutInitiated = sessionStorage.getItem('skm_checkout_initiated');
+        if (checkoutInitiated === 'true') {
+          console.log('[Cart Persistence] Checkout was initiated. Ensuring cart is cleared...');
+          
+          // Clear the flag
+          sessionStorage.removeItem('skm_checkout_initiated');
+          
+          // Clear session cart
+          fetch(window.Shopify.routes.root + 'cart/clear.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          })
+          .then(() => {
+            console.log('[Cart Persistence] Cart cleared after checkout.');
+            updateCartUI(0);
+          })
+          .catch(err => console.error('[Cart Persistence] Error clearing cart after checkout:', err));
+          
+          // Clear localStorage saved cart for this customer
+          if (customerId) {
+            localStorage.removeItem(CART_STORAGE_KEY + customerId);
+            console.log('[Cart Persistence] Cleared saved cart from localStorage after checkout.');
+          }
+          
+          return; // Don't restore cart
+        }
+        
+        // === SCENARIO 1: User just logged out (is now guest) ===
+        if (!isLoggedIn && hasLoggedOutFlag) {
+          console.log('[Cart Persistence] User logged out. Clearing session cart...');
+          
+          // Clear the session cart
+          fetch(window.Shopify.routes.root + 'cart/clear.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          })
+          .then(response => response.json())
+          .then(() => {
+            // Update UI
+            updateCartUI(0);
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            console.log('[Cart Persistence] Session cart cleared. Customer cart preserved in storage.');
+          })
+          .catch(err => console.error('[Cart Persistence] Error clearing cart:', err));
+          
+          return;
+        }
+        
+        // === SCENARIO 2: User is logged in ===
+        if (isLoggedIn && customerId) {
+          // Check if we need to restore cart from localStorage
+          restoreCartIfNeeded(customerId);
+          
+          // Set up cart sync - save to localStorage on every cart update
+          document.addEventListener('cart:update', () => {
+            saveCartToStorage(customerId);
+          });
+          
+          // Also save current cart state now
+          saveCartToStorage(customerId);
+        }
+        
+        // === HELPER FUNCTIONS ===
+        
+        /**
+         * Save current cart to localStorage for this customer
+         */
+        async function saveCartToStorage(custId) {
+          try {
+            const response = await fetch(window.Shopify.routes.root + 'cart.js');
+            const cart = await response.json();
+            
+            if (cart.items && cart.items.length > 0) {
+              const cartData = {
+                items: cart.items.map(item => ({
+                  variant_id: item.variant_id,
+                  quantity: item.quantity,
+                  properties: item.properties
+                })),
+                savedAt: Date.now()
+              };
+              localStorage.setItem(CART_STORAGE_KEY + custId, JSON.stringify(cartData));
+              console.log('[Cart Persistence] Cart saved for customer:', custId, cartData.items.length, 'items');
+            }
+          } catch (err) {
+            console.error('[Cart Persistence] Error saving cart:', err);
+          }
+        }
+        
+        /**
+         * Restore cart from localStorage if current cart is empty
+         */
+        async function restoreCartIfNeeded(custId) {
+          try {
+            // Check current cart
+            const response = await fetch(window.Shopify.routes.root + 'cart.js');
+            const currentCart = await response.json();
+            
+            // If cart already has items, just update storage and return
+            if (currentCart.items && currentCart.items.length > 0) {
+              console.log('[Cart Persistence] Cart already has items, saving to storage.');
+              saveCartToStorage(custId);
+              return;
+            }
+            
+            // Cart is empty - check if we have saved cart
+            const savedData = localStorage.getItem(CART_STORAGE_KEY + custId);
+            if (!savedData) {
+              console.log('[Cart Persistence] No saved cart found for customer:', custId);
+              return;
+            }
+            
+            const cartData = JSON.parse(savedData);
+            
+            // Check if saved cart has items and isn't too old (7 days max)
+            const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+            if (!cartData.items || cartData.items.length === 0 || (Date.now() - cartData.savedAt) > maxAge) {
+              console.log('[Cart Persistence] Saved cart is empty or expired.');
+              localStorage.removeItem(CART_STORAGE_KEY + custId);
+              return;
+            }
+            
+            console.log('[Cart Persistence] Restoring cart with', cartData.items.length, 'items...');
+            
+            // Restore items to cart
+            const addPromises = cartData.items.map(item => {
+              return fetch(window.Shopify.routes.root + 'cart/add.js', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: item.variant_id,
+                  quantity: item.quantity,
+                  properties: item.properties || {}
+                })
+              });
+            });
+            
+            await Promise.all(addPromises);
+            
+            // Fetch final cart state and update UI
+            const finalResponse = await fetch(window.Shopify.routes.root + 'cart.js');
+            const finalCart = await finalResponse.json();
+            
+            updateCartUI(finalCart.item_count);
+            
+            // Dispatch event for other components
+            document.dispatchEvent(new CustomEvent('cart:update', {
+              bubbles: true,
+              detail: { resource: finalCart, source: 'cart-restore', itemCount: finalCart.item_count }
+            }));
+            
+            console.log('[Cart Persistence] Cart restored! Total items:', finalCart.item_count);
+            
+          } catch (err) {
+            console.error('[Cart Persistence] Error restoring cart:', err);
+          }
+        }
+        
+        /**
+         * Update cart count in header UI
+         */
+        function updateCartUI(count) {
+          // Precision header cart count
+          const precisionCartCount = document.getElementById('precision-cart-count');
+          if (precisionCartCount) {
+            precisionCartCount.textContent = count;
+            precisionCartCount.dataset.cartCount = count;
+            if (count > 0) {
+              precisionCartCount.classList.remove('hidden');
+            } else {
+              precisionCartCount.classList.add('hidden');
+            }
+          }
+          
+          // Theme cart icons
+          const cartIcons = document.querySelectorAll('cart-icon');
+          cartIcons.forEach(icon => {
+            if (typeof icon.updateCartCount === 'function') {
+              icon.updateCartCount();
+            }
+          });
+          
+          // Other cart count elements
+          document.querySelectorAll('[data-cart-count], .cart-bubble__text-count').forEach(el => {
+            el.textContent = count;
+            if (count > 0) {
+              el.classList.remove('hidden', 'visually-hidden');
+            } else {
+              el.classList.add('hidden');
+            }
+          });
+        }
+        
+      })();
+    </script>
+  </body>
+</html>

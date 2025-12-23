@@ -1,0 +1,504 @@
+{% comment %}
+  Main Product Precision - "Spec Sheet" Design
+{% endcomment %}
+
+<script>
+  // Expose compatible vehicles to JS
+  window.productCompatibleVehicles = [
+    {%- if product.metafields.custom.fits_vehicles.value != blank -%}
+      {%- for vehicle in product.metafields.custom.fits_vehicles.value -%}
+        "{{ vehicle.system.id }}",
+      {%- endfor -%}
+    {%- endif -%}
+  ];
+</script>
+
+{% comment %} Product JSON for variant media filter {% endcomment %}
+<script type="application/json" data-product-json>
+  {{ product | json }}
+</script>
+<div class="product-precision-page bg-white min-h-screen text-black font-sans">
+  <div class="page-width max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col lg:flex-row gap-12 relative">
+      
+      <!-- LEFT COLUMN: VISUAL SHOWCASE (65%) -->
+      <div class="w-full lg:w-[65%] flex flex-col gap-4" data-product-media-container>
+        {%- if product.media.size > 0 -%}
+          {%- for media in product.media -%}
+            <div class="media-item w-full bg-gray-100 rounded-sm overflow-hidden relative group" data-product-media data-alt="{{ media.alt | escape }}">
+              {% render 'product-media', 
+                media: media, 
+                loop: section.settings.enable_video_looping, 
+                variant_image: false,
+                loading: 'lazy',
+                widths: '550, 750, 1100, 1500, 2000, 3000'
+              %}
+            </div>
+          {%- endfor -%}
+        {%- else -%}
+          <div class="media-item w-full bg-gray-100 aspect-square flex items-center justify-center text-gray-400">
+            {{ 'product-1' | placeholder_svg_tag: 'w-1/3 h-1/3' }}
+          </div>
+        {%- endif -%}
+      </div>
+
+      <!-- RIGHT COLUMN: CONTROL PANEL (35%) -->
+      <div class="w-full lg:w-[35%] lg:sticky lg:top-8 h-fit flex flex-col gap-6">
+        
+        <!-- Header -->
+        <div class="border-b border-gray-200 pb-4 relative">
+          <!-- Tech Line -->
+          <div class="absolute bottom-[-1px] left-0 w-full h-[1px] bg-black/10 flex justify-between">
+            <span class="w-1 h-[4px] bg-black -mt-[1.5px] rotate-45"></span>
+            <span class="w-1 h-[4px] bg-black -mt-[1.5px] rotate-45"></span>
+          </div>
+
+          <h1 class="text-3xl md:text-4xl font-bold uppercase tracking-tight text-black mb-2" style="font-family: 'Oswald', sans-serif;">
+            {{ product.title }}
+          </h1>
+          <div class="flex items-center justify-between mt-4">
+            <div class="flex flex-col gap-1">
+              <div class="text-xs font-mono text-gray-500" id="product-sku-display">
+                {%- if product.selected_or_first_available_variant.sku != blank -%}
+                  SKU: <span class="text-black font-bold">{{ product.selected_or_first_available_variant.sku }}</span>
+                {%- endif -%}
+              </div>
+              
+              <div class="text-xs font-mono text-gray-500" id="product-availability-display">
+                Availability: 
+                {%- if product.selected_or_first_available_variant.available -%}
+                  <span class="text-green-600 font-bold uppercase">In Stock (<span id="product-inventory-count">{{ product.selected_or_first_available_variant.inventory_quantity | default: '1+' }}</span>)</span>
+                {%- else -%}
+                  <span class="text-red-600 font-bold uppercase">Out of Stock</span>
+                {%- endif -%}
+              </div>
+            </div>
+
+            <!-- Dynamic Price Display with B2B Support -->
+            {%- liquid
+              assign selected_variant = product.selected_or_first_available_variant
+              assign original_price = selected_variant.price
+              assign compare_at_price = selected_variant.compare_at_price
+              
+              # Get B2B price - check variant-level first, then fall back to product-level
+              assign variant_b2b_price_raw = selected_variant.metafields.custom.b2b_price.value
+              assign product_b2b_price_raw = product.metafields.custom.b2b_price.value
+              
+              # Get discount price - check variant-level first, then fall back to product-level
+              assign variant_discount_price_raw = selected_variant.metafields.custom.discount_price.value
+              assign product_discount_price_raw = product.metafields.custom.discount_price.value
+              
+              # Use variant prices if available, otherwise product prices
+              assign b2b_price_raw = variant_b2b_price_raw
+              if b2b_price_raw == blank or b2b_price_raw == empty
+                assign b2b_price_raw = product_b2b_price_raw
+              endif
+              
+              assign discount_price_raw = variant_discount_price_raw
+              if discount_price_raw == blank or discount_price_raw == empty
+                assign discount_price_raw = product_discount_price_raw
+              endif
+              
+              assign b2b_price = nil
+              assign discount_price = nil
+              
+              if b2b_price_raw != blank and b2b_price_raw != empty
+                assign b2b_price = b2b_price_raw | times: 100
+              endif
+              
+              if discount_price_raw != blank and discount_price_raw != empty
+                assign discount_price = discount_price_raw | times: 100
+              endif
+              
+              # Check if user is B2B
+              assign is_b2b_user = false
+              if customer
+                for tag in customer.tags
+                  assign tag_downcase = tag | downcase | strip
+                  if tag_downcase == 'b2b' or tag_downcase == 'wholesale' or tag_downcase == 'business'
+                    assign is_b2b_user = true
+                    break
+                  endif
+                endfor
+              endif
+              
+              # Determine display price
+              assign display_price = original_price
+              assign crossed_out_price = nil
+              assign price_badge = nil
+              assign badge_color = 'bg-[#CC0000]'
+              assign show_crossed_price = false
+              
+              if is_b2b_user
+                # B2B user - compare B2B price vs discount price, show lower
+                if discount_price != nil and b2b_price != nil
+                  if b2b_price <= discount_price
+                    assign display_price = b2b_price
+                    assign crossed_out_price = original_price
+                    assign price_badge = 'WHOLESALE'
+                    assign badge_color = 'bg-[#CC0000]'
+                  else
+                    assign display_price = discount_price
+                    assign crossed_out_price = original_price
+                    assign price_diff = original_price | minus: discount_price
+                    assign percent_off = price_diff | times: 100 | divided_by: original_price | round
+                    assign price_badge = percent_off | append: '% OFF'
+                    assign badge_color = 'bg-green-600'
+                  endif
+                  assign show_crossed_price = true
+                elsif b2b_price != nil
+                  assign display_price = b2b_price
+                  assign crossed_out_price = original_price
+                  assign price_badge = 'WHOLESALE'
+                  assign badge_color = 'bg-[#CC0000]'
+                  assign show_crossed_price = true
+                elsif discount_price != nil
+                  assign display_price = discount_price
+                  assign crossed_out_price = original_price
+                  assign price_diff = original_price | minus: discount_price
+                  assign percent_off = price_diff | times: 100 | divided_by: original_price | round
+                  assign price_badge = percent_off | append: '% OFF'
+                  assign badge_color = 'bg-green-600'
+                  assign show_crossed_price = true
+                endif
+              else
+                # Standard user - show discount price with % OFF badge
+                if discount_price != nil
+                  assign display_price = discount_price
+                  assign crossed_out_price = original_price
+                  assign price_diff = original_price | minus: discount_price
+                  assign percent_off = price_diff | times: 100 | divided_by: original_price | round
+                  if percent_off > 0
+                    assign price_badge = percent_off | append: '% OFF'
+                  else
+                    assign price_badge = 'ON SALE'
+                  endif
+                  assign badge_color = 'bg-green-600'
+                  assign show_crossed_price = true
+                elsif compare_at_price > original_price
+                  assign crossed_out_price = compare_at_price
+                  assign show_crossed_price = true
+                endif
+              endif
+            -%}
+            <div class="text-xl" id="product-price-display">
+              {%- if show_crossed_price -%}
+                <span class="product-compare-price text-sm text-gray-400 line-through mr-2" data-compare-price>
+                  {{ crossed_out_price | money }}
+                </span>
+              {%- endif -%}
+              <span class="product-price font-bold {% if show_crossed_price %}text-[#CC0000]{% else %}text-black{% endif %}" data-product-price>
+                {{ display_price | money }}
+              </span>
+              {%- if price_badge -%}
+                <span class="price-badge ml-2 inline-block {{ badge_color }} text-white text-[10px] px-2 py-0.5 uppercase tracking-wider font-bold" style="clip-path: polygon(0 0, 100% 0, 95% 50%, 100% 100%, 0 100%, 5% 50%);">
+                  {{ price_badge }}
+                </span>
+              {%- endif -%}
+            </div>
+          </div>
+        </div>
+
+        <!-- Fitment Status Module REMOVED -->
+        
+        <!-- Buy Buttons -->
+        {%- render 'buy-buttons-precision', product: product, product_form_id: 'product-form-' | append: section.id -%}
+
+        <!-- Description -->
+        <div class="prose prose-sm max-w-none text-gray-600 font-mono text-xs leading-relaxed">
+          {{ product.description }}
+        </div>
+
+        <!-- Tech Specs Accordion -->
+        <div class="border-t border-gray-200 mt-8">
+          {%- for block in section.blocks -%}
+            {%- if block.type == 'collapsible_tab' -%}
+              <details class="group border-b border-gray-200">
+                <summary class="flex items-center justify-between py-4 cursor-pointer list-none select-none hover:bg-gray-50 px-2 transition-colors">
+                  <div class="flex items-center gap-3">
+                    <span class="w-2 h-2 bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    <span class="font-bold uppercase tracking-wider text-xs text-black">{{ block.settings.heading }}</span>
+                  </div>
+                  <span class="relative w-4 h-4 flex items-center justify-center">
+                    <span class="absolute w-full h-[2px] bg-black"></span>
+                    <span class="absolute w-[2px] h-full bg-black transition-transform duration-300 group-open:rotate-90"></span>
+                  </span>
+                </summary>
+                <div class="pb-4 px-2 text-sm text-gray-600 font-mono">
+                  {{ block.settings.content }}
+                  {{ block.settings.page.content }}
+                </div>
+              </details>
+            {%- endif -%}
+          {%- endfor -%}
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+{% comment %} Variant Media Filter - filters gallery based on selected options {% endcomment %}
+<script src="{{ 'variant-media-filter.js' | asset_url }}" defer></script>
+
+{% comment %} Hidden Quick-Add Modal Content - simplified layout for modal display {% endcomment %}
+<div class="quick-add-content-wrapper" data-product-grid-content data-quick-add-content style="position: absolute; left: -9999px; top: -9999px;">
+  <div class="quick-add-product-grid" style="display: grid; grid-template-columns: 200px 1fr; gap: 24px; padding: 24px;">
+    <!-- Product Image -->
+    <div class="quick-add-media">
+      {%- if product.featured_media -%}
+        <img 
+          src="{{ product.featured_media | image_url: width: 400 }}" 
+          alt="{{ product.featured_media.alt | escape }}"
+          style="width: 100%; border-radius: 8px;"
+        >
+      {%- endif -%}
+    </div>
+    
+    <!-- Product Details -->
+    <div class="product-details" style="display: flex; flex-direction: column; gap: 16px;">
+      <h2 style="font-size: 1.5rem; font-weight: bold; margin: 0;">{{ product.title }}</h2>
+      
+      <!-- Price with B2B/Discount Support -->
+      {%- liquid
+        assign qa_selected_variant = product.selected_or_first_available_variant
+        assign qa_original_price = qa_selected_variant.price
+        assign qa_compare_at_price = qa_selected_variant.compare_at_price
+        
+        assign qa_variant_b2b_price_raw = qa_selected_variant.metafields.custom.b2b_price.value
+        assign qa_product_b2b_price_raw = product.metafields.custom.b2b_price.value
+        assign qa_variant_discount_price_raw = qa_selected_variant.metafields.custom.discount_price.value
+        assign qa_product_discount_price_raw = product.metafields.custom.discount_price.value
+        
+        assign qa_b2b_price_raw = qa_variant_b2b_price_raw
+        if qa_b2b_price_raw == blank or qa_b2b_price_raw == empty
+          assign qa_b2b_price_raw = qa_product_b2b_price_raw
+        endif
+        
+        assign qa_discount_price_raw = qa_variant_discount_price_raw
+        if qa_discount_price_raw == blank or qa_discount_price_raw == empty
+          assign qa_discount_price_raw = qa_product_discount_price_raw
+        endif
+        
+        assign qa_b2b_price = nil
+        assign qa_discount_price = nil
+        
+        if qa_b2b_price_raw != blank and qa_b2b_price_raw != empty
+          assign qa_b2b_price = qa_b2b_price_raw | times: 100
+        endif
+        
+        if qa_discount_price_raw != blank and qa_discount_price_raw != empty
+          assign qa_discount_price = qa_discount_price_raw | times: 100
+        endif
+        
+        assign qa_is_b2b_user = false
+        if customer
+          for tag in customer.tags
+            assign tag_downcase = tag | downcase | strip
+            if tag_downcase == 'b2b' or tag_downcase == 'wholesale' or tag_downcase == 'business'
+              assign qa_is_b2b_user = true
+              break
+            endif
+          endfor
+        endif
+        
+        assign qa_display_price = qa_original_price
+        assign qa_crossed_out_price = nil
+        assign qa_price_badge = nil
+        assign qa_badge_color = 'background: #CC0000;'
+        assign qa_show_crossed_price = false
+        
+        if qa_is_b2b_user
+          if qa_discount_price != nil and qa_b2b_price != nil
+            if qa_b2b_price <= qa_discount_price
+              assign qa_display_price = qa_b2b_price
+              assign qa_crossed_out_price = qa_original_price
+              assign qa_price_badge = 'WHOLESALE'
+            else
+              assign qa_display_price = qa_discount_price
+              assign qa_crossed_out_price = qa_original_price
+              assign qa_price_diff = qa_original_price | minus: qa_discount_price
+              assign qa_percent_off = qa_price_diff | times: 100 | divided_by: qa_original_price | round
+              assign qa_price_badge = qa_percent_off | append: '% OFF'
+              assign qa_badge_color = 'background: #16a34a;'
+            endif
+            assign qa_show_crossed_price = true
+          elsif qa_b2b_price != nil
+            assign qa_display_price = qa_b2b_price
+            assign qa_crossed_out_price = qa_original_price
+            assign qa_price_badge = 'WHOLESALE'
+            assign qa_show_crossed_price = true
+          elsif qa_discount_price != nil
+            assign qa_display_price = qa_discount_price
+            assign qa_crossed_out_price = qa_original_price
+            assign qa_price_diff = qa_original_price | minus: qa_discount_price
+            assign qa_percent_off = qa_price_diff | times: 100 | divided_by: qa_original_price | round
+            assign qa_price_badge = qa_percent_off | append: '% OFF'
+            assign qa_badge_color = 'background: #16a34a;'
+            assign qa_show_crossed_price = true
+          endif
+        else
+          if qa_discount_price != nil
+            assign qa_display_price = qa_discount_price
+            assign qa_crossed_out_price = qa_original_price
+            assign qa_price_diff = qa_original_price | minus: qa_discount_price
+            assign qa_percent_off = qa_price_diff | times: 100 | divided_by: qa_original_price | round
+            if qa_percent_off > 0
+              assign qa_price_badge = qa_percent_off | append: '% OFF'
+            else
+              assign qa_price_badge = 'ON SALE'
+            endif
+            assign qa_badge_color = 'background: #16a34a;'
+            assign qa_show_crossed_price = true
+          elsif qa_compare_at_price > qa_original_price
+            assign qa_crossed_out_price = qa_compare_at_price
+            assign qa_show_crossed_price = true
+          endif
+        endif
+      -%}
+      <product-price>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          {%- if qa_show_crossed_price and qa_crossed_out_price -%}
+            <span style="text-decoration: line-through; color: #999; font-size: 0.9rem;">{{ qa_crossed_out_price | money }}</span>
+          {%- endif -%}
+          <span style="font-size: 1.25rem; font-weight: bold; color: #dc2626;">{{ qa_display_price | money }}</span>
+          {%- if qa_price_badge -%}
+            <span style="{{ qa_badge_color }} color: white; font-size: 10px; padding: 2px 8px; font-weight: bold; text-transform: uppercase;">{{ qa_price_badge }}</span>
+          {%- endif -%}
+        </div>
+      </product-price>
+      
+      <!-- Variant Options and Add to Cart Form -->
+      {%- form 'product', product, id: 'quick-add-product-form', class: 'quick-add-form', novalidate: 'novalidate', data-type: 'add-to-cart-form' -%}
+        <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}" class="product-variant-id">
+        
+        {%- unless product.has_only_default_variant -%}
+          <div class="variant-options" style="margin-bottom: 16px;">
+            {%- for option in product.options_with_values -%}
+              {%- assign option_index = forloop.index0 -%}
+              <fieldset style="border: none; padding: 0; margin: 0 0 12px 0;">
+                <legend style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 8px;">{{ option.name }}</legend>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                  {%- for value in option.values -%}
+                    {%- assign option_available = false -%}
+                    {%- for variant in product.variants -%}
+                      {%- assign variant_option_value = variant.options[option_index] -%}
+                      {%- if variant.available and variant_option_value == value -%}
+                        {%- assign option_available = true -%}
+                        {%- break -%}
+                      {%- endif -%}
+                    {%- endfor -%}
+                    <label style="cursor: pointer; {% unless option_available %}opacity: 0.5;{% endunless %}">
+                      <input type="radio" name="option{{ option.position }}" value="{{ value | escape }}" 
+                             {% if option.selected_value == value %}checked{% endif %} 
+                             {% unless option_available %}disabled{% endunless %}
+                             style="position: absolute; opacity: 0; width: 0; height: 0;"
+                             class="qa-variant-input">
+                      <span class="qa-variant-btn" style="display: block; padding: 8px 16px; font-size: 14px; border: 2px solid #e5e5e5; border-radius: 4px; background: white; transition: all 0.2s;">{{ value }}</span>
+                    </label>
+                  {%- endfor -%}
+                </div>
+              </fieldset>
+            {%- endfor -%}
+          </div>
+        {%- endunless -%}
+        
+        {%- comment -%} Add-on options {%- endcomment -%}
+        {% assign addon_meta = product.metafields.custom.add_on_options %}
+        {% if addon_meta and addon_meta.value != blank %}
+          <div class="addon-options" style="margin-bottom: 16px;">
+            {% for addon in addon_meta.value %}
+              <fieldset style="border: none; padding: 0; margin: 0 0 12px 0;">
+                <legend style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #2563eb; margin-bottom: 8px;">
+                  {{ addon.name }} <span style="color: #999; font-weight: normal;">(optional)</span>
+                </legend>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                  <label style="cursor: pointer;">
+                    <input type="radio" name="addon_{{ addon.name | handleize }}" value="" data-price-modifier="0" checked
+                           style="position: absolute; opacity: 0; width: 0; height: 0;" class="qa-addon-input">
+                    <span class="qa-addon-btn" style="display: block; padding: 8px 16px; font-size: 14px; border: 2px solid #e5e5e5; border-radius: 4px; background: white; transition: all 0.2s;">None</span>
+                  </label>
+                  {% for val in addon.values %}
+                    {% assign price_mod = addon.priceModifiers[val] | default: 0 %}
+                    <label style="cursor: pointer;">
+                      <input type="radio" name="addon_{{ addon.name | handleize }}" value="{{ val }}" data-price-modifier="{{ price_mod }}"
+                             style="position: absolute; opacity: 0; width: 0; height: 0;" class="qa-addon-input">
+                      <span class="qa-addon-btn" style="display: block; padding: 8px 16px; font-size: 14px; border: 2px solid #93c5fd; border-radius: 4px; background: white; transition: all 0.2s;">
+                        {{ val }}{% if price_mod > 0 %}<span style="font-size: 11px; opacity: 0.7; margin-left: 4px;">(+${{ price_mod }})</span>{% endif %}
+                      </span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </fieldset>
+            {% endfor %}
+          </div>
+        {% endif %}
+        
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <div style="display: flex; border: 1px solid #e5e5e5; border-radius: 4px; overflow: hidden;">
+            <button type="button" onclick="this.nextElementSibling.stepDown(); this.nextElementSibling.dispatchEvent(new Event('change'));" style="width: 36px; height: 44px; border: none; background: #f5f5f5; cursor: pointer; font-size: 18px;">-</button>
+            <input type="number" name="quantity" value="1" min="1" style="width: 50px; height: 44px; border: none; text-align: center; font-size: 14px;">
+            <button type="button" onclick="this.previousElementSibling.stepUp(); this.previousElementSibling.dispatchEvent(new Event('change'));" style="width: 36px; height: 44px; border: none; background: #f5f5f5; cursor: pointer; font-size: 18px;">+</button>
+          </div>
+          <button type="submit" name="add" style="flex: 1; height: 44px; background: #000; color: #fff; border: none; border-radius: 4px; font-weight: 600; font-size: 14px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em;"
+                  {% unless product.selected_or_first_available_variant.available %}disabled style="opacity: 0.5; cursor: not-allowed;"{% endunless %}>
+            {%- if product.selected_or_first_available_variant.available -%}Add to Cart{%- else -%}Sold Out{%- endif -%}
+          </button>
+        </div>
+      {%- endform -%}
+      
+      <style>
+        .qa-variant-input:checked + .qa-variant-btn { border-color: #000; background: #000; color: #fff; }
+        .qa-addon-input:checked + .qa-addon-btn { border-color: #2563eb; background: #2563eb; color: #fff; }
+      </style>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Product Precision",
+  "tag": "section",
+  "class": "section",
+  "blocks": [
+    {
+      "type": "@app"
+    },
+    {
+      "type": "collapsible_tab",
+      "name": "Collapsible row",
+      "settings": [
+        {
+          "type": "text",
+          "id": "heading",
+          "default": "Collapsible row",
+          "label": "Heading"
+        },
+        {
+          "type": "richtext",
+          "id": "content",
+          "label": "Row content"
+        },
+        {
+          "type": "page",
+          "id": "page",
+          "label": "Row content from page"
+        }
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "enable_video_looping",
+      "default": false,
+      "label": "Enable video looping"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Product Precision"
+    }
+  ]
+}
+{% endschema %}

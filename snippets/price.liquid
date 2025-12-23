@@ -1,0 +1,298 @@
+{%- doc -%}
+  This snippet is used to render product pricing with conditional logic.
+  
+  Pricing Logic:
+  - Standard Users: Show discount_price (if exists) as primary with strikethrough original and % OFF badge
+  - B2B Users: Compare b2b_price vs discount_price, show lower one as primary
+  
+  @param {product} product_resource - The product to render
+  @param {boolean} [show_unit_price] - Whether to show the unit price
+  @param {boolean} [show_sale_price_first] - Whether to show the sale price first
+{%- enddoc -%}
+
+{%- liquid
+  assign show_unit_price = show_unit_price | default: false
+  assign show_sale_price_first = show_sale_price_first | default: false
+  assign selected_variant = product_resource.selected_or_first_available_variant
+  assign original_price = selected_variant.price
+  assign compare_at_price = selected_variant.compare_at_price
+
+  assign is_product_card = false
+  if template.name != 'product'
+    assign is_product_card = true
+  endif
+
+  if is_product_card and product_resource != blank
+    assign original_price = product_resource.price_min
+    assign compare_at_price = product_resource.compare_at_price_min
+  endif
+
+  if product_resource == blank
+    assign original_price = 1999
+  endif
+
+  # Get custom metafield prices from product
+  assign discount_price_raw = product_resource.metafields.custom.discount_price.value
+  assign b2b_price_raw = product_resource.metafields.custom.b2b_price.value
+  
+  # Convert to cents for comparison (Shopify prices are in cents)
+  assign discount_price = nil
+  assign b2b_price = nil
+  
+  if discount_price_raw != blank and discount_price_raw != empty
+    assign discount_price = discount_price_raw | times: 100
+  endif
+
+  if is_product_card and product_resource != blank
+    assign lowest_variant_discount_price = nil
+    assign lowest_variant_discount_compare_price = nil
+    assign lowest_variant_b2b_price = nil
+    assign lowest_variant_b2b_compare_price = nil
+
+    for variant in product_resource.variants
+      assign variant_discount_raw = variant.metafields.custom.discount_price.value
+      assign variant_b2b_raw = variant.metafields.custom.b2b_price.value
+      assign variant_retail_price = variant.price
+
+      if variant_discount_raw != blank and variant_discount_raw != empty
+        assign variant_discount_price = variant_discount_raw | times: 100 | round
+
+        if variant_discount_price < variant_retail_price
+          if lowest_variant_discount_price == nil or variant_discount_price < lowest_variant_discount_price
+            assign lowest_variant_discount_price = variant_discount_price
+            assign lowest_variant_discount_compare_price = variant_retail_price
+          endif
+        endif
+      endif
+
+      if variant_b2b_raw != blank and variant_b2b_raw != empty
+        assign variant_b2b_price = variant_b2b_raw | times: 100 | round
+
+        if variant_b2b_price < variant_retail_price
+          if lowest_variant_b2b_price == nil or variant_b2b_price < lowest_variant_b2b_price
+            assign lowest_variant_b2b_price = variant_b2b_price
+            assign lowest_variant_b2b_compare_price = variant_retail_price
+          endif
+        endif
+      endif
+    endfor
+
+    if lowest_variant_discount_price != nil
+      if discount_price == nil or lowest_variant_discount_price < discount_price
+        assign discount_price = lowest_variant_discount_price
+        assign original_price = lowest_variant_discount_compare_price
+      endif
+    endif
+
+    if lowest_variant_b2b_price != nil
+      if b2b_price_raw == blank or b2b_price_raw == empty or lowest_variant_b2b_price < b2b_price
+        assign b2b_price = lowest_variant_b2b_price
+        if lowest_variant_b2b_compare_price != nil
+          assign original_price = lowest_variant_b2b_compare_price
+        endif
+      endif
+    endif
+  endif
+  
+  if b2b_price_raw != blank and b2b_price_raw != empty
+    if b2b_price == nil
+      assign b2b_price = b2b_price_raw | times: 100
+    endif
+  endif
+
+  # Check if user is B2B (case-insensitive, supports multiple tag variations)
+  assign is_b2b_user = false
+  if customer
+    for tag in customer.tags
+      assign tag_downcase = tag | downcase | strip
+      if tag_downcase == 'b2b' or tag_downcase == 'wholesale' or tag_downcase == 'business'
+        assign is_b2b_user = true
+        break
+      endif
+    endfor
+  endif
+
+  # Initialize display variables
+  assign primary_price = original_price
+  assign crossed_out_price = nil
+  assign badge_text = nil
+  assign badge_color = nil
+  assign discount_percent = nil
+  assign show_crossed_price = false
+
+  # ==========================================
+  # PRICING LOGIC
+  # ==========================================
+  
+  if is_b2b_user
+    # ----- B2B USER LOGIC -----
+    
+    if discount_price != nil and b2b_price != nil
+      # Scenario B: Both prices exist - show LOWER one
+      if b2b_price <= discount_price
+        assign primary_price = b2b_price
+        assign crossed_out_price = discount_price
+        assign badge_text = 'WHOLESALE'
+        assign badge_color = 'bg-[#CC0000]'
+      else
+        assign primary_price = discount_price
+        assign crossed_out_price = b2b_price
+        assign badge_text = 'SPECIAL B2B'
+        assign badge_color = 'bg-green-600'
+      endif
+      assign show_crossed_price = true
+      
+    elsif b2b_price != nil
+      # Scenario A: Only B2B price exists
+      assign primary_price = b2b_price
+      assign crossed_out_price = original_price
+      assign badge_text = 'WHOLESALE'
+      assign badge_color = 'bg-[#CC0000]'
+      assign show_crossed_price = true
+      
+    elsif discount_price != nil
+      # B2B user but only discount price exists
+      assign primary_price = discount_price
+      assign crossed_out_price = original_price
+      assign badge_text = 'ON SALE'
+      assign badge_color = 'bg-green-600'
+      assign show_crossed_price = true
+      
+      # Calculate discount percentage
+      assign price_diff = original_price | minus: discount_price
+      assign discount_percent = price_diff | times: 100 | divided_by: original_price | round
+    endif
+    
+  else
+    # ----- STANDARD USER LOGIC -----
+    
+    if discount_price != nil
+      assign primary_price = discount_price
+      assign crossed_out_price = original_price
+      assign show_crossed_price = true
+      
+      # Calculate discount percentage
+      assign price_diff = original_price | minus: discount_price
+      assign discount_percent = price_diff | times: 100 | divided_by: original_price | round
+      
+      if discount_percent > 0
+        assign badge_text = discount_percent | append: '% OFF'
+      else
+        assign badge_text = 'ON SALE'
+      endif
+      assign badge_color = 'bg-green-600'
+      
+    elsif compare_at_price > original_price
+      # Fall back to standard compare_at_price logic
+      assign primary_price = original_price
+      assign crossed_out_price = compare_at_price
+      assign show_crossed_price = true
+    endif
+  endif
+
+  # Check if variant has volume pricing
+  assign has_volume_pricing = null
+  assign price_min = null
+  assign price_max = null
+
+  if is_product_card
+    assign price_min = product_resource.price_min
+    assign price_max = product_resource.price_max
+    assign has_volume_pricing = product_resource.quantity_price_breaks_configured? | default: false
+  else
+    if selected_variant.quantity_price_breaks.size > 0
+      assign has_volume_pricing = true
+      assign price_min = selected_variant.quantity_price_breaks.last.price
+      assign price_max = selected_variant.price
+    endif
+  endif
+
+  # Override volume pricing for special prices
+  if is_b2b_user and b2b_price != nil
+    assign price_min = primary_price
+    assign price_max = primary_price
+    assign has_volume_pricing = false
+  elsif discount_price != nil
+    assign price_min = primary_price
+    assign price_max = primary_price
+    assign has_volume_pricing = false
+  endif
+
+  # Determine if currency code should be shown
+  assign use_currency = false
+  if product.handle == product_resource.handle
+    if settings.currency_code_enabled_product_pages
+      assign use_currency = true
+    endif
+  elsif settings.currency_code_enabled_product_cards
+    assign use_currency = true
+  endif
+
+  # Format all prices
+  if use_currency
+    assign primary_price_formatted = primary_price | money_with_currency
+    assign crossed_out_price_formatted = crossed_out_price | money_with_currency
+    assign price_min = price_min | money_with_currency
+    assign price_max = price_max | money_with_currency
+  else
+    assign primary_price_formatted = primary_price | money
+    assign crossed_out_price_formatted = crossed_out_price | money
+    assign price_min = price_min | money
+    assign price_max = price_max | money
+  endif
+-%}
+
+<div ref="priceContainer" class="price-container">
+  {% if has_volume_pricing %}
+    {%- comment -%} Volume pricing display {%- endcomment -%}
+    {% if show_crossed_price %}
+      <span role="group">
+        <span class="visually-hidden">{{ 'content.price_regular' | t }}&nbsp;</span>
+        <span class="compare-at-price text-gray-500 line-through text-sm">{{- crossed_out_price_formatted -}}</span>
+      </span>
+    {% endif %}
+    <span role="group">
+      <span class="visually-hidden">{{ 'content.price_range' | t }}&nbsp;</span>
+      <span class="price price-range price--large">{{ price_min }} - {{ price_max }}</span>
+    </span>
+    
+  {% elsif show_crossed_price %}
+    {%- comment -%} Special pricing with crossed out price {%- endcomment -%}
+    <div class="flex flex-col items-start gap-1">
+      {%- comment -%} Crossed out price {%- endcomment -%}
+      <span class="text-sm text-gray-500 line-through opacity-75">
+        {{ crossed_out_price_formatted }}
+      </span>
+      
+      {%- comment -%} Primary price with badge {%- endcomment -%}
+      <span class="price-item price-item--sale font-bold text-[#CC0000] flex items-center gap-2 flex-wrap">
+        {{ primary_price_formatted }}
+        
+        {% if badge_text != nil %}
+          <span class="badge {{ badge_color }} text-white text-[10px] px-2 py-0.5 uppercase tracking-wider font-bold" style="clip-path: polygon(0 0, 100% 0, 95% 50%, 100% 100%, 0 100%, 5% 50%);">
+            {{ badge_text }}
+          </span>
+        {% endif %}
+      </span>
+    </div>
+    
+  {% else %}
+    {%- comment -%} Standard pricing display {%- endcomment -%}
+    <span class="price">{{ primary_price_formatted | default: '&nbsp;' }}</span>
+  {% endif %}
+  
+  {%- if selected_variant.unit_price and show_unit_price %}
+    {%- liquid
+      if use_currency
+        assign unit_price = selected_variant.unit_price | money_with_currency
+      else
+        assign unit_price = selected_variant.unit_price | money
+      endif
+    -%}
+    {% render 'unit-price', price: unit_price, measurement: selected_variant.unit_price_measurement %}
+  {%- endif -%}
+</div>
+
+{%- if has_volume_pricing -%}
+  <small class="volume-pricing-note">{{ 'content.volume_pricing_available' | t }}</small>
+{%- endif -%}

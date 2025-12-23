@@ -1,0 +1,334 @@
+<div class="min-h-[80vh] flex items-center justify-center bg-white px-4 py-24">
+  <div class="w-full max-w-lg">
+    
+    <!-- Header -->
+    <div class="text-center mb-12">
+      <h1 class="text-3xl font-bold uppercase tracking-tighter text-[#111111] mb-2">
+        New Profile
+      </h1>
+      <p class="text-gray-500 uppercase tracking-widest text-xs">
+        Initialize Driver Data
+      </p>
+    </div>
+
+    <!-- Register Form -->
+    <div class="bg-white">
+      
+      <!-- Error Handling (Red Alert Box) -->
+      {%- if form.errors -%}
+        <div class="mb-6 bg-[#CC0000] p-4 text-white text-sm font-medium flex items-start gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 mt-0.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+          <div>
+            <p class="uppercase tracking-wide font-bold mb-1">Registration Failed</p>
+            {{ form.errors | default_errors }}
+          </div>
+        </div>
+      {%- endif -%}
+
+      {% form 'create_customer' %}
+        
+        <!-- Success State: Redirect to Login with Activation Message -->
+        {%- if form.posted_successfully? -%}
+          <div class="mb-6 bg-green-50 border border-green-200 p-4 text-green-800 text-sm font-medium flex items-start gap-3">
+             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+             </svg>
+             <div>
+               <p class="font-bold uppercase tracking-wide mb-1">Registration Successful</p>
+               <p>Please check your email to activate your account. Redirecting to login...</p>
+             </div>
+          </div>
+          <script>
+            setTimeout(function() {
+              window.location.href = "{{ routes.account_login_url }}?status=verification_sent";
+            }, 3000);
+          </script>
+        {%- endif -%}
+
+        <div class="space-y-6">
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- First Name (Required) -->
+            <div class="relative group pt-4">
+              <input 
+                id="RegisterFirstName" 
+                type="text" 
+                name="customer[first_name]" 
+                class="peer w-full h-14 bg-gray-50 border-b-2 border-gray-200 text-[#111111] text-base placeholder-transparent focus:outline-none focus:border-[#CC0000] focus:bg-white transition-all px-4" 
+                placeholder="First Name" 
+                autocomplete="given-name"
+                required
+              >
+              <label 
+                for="RegisterFirstName" 
+                class="absolute left-4 top-0 text-[10px] text-gray-500 font-bold uppercase tracking-wide peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-8 peer-focus:top-0 peer-focus:text-[#CC0000] peer-focus:text-[10px] transition-all"
+              >
+                First Name <span class="text-[#CC0000]">*</span>
+              </label>
+            </div>
+
+            <!-- Last Name (Required) -->
+            <div class="relative group pt-4">
+              <input 
+                id="RegisterLastName" 
+                type="text" 
+                name="customer[last_name]" 
+                class="peer w-full h-14 bg-gray-50 border-b-2 border-gray-200 text-[#111111] text-base placeholder-transparent focus:outline-none focus:border-[#CC0000] focus:bg-white transition-all px-4" 
+                placeholder="Last Name" 
+                autocomplete="family-name"
+                required
+              >
+              <label 
+                for="RegisterLastName" 
+                class="absolute left-4 top-0 text-[10px] text-gray-500 font-bold uppercase tracking-wide peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-8 peer-focus:top-0 peer-focus:text-[#CC0000] peer-focus:text-[10px] transition-all"
+              >
+                Last Name <span class="text-[#CC0000]">*</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Email (Required) -->
+          <div class="relative group pt-4">
+            <input 
+              id="RegisterEmail" 
+              type="email" 
+              name="customer[email]" 
+              class="peer w-full h-14 bg-gray-50 border-b-2 border-gray-200 text-[#111111] text-base placeholder-transparent focus:outline-none focus:border-[#CC0000] focus:bg-white transition-all px-4" 
+              placeholder="Email" 
+              autocomplete="email" 
+              required
+            >
+            <label 
+              for="RegisterEmail" 
+              class="absolute left-4 top-0 text-[10px] text-gray-500 font-bold uppercase tracking-wide peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-8 peer-focus:top-0 peer-focus:text-[#CC0000] peer-focus:text-[10px] transition-all"
+            >
+              Email Address <span class="text-[#CC0000]">*</span>
+            </label>
+          </div>
+
+          <!-- Phone Number (Required) -->
+          <div class="relative group pt-4">
+            <input 
+              id="RegisterPhone" 
+              type="tel" 
+              name="customer[phone]" 
+              class="peer w-full h-14 bg-gray-50 border-b-2 border-gray-200 text-[#111111] text-base placeholder-transparent focus:outline-none focus:border-[#CC0000] focus:bg-white transition-all px-4" 
+              placeholder="Phone Number" 
+              autocomplete="tel"
+              required
+            >
+            <label 
+              for="RegisterPhone" 
+              class="absolute left-4 top-0 text-[10px] text-gray-500 font-bold uppercase tracking-wide peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-8 peer-focus:top-0 peer-focus:text-[#CC0000] peer-focus:text-[10px] transition-all"
+            >
+              Phone Number <span class="text-[#CC0000]">*</span>
+            </label>
+          </div>
+
+          <!-- Password (Required) -->
+          <div class="relative group pt-4">
+            <input 
+              id="RegisterPassword" 
+              type="password" 
+              name="customer[password]" 
+              class="peer w-full h-14 bg-gray-50 border-b-2 border-gray-200 text-[#111111] text-base placeholder-transparent focus:outline-none focus:border-[#CC0000] focus:bg-white transition-all px-4" 
+              placeholder="Password" 
+              autocomplete="new-password" 
+              required
+            >
+            <label 
+              for="RegisterPassword" 
+              class="absolute left-4 top-0 text-[10px] text-gray-500 font-bold uppercase tracking-wide peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-8 peer-focus:top-0 peer-focus:text-[#CC0000] peer-focus:text-[10px] transition-all"
+            >
+              Password <span class="text-[#CC0000]">*</span>
+            </label>
+          </div>
+
+          <!-- Optional Address Section (Collapsible) -->
+          <div class="border border-gray-200 bg-gray-50/50">
+            <button 
+              type="button" 
+              id="toggleAddressSection"
+              class="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-100 transition-colors"
+              aria-expanded="false"
+              aria-controls="addressFields"
+            >
+              <span class="text-xs font-bold uppercase tracking-wide text-gray-600">
+                Add Shipping Address 
+                <span class="text-gray-400 font-normal">(Optional)</span>
+              </span>
+              <svg id="addressChevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-gray-500 transition-transform duration-300">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+            
+            <div id="addressFields" class="hidden px-4 pb-4 pt-2 space-y-5">
+              <!-- Address Line 1 -->
+              <div class="relative group pt-4">
+                <input 
+                  id="RegisterAddress1" 
+                  type="text" 
+                  name="customer[note][address1]" 
+                  class="peer w-full h-14 bg-white border-b-2 border-gray-200 text-[#111111] text-base placeholder-transparent focus:outline-none focus:border-[#CC0000] transition-all px-4" 
+                  placeholder="Address Line 1" 
+                  autocomplete="address-line1"
+                >
+                <label 
+                  for="RegisterAddress1" 
+                  class="absolute left-4 top-0 text-[10px] text-gray-500 font-bold uppercase tracking-wide peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-8 peer-focus:top-0 peer-focus:text-[#CC0000] peer-focus:text-[10px] transition-all"
+                >
+                  Street Address
+                </label>
+              </div>
+
+              <!-- Address Line 2 -->
+              <div class="relative group pt-4">
+                <input 
+                  id="RegisterAddress2" 
+                  type="text" 
+                  name="customer[note][address2]" 
+                  class="peer w-full h-14 bg-white border-b-2 border-gray-200 text-[#111111] text-base placeholder-transparent focus:outline-none focus:border-[#CC0000] transition-all px-4" 
+                  placeholder="Address Line 2" 
+                  autocomplete="address-line2"
+                >
+                <label 
+                  for="RegisterAddress2" 
+                  class="absolute left-4 top-0 text-[10px] text-gray-500 font-bold uppercase tracking-wide peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-8 peer-focus:top-0 peer-focus:text-[#CC0000] peer-focus:text-[10px] transition-all"
+                >
+                  Apt, Suite, Unit
+                </label>
+              </div>
+
+              <!-- City and State Row -->
+              <div class="grid grid-cols-2 gap-4">
+                <!-- City -->
+                <div class="relative group pt-4">
+                  <input 
+                    id="RegisterCity" 
+                    type="text" 
+                    name="customer[note][city]" 
+                    class="peer w-full h-14 bg-white border-b-2 border-gray-200 text-[#111111] text-base placeholder-transparent focus:outline-none focus:border-[#CC0000] transition-all px-4" 
+                    placeholder="City" 
+                    autocomplete="address-level2"
+                  >
+                  <label 
+                    for="RegisterCity" 
+                    class="absolute left-4 top-0 text-[10px] text-gray-500 font-bold uppercase tracking-wide peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-8 peer-focus:top-0 peer-focus:text-[#CC0000] peer-focus:text-[10px] transition-all"
+                  >
+                    City
+                  </label>
+                </div>
+
+                <!-- State/Province -->
+                <div class="relative group pt-4">
+                  <input 
+                    id="RegisterProvince" 
+                    type="text" 
+                    name="customer[note][province]" 
+                    class="peer w-full h-14 bg-white border-b-2 border-gray-200 text-[#111111] text-base placeholder-transparent focus:outline-none focus:border-[#CC0000] transition-all px-4" 
+                    placeholder="State" 
+                    autocomplete="address-level1"
+                  >
+                  <label 
+                    for="RegisterProvince" 
+                    class="absolute left-4 top-0 text-[10px] text-gray-500 font-bold uppercase tracking-wide peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-8 peer-focus:top-0 peer-focus:text-[#CC0000] peer-focus:text-[10px] transition-all"
+                  >
+                    State
+                  </label>
+                </div>
+              </div>
+
+              <!-- Zip and Country Row -->
+              <div class="grid grid-cols-2 gap-4">
+                <!-- Zip/Postal Code -->
+                <div class="relative group pt-4">
+                  <input 
+                    id="RegisterZip" 
+                    type="text" 
+                    name="customer[note][zip]" 
+                    class="peer w-full h-14 bg-white border-b-2 border-gray-200 text-[#111111] text-base placeholder-transparent focus:outline-none focus:border-[#CC0000] transition-all px-4" 
+                    placeholder="Zip Code" 
+                    autocomplete="postal-code"
+                  >
+                  <label 
+                    for="RegisterZip" 
+                    class="absolute left-4 top-0 text-[10px] text-gray-500 font-bold uppercase tracking-wide peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-8 peer-focus:top-0 peer-focus:text-[#CC0000] peer-focus:text-[10px] transition-all"
+                  >
+                    Zip Code
+                  </label>
+                </div>
+
+                <!-- Country -->
+                <div class="relative group pt-4">
+                  <select 
+                    id="RegisterCountry" 
+                    name="customer[note][country]" 
+                    class="peer w-full h-14 bg-white border-b-2 border-gray-200 text-[#111111] text-base focus:outline-none focus:border-[#CC0000] transition-all px-4 appearance-none"
+                    autocomplete="country"
+                  >
+                    <option value="">Select</option>
+                    {{ all_country_option_tags }}
+                  </select>
+                  <label 
+                    for="RegisterCountry" 
+                    class="absolute left-4 top-0 text-[10px] text-gray-500 font-bold uppercase tracking-wide"
+                  >
+                    Country
+                  </label>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="absolute right-4 top-9 w-4 h-4 text-gray-400 pointer-events-none">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" class="w-full h-14 bg-[#111111] hover:bg-[#CC0000] text-white font-bold uppercase tracking-widest transition-colors duration-300 flex items-center justify-center gap-2 group/btn">
+            <span>Establish Connection</span>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 group-hover/btn:translate-x-1 transition-transform">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </button>
+
+          <!-- Footer Link -->
+          <div class="text-center mt-8">
+            <p class="text-xs text-gray-500 uppercase tracking-wide">
+              Already have credentials? 
+              <a href="{{ routes.account_login_url }}" class="text-[#111111] font-bold hover:text-[#CC0000] transition-colors ml-1">
+                Access Terminal
+              </a>
+            </p>
+          </div>
+
+        </div>
+      {% endform %}
+    </div>
+
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const toggleBtn = document.getElementById('toggleAddressSection');
+    const addressFields = document.getElementById('addressFields');
+    const chevron = document.getElementById('addressChevron');
+    
+    if (toggleBtn && addressFields && chevron) {
+      toggleBtn.addEventListener('click', function() {
+        const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+        
+        // Toggle visibility
+        addressFields.classList.toggle('hidden');
+        
+        // Update aria-expanded
+        toggleBtn.setAttribute('aria-expanded', !isExpanded);
+        
+        // Rotate chevron
+        chevron.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(180deg)';
+      });
+    }
+  });
+</script>

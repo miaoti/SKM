@@ -1,0 +1,22 @@
+{
+  "type": "header",
+  "name": "Header",
+  "sections": {
+    "alert_line": {
+      "type": "announcement-bar-precision",
+      "settings": {
+        "text": "FREE SHIPPING ON ORDERS OVER $500 | LIFETIME WARRANTY INCLUDED"
+      }
+    },
+    "precision_header": {
+      "type": "header-precision",
+      "settings": {
+        "menu": "main-menu"
+      }
+    }
+  },
+  "order": [
+    "alert_line",
+    "precision_header"
+  ]
+}

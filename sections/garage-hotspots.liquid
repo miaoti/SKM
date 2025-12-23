@@ -1,0 +1,111 @@
+<div class="py-24 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="mb-12 text-center">
+      <h2 class="text-4xl font-bold text-gray-900 tracking-tight" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">
+        {{ section.settings.heading | default: "THE GARAGE" }}
+      </h2>
+    </div>
+    
+    <div class="relative w-full aspect-[16/9] rounded-none overflow-hidden bg-gray-100">
+      {%- if section.settings.image != blank -%}
+        {{ section.settings.image | image_url: width: 2000 | image_tag: class: "w-full h-full object-cover" }}
+      {%- else -%}
+        {{ 'lifestyle-1' | placeholder_svg_tag: 'w-full h-full object-cover opacity-50' }}
+      {%- endif -%}
+
+      {%- for block in section.blocks -%}
+        <div class="absolute group" style="top: {{ block.settings.top }}%; left: {{ block.settings.left }}%;">
+           <div class="relative flex items-center justify-center w-8 h-8 cursor-pointer">
+             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+             <span class="relative inline-flex rounded-full h-4 w-4 bg-[#CC0000]"></span>
+           </div>
+           
+           <!-- Tooltip -->
+           <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-10">
+             <div class="bg-black text-white p-4 text-sm rounded-none shadow-xl relative">
+               <h4 class="font-bold text-[#CC0000] uppercase mb-1">{{ block.settings.title }}</h4>
+               <p class="text-gray-300">{{ block.settings.text }}</p>
+               <!-- Arrow -->
+               <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-2 border-8 border-transparent border-t-black"></div>
+             </div>
+           </div>
+        </div>
+      {%- endfor -%}
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Garage Hotspots",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "THE GARAGE"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "Garage Image"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "hotspot",
+      "name": "Hotspot",
+      "settings": [
+        {
+          "type": "range",
+          "id": "top",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "unit": "%",
+          "label": "Vertical Position",
+          "default": 50
+        },
+        {
+          "type": "range",
+          "id": "left",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "unit": "%",
+          "label": "Horizontal Position",
+          "default": 50
+        },
+        {
+          "type": "text",
+          "id": "title",
+          "label": "Title",
+          "default": "Feature"
+        },
+        {
+          "type": "textarea",
+          "id": "text",
+          "label": "Description",
+          "default": "Feature description goes here."
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Garage Hotspots",
+      "blocks": [
+        {
+          "type": "hotspot",
+          "settings": {
+            "top": 40,
+            "left": 60,
+            "title": "Anti-Drone Tech",
+            "text": "Cancels out specific frequencies to eliminate cabin drone."
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}

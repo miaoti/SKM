@@ -1,0 +1,16 @@
+{
+  "sections": {
+    "main": {
+      "type": "ymm-search",
+      "settings": {
+        "heading": "Find Exhausts for Your Vehicle",
+        "subheading": "Premium performance, engineered fitment.",
+        "collection_handle": "all",
+        "show_submodel": true,
+        "show_engine": false,
+        "storefront_access_token": ""
+      }
+    }
+  },
+  "order": ["main"]
+}

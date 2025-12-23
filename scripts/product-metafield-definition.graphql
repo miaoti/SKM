@@ -1,0 +1,26 @@
+# Define product metafield for vehicle fitment with storefront filtering
+mutation CreateFitsVehiclesMetafieldDefinition {
+  metafieldDefinitionCreate(
+    definition: {
+      name: "Fits Vehicles"
+      namespace: "custom"
+      key: "fits_vehicles"
+      ownerType: PRODUCT
+      type: "list.metaobject_reference"
+      metafieldValidation: {
+        max: 50
+        name: "list_size"
+      }
+      pin: true
+      visibleToStorefront: true
+      filterableInStorefront: true
+      referenceSelection: {
+        referenceType: "metaobject"
+        metaobjectType: "vehicle"
+      }
+    }
+  ) {
+    metafieldDefinition { id name type }
+    userErrors { field message }
+  }
+}

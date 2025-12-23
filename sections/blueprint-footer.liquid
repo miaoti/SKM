@@ -1,0 +1,214 @@
+<div class="relative bg-[#111111] text-white pt-12 pb-6 border-t-[4px] border-red-600 overflow-hidden">
+  <!-- Automotive Texture / Watermark (Bottom Right) -->
+  <div class="absolute bottom-0 right-0 pointer-events-none opacity-[0.08] w-[500px] h-[250px] z-0 translate-x-[20%] translate-y-[20%]">
+     <!-- Technical Blueprint Style Sports Car Rear Silhouette SVG -->
+     <svg viewBox="0 0 500 250" fill="none" stroke="currentColor" stroke-width="1.5" class="w-full h-full text-white">
+        <!-- Roofline and Rear Deck -->
+        <path d="M50 120 C 100 80, 200 60, 300 60 C 380 60, 440 80, 480 110" />
+        
+        <!-- Rear Fender / Shoulder Line -->
+        <path d="M20 160 C 40 140, 480 140, 500 160" />
+        
+        <!-- Taillights (Left) -->
+        <rect x="60" y="165" width="80" height="20" rx="2" stroke-width="2" />
+        <line x1="86" y1="165" x2="86" y2="185" />
+        <line x1="112" y1="165" x2="112" y2="185" />
+        
+        <!-- Taillights (Right) -->
+        <rect x="360" y="165" width="80" height="20" rx="2" stroke-width="2" />
+        <line x1="386" y1="165" x2="386" y2="185" />
+        <line x1="412" y1="165" x2="412" y2="185" />
+
+        <!-- Bumper Line -->
+        <path d="M40 190 C 100 210, 400 210, 460 190" />
+        
+        <!-- Diffuser / Exhaust Area -->
+        <path d="M120 210 L 140 240 L 360 240 L 380 210" />
+        
+        <!-- Quad Exhaust Tips -->
+        <circle cx="160" cy="225" r="12" stroke-width="2" />
+        <circle cx="190" cy="225" r="12" stroke-width="2" />
+        <circle cx="310" cy="225" r="12" stroke-width="2" />
+        <circle cx="340" cy="225" r="12" stroke-width="2" />
+     </svg>
+  </div>
+
+  <div class="relative z-10 max-w-[1920px] mx-auto px-4 md:px-8 lg:px-16">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-4 mb-12">
+      
+      <!-- Col 1: Brand -->
+      <div class="flex flex-col items-center md:items-start text-center md:text-left">
+        <a href="/" id="footer-logo-link">
+          <h2 id="footer-logo-text" class="text-2xl font-bold mb-4 tracking-tight uppercase" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">{{ shop.name }}</h2>
+        </a>
+        <p class="text-gray-400 text-sm leading-relaxed max-w-xs">
+          Precision engineered exhaust systems for the discerning enthusiast. Designed and manufactured in the USA.
+        </p>
+        <div class="mt-6 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+           <span class="block">Designed in the USA</span>
+           <!-- US Flag Icon -->
+           <svg class="w-4 h-3" viewBox="0 0 640 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+             <path fill="#bd3d44" d="M0 0h640v480H0z"/>
+             <path stroke="#fff" stroke-width="37" d="M0 55.3h640M0 129h640M0 203h640M0 277h640M0 351h640M0 425h640"/>
+             <path fill="#192f5d" d="M0 0h296v258.5H0z"/>
+             <path fill="#fff" d="M16 19h21v21H16zM69 19h21v21H69zM122 19h21v21H122zM175 19h21v21H175zM228 19h21v21H228zM42 56h21v21H42zM95 56h21v21H95zM148 56h21v21H148zM201 56h21v21H201zM254 56h21v21H254zM16 93h21v21H16zM69 93h21v21H69zM122 93h21v21H122zM175 93h21v21H175zM228 93h21v21H228zM42 130h21v21H42zM95 130h21v21H95zM148 130h21v21H148zM201 130h21v21H201zM254 130h21v21H254zM16 167h21v21H16zM69 167h21v21H69zM122 167h21v21H122zM175 167h21v21H175zM228 167h21v21H228zM42 204h21v21H42zM95 204h21v21H95zM148 204h21v21H148zM201 204h21v21H201zM254 204h21v21H254z"/>
+           </svg>
+        </div>
+      </div>
+
+      <!-- Col 2: Quick Links -->
+      <div class="flex flex-col items-center md:items-start text-center md:text-left">
+        <h4 class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-6">Navigation</h4>
+        <ul class="space-y-3 text-sm">
+          {%- for link in section.settings.menu.links -%}
+            <li>
+              <a href="{{ link.url }}" class="block text-white hover:text-red-600 hover:translate-x-1 transition-all duration-300">
+                {{ link.title }}
+              </a>
+            </li>
+          {%- else -%}
+            <li><a href="/search" class="block text-white hover:text-red-600 hover:translate-x-1 transition-all duration-300">Search</a></li>
+            <li><a href="/policies/privacy-policy" class="block text-white hover:text-red-600 hover:translate-x-1 transition-all duration-300">Privacy Policy</a></li>
+            <li><a href="/policies/terms-of-service" class="block text-white hover:text-red-600 hover:translate-x-1 transition-all duration-300">Terms of Service</a></li>
+          {%- endfor -%}
+        </ul>
+      </div>
+
+      <!-- Col 3: Support -->
+      <div class="flex flex-col items-center md:items-start text-center md:text-left">
+         <h4 class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-6">Support</h4>
+         <ul class="space-y-3 text-sm mb-8">
+            <li><a href="/pages/contact" class="block text-white hover:text-red-600 hover:translate-x-1 transition-all duration-300">Contact Us</a></li>
+            <li><a href="/account" class="block text-white hover:text-red-600 hover:translate-x-1 transition-all duration-300">Track Order</a></li>
+            <li><a href="/pages/dealers" class="block text-white hover:text-red-600 hover:translate-x-1 transition-all duration-300">Dealers</a></li>
+         </ul>
+
+         <div class="flex gap-4">
+            <!-- Twitter -->
+            <a href="#" data-platform="twitter" class="group" style="display:none;">
+              <svg class="w-5 h-5 text-white group-hover:text-red-600 group-hover:scale-110 transition-all duration-300" fill="currentColor" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg>
+            </a>
+            <!-- Instagram -->
+            <a href="#" data-platform="instagram" class="group" style="display:none;">
+               <svg class="w-5 h-5 text-white group-hover:text-red-600 group-hover:scale-110 transition-all duration-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.949 0-3.259-.014-3.667-.072-4.949-.2-4.358-2.618-6.78-6.98-6.98zM12 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zm0 10.162a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+            </a>
+            <!-- Facebook -->
+            <a href="#" data-platform="facebook" class="group" style="display:none;">
+               <svg class="w-5 h-5 text-white group-hover:text-red-600 group-hover:scale-110 transition-all duration-300" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            </a>
+            <!-- YouTube -->
+            <a href="#" data-platform="youtube" class="group" style="display:none;">
+               <svg class="w-5 h-5 text-white group-hover:text-red-600 group-hover:scale-110 transition-all duration-300" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            </a>
+         </div>
+         <script>
+           (function() {
+              const updateLinks = async () => {
+                try {
+                  const res = await fetch('https://skm-inventory-api.miaotingshuo.workers.dev/shop/profile');
+                  if (!res.ok) return;
+                  const data = await res.json();
+                  
+                  // Update footer logo
+                  if (data.logo && data.logo.trim() !== '') {
+                    const footerLogoLink = document.getElementById('footer-logo-link');
+                    if (footerLogoLink) {
+                      const img = document.createElement('img');
+                      img.src = data.logo;
+                      img.alt = '{{ shop.name }}';
+                      img.style.height = '48px';
+                      img.style.width = 'auto';
+                      img.style.objectFit = 'contain';
+                      img.style.marginBottom = '16px';
+                      footerLogoLink.innerHTML = '';
+                      footerLogoLink.appendChild(img);
+                    }
+                  }
+                  
+                  // Update social links
+                  const mapping = {
+                    'twitter': data.social_twitter,
+                    'instagram': data.social_instagram,
+                    'facebook': data.social_facebook,
+                    'youtube': data.social_youtube
+                  };
+                  document.querySelectorAll('a[data-platform]').forEach(link => {
+                    const platform = link.getAttribute('data-platform');
+                    const url = mapping[platform];
+                    if (url && url.trim() !== '') {
+                      link.href = url;
+                      link.style.display = '';
+                    } else {
+                      // Hide icon if no URL is set
+                      link.style.display = 'none';
+                    }
+                  });
+                } catch (e) {}
+              };
+              if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', updateLinks);
+              } else {
+                updateLinks();
+              }
+              window.addEventListener('load', updateLinks);
+            })();
+         </script>
+      </div>
+
+      <!-- Col 4: Newsletter -->
+      <div class="flex flex-col items-center md:items-start text-center md:text-left">
+        <h4 class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-6">Join the Inner Circle</h4>
+        {% form 'customer', class: 'w-full max-w-sm' %}
+          <input type="hidden" name="contact[tags]" value="newsletter">
+          <div class="flex gap-0">
+             <input 
+               type="email" 
+               name="contact[email]" 
+               class="w-full bg-transparent border border-white text-white px-4 py-3 text-sm outline-none placeholder-gray-500 focus:border-red-600 transition-colors" 
+               placeholder="Enter your email" 
+               required
+             >
+             <button type="submit" class="bg-red-600 text-white w-12 h-[46px] flex items-center justify-center hover:bg-red-700 transition-colors flex-shrink-0">
+               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+               </svg>
+             </button>
+          </div>
+          {% if form.posted_successfully? %}
+            <p class="mt-2 text-xs text-green-400">Welcome to the inner circle.</p>
+          {% endif %}
+        {% endform %}
+      </div>
+
+    </div>
+
+    <!-- Divider & Copyright -->
+    <div class="border-t border-gray-800 pt-6 flex flex-col md:flex-row items-center justify-between text-xs text-gray-600">
+       <p>&copy; {{ 'now' | date: "%Y" }} {{ shop.name }}. All rights reserved.</p>
+       <div class="flex gap-4 mt-4 md:mt-0">
+         <a href="#" class="hover:text-white transition-colors">Privacy</a>
+         <a href="#" class="hover:text-white transition-colors">Terms</a>
+         <a href="#" class="hover:text-white transition-colors">Sitemap</a>
+       </div>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Blueprint Footer",
+  "settings": [
+    {
+      "type": "link_list",
+      "id": "menu",
+      "label": "Footer Menu",
+      "default": "footer"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Blueprint Footer"
+    }
+  ]
+}
+{% endschema %}
