@@ -24,11 +24,9 @@
   /* Backgrounds */
   .bg-carbon-fiber {
     background-color: #050505;
-    background-image: 
-      linear-gradient(45deg, #111 25%, transparent 25%, transparent 75%, #111 75%, #111),
-      linear-gradient(45deg, #111 25%, transparent 25%, transparent 75%, #111 75%, #111);
-    background-size: 4px 4px;
-    background-position: 0 0, 2px 2px;
+    background-image: url('https://github.com/miaoti/SKM/blob/main/Pictures/Contact/background%20texture.png?raw=true');
+    background-size: cover;
+    background-position: center;
   }
 
   /* Glassmorphism */
@@ -113,7 +111,7 @@
       </h1>
       
       <p class="text-[#CC0000] text-xs md:text-sm tracking-[0.3em] font-bold mt-4 mb-8">
-        [ MISSION: PRECISION FITMENT & GLOBAL LOGISTICS ]
+        PRECISION ENGINEERING • GLOBAL LOGISTICS • TECHNICAL SUPPORT
       </p>
 
       <!-- The Racing Red Line -->
@@ -124,75 +122,72 @@
   <!-- =========================================
        2. SPLIT LAYOUT: "Tactical Intel & Input"
   ========================================== -->
-  <div class="w-full max-w-[1600px] mx-auto px-6 lg:px-12 py-24 relative">
+  <div class="w-full py-24 relative" style="width: 100%; min-width: 100%;">
+    <div class="w-full max-w-[1400px] mx-auto px-8 lg:px-16">
     
-    <!-- Background "DNA" Watermark (SVG Manifold) -->
-    <div class="absolute top-0 left-0 w-full h-full opacity-[0.03] pointer-events-none z-0 flex items-center justify-center overflow-hidden">
-        <svg width="800" height="800" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="0.5" class="text-white transform -rotate-12 scale-150">
-           <path d="M20 30 Q 40 10 60 30 T 90 30" />
-           <path d="M20 40 Q 40 20 60 40 T 90 40" />
-           <path d="M20 30 L 20 40 M 90 30 L 90 40" />
-           <!-- Simple schematic lines -->
-           <circle cx="20" cy="35" r="3" />
-           <circle cx="90" cy="35" r="4" />
-        </svg>
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 relative z-10">
-      
-      <!-- LEFT COLUMN: Technical Intel -->
-      <div class="flex flex-col justify-center space-y-16">
-        
-        <!-- Address -->
-        <div class="group relative pl-6">
-            <div class="absolute left-0 top-1 bottom-1 w-[1px] bg-gray-800 group-hover:bg-[#CC0000] transition-colors"></div>
-            <div class="font-bold text-[10px] text-[#CC0000] tracking-widest mb-2">HQ COORDINATES</div>
-            <div class="flex items-start gap-4">
-               <!-- Blueprint Pin Icon -->
-               <svg class="w-6 h-6 text-gray-400 stroke-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="square" stroke-linejoin="miter" d="M12 21s-8-5.6-8-12a8 8 0 1 1 16 0c0 6.4-8 12-8 12z" />
-                  <circle cx="12" cy="9" r="2" />
-               </svg>
-               <div class="text-gray-300 text-sm leading-relaxed">
-                  13717 Floyd Cir<br>
-                  Dallas, TX 75243<br>
-                  Sector 7 (United States)
-               </div>
-            </div>
-        </div>
-
-        <!-- Email -->
-        <div class="group relative pl-6">
-            <div class="absolute left-0 top-1 bottom-1 w-[1px] bg-gray-800 group-hover:bg-[#CC0000] transition-colors"></div>
-            <div class="font-bold text-[10px] text-[#CC0000] tracking-widest mb-2">COMMUNICATIONS ARRAY</div>
-            <a href="mailto:support@skm-ex.com" class="text-xl md:text-2xl text-white hover:text-[#CC0000] transition-colors inline-block relative after:content-[''] after:absolute after:w-full after:scale-x-0 after:h-[1px] after:bottom-0 after:left-0 after:bg-[#CC0000] after:origin-bottom-right after:transition-transform after:duration-300 hover:after:scale-x-100 hover:after:origin-bottom-left">
-              support@skm-ex.com
-            </a>
-        </div>
-
-        <!-- Hours -->
-        <div class="group relative pl-6">
-            <div class="absolute left-0 top-1 bottom-1 w-[1px] bg-gray-800 group-hover:bg-[#CC0000] transition-colors"></div>
-            <div class="font-bold text-[10px] text-[#CC0000] tracking-widest mb-2">OPERATIONAL WINDOW</div>
-            <div class="flex items-center gap-4 text-3xl md:text-4xl font-tech-header font-bold text-gray-200">
-                09:00 <span class="text-gray-600">—</span> 18:00
-                <span class="text-sm font-tech-mono text-gray-500 ml-2">EST</span>
-            </div>
-            
-            <!-- Live Dot Logic (Simple JS or Liquid check typically, hardcoded visual prompt here for now) -->
-            <div class="flex items-center gap-2 mt-2">
-                <span class="relative flex h-2 w-2">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                </span>
-                <span class="text-[10px] text-green-500 uppercase tracking-widest">System Active</span>
-            </div>
-        </div>
-
+      <!-- Background "DNA" Watermark (Updated Image) -->
+      <div class="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none z-0 flex items-center justify-center overflow-hidden">
+          <img src="https://raw.githubusercontent.com/miaoti/SKM/refs/heads/main/Pictures/Contact/cad.png" 
+               alt="Technical DNA" 
+               class="w-full h-full object-cover transform scale-150 rotate-12 opacity-50 grayscale invert">
       </div>
 
-      <!-- RIGHT COLUMN: The Command Form -->
-      <div class="glass-panel p-8 md:p-12 rounded-sm shadow-2xl relative overflow-hidden">
+      <!-- Two Column Grid - Force display with inline styles -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4rem;" class="relative z-10">
+        
+        <!-- LEFT COLUMN: Technical Intel -->
+        <div class="flex flex-col justify-center space-y-12" style="min-width: 0;">
+          
+          <!-- Address -->
+          <div class="group relative pl-6">
+              <div class="absolute left-0 top-1 bottom-1 w-[1px] bg-gray-800 group-hover:bg-[#CC0000] transition-colors"></div>
+              <div class="font-bold text-[10px] text-[#CC0000] tracking-widest mb-2">LOCATION</div>
+              <div class="flex items-start gap-4">
+                 <!-- Blueprint Pin Icon -->
+                 <svg class="w-6 h-6 text-gray-400 stroke-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="square" stroke-linejoin="miter" d="M12 21s-8-5.6-8-12a8 8 0 1 1 16 0c0 6.4-8 12-8 12z" />
+                    <circle cx="12" cy="9" r="2" />
+                 </svg>
+                 <div class="text-gray-300 text-sm leading-relaxed">
+                    13717 Floyd Cir<br>
+                    Dallas, TX 75243<br>
+                    Sector 7 (United States)
+                 </div>
+              </div>
+          </div>
+
+          <!-- Email -->
+          <div class="group relative pl-6">
+              <div class="absolute left-0 top-1 bottom-1 w-[1px] bg-gray-800 group-hover:bg-[#CC0000] transition-colors"></div>
+              <div class="font-bold text-[10px] text-[#CC0000] tracking-widest mb-2">EMAIL</div>
+              <a href="mailto:support@skm-ex.com" class="text-xl md:text-2xl text-white hover:text-[#CC0000] transition-colors inline-block relative after:content-[''] after:absolute after:w-full after:scale-x-0 after:h-[1px] after:bottom-0 after:left-0 after:bg-[#CC0000] after:origin-bottom-right after:transition-transform after:duration-300 hover:after:scale-x-100 hover:after:origin-bottom-left">
+                support@skm-ex.com
+              </a>
+          </div>
+
+          <!-- Hours -->
+          <div class="group relative pl-6">
+              <div class="absolute left-0 top-1 bottom-1 w-[1px] bg-gray-800 group-hover:bg-[#CC0000] transition-colors"></div>
+              <div class="font-bold text-[10px] text-[#CC0000] tracking-widest mb-2">HOURS</div>
+              <div class="flex items-center gap-4 text-3xl md:text-4xl font-tech-header font-bold text-gray-200">
+                  09:00 <span class="text-gray-600">—</span> 18:00
+                  <span class="text-sm font-tech-mono text-gray-500 ml-2">EST</span>
+              </div>
+              
+              <!-- Live Dot -->
+              <div class="flex items-center gap-2 mt-2">
+                  <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
+                  <span class="text-[10px] text-green-500 uppercase tracking-widest">System Active</span>
+              </div>
+          </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: The Command Form -->
+        <div class="glass-panel p-8 md:p-12 rounded-sm shadow-2xl relative overflow-hidden" style="min-width: 0;">
         <!-- Subtle red glow corner -->
         <div class="absolute -top-10 -right-10 w-32 h-32 bg-[#CC0000] opacity-10 blur-[50px] rounded-full"></div>
 
@@ -217,41 +212,34 @@
               </div>
             {% endif %}
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <!-- Name -->
-              <div class="relative group">
-                <input type="text" id="ContactFormName" name="contact[name]" placeholder=" " class="input-tech peer w-full h-10 px-0" required>
-                <label for="ContactFormName" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Operative Name</label>
-              </div>
+            <!-- Name -->
+            <div class="relative group mb-6">
+              <input type="text" id="ContactFormName" name="contact[name]" placeholder=" " class="input-tech peer w-full h-10 px-0" required>
+              <label for="ContactFormName" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Name</label>
+            </div>
 
-              <!-- Email -->
-              <div class="relative group">
-                <input type="email" id="ContactFormEmail" name="contact[email]" placeholder=" " class="input-tech peer w-full h-10 px-0" required>
-                <label for="ContactFormEmail" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Comms ID (Email)</label>
-              </div>
+            <!-- Email -->
+            <div class="relative group mb-6">
+              <input type="email" id="ContactFormEmail" name="contact[email]" placeholder=" " class="input-tech peer w-full h-10 px-0" required>
+              <label for="ContactFormEmail" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Email</label>
             </div>
 
             <!-- Phone -->
             <div class="relative group">
               <input type="tel" id="ContactFormPhone" name="contact[phone]" placeholder=" " class="input-tech peer w-full h-10 px-0">
-              <label for="ContactFormPhone" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Signal Frequency (Phone)</label>
+              <label for="ContactFormPhone" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Phone</label>
             </div>
 
             <!-- Smart Vehicle Input -->
             <div class="relative group">
-              <input type="text" id="ContactFormVehicle" name="contact[vehicle_details]" placeholder=" " class="input-tech peer w-full h-10 px-0 group-hover:border-b-gray-500">
-              <label for="ContactFormVehicle" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Vehicle Config (Year/Make/Model)</label>
-              
-              <!-- Scanning Animation (CSS only for demo, normally JS triggered) -->
-              <div class="absolute right-0 top-2 text-[10px] text-[#CC0000] opacity-0 peer-focus:opacity-100 transition-opacity animate-pulse">
-                INITIALIZING SCAN...
-              </div>
+              <input type="text" id="ContactFormVehicle" name="contact[vehicle_details]" placeholder=" " class="input-tech peer w-full h-10 px-0">
+              <label for="ContactFormVehicle" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Vehicle (Year/Make/Model)</label>
             </div>
 
             <!-- Message -->
             <div class="relative group">
               <textarea id="ContactFormMessage" name="contact[body]" rows="3" placeholder=" " class="input-tech peer w-full py-2 px-0 resize-none"></textarea>
-              <label for="ContactFormMessage" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Encrypted Data Packet</label>
+              <label for="ContactFormMessage" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Message</label>
             </div>
 
             <!-- Submit Button (Tactical Toggle) -->
@@ -273,6 +261,7 @@
       </div>
 
     </div>
+  </div>
   </div>
 
   <!-- =========================================
