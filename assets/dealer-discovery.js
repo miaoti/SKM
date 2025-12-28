@@ -12,11 +12,67 @@ const API_BASE = 'https://skm-inventory-api.miaotingshuo.workers.dev';
 let map = null;
 let markers = [];
 let dealers = [];
+let userLocation = null; // User's location if granted
+
+/**
+ * Calculate distance between two points using Haversine formula
+ * Returns distance in miles
+ */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 3959; // Earth's radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Request user's location
+ */
+function requestUserLocation() {
+  if (!navigator.geolocation) {
+    console.log('Geolocation not supported');
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      userLocation = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      };
+      console.log('User location obtained:', userLocation);
+
+      // Re-render dealer list with distances and sorting
+      if (dealers.length > 0) {
+        renderDealerList(dealers);
+      }
+
+      // Re-add markers (includes user location marker now)
+      if (map) {
+        addDealerMarkers();
+      }
+    },
+    (error) => {
+      console.log('Location access denied or error:', error.message);
+      // Continue without location - dealers will show without distance
+    },
+    {
+      enableHighAccuracy: false, // Don't need exact location
+      timeout: 10000,
+      maximumAge: 300000 // Cache for 5 minutes
+    }
+  );
+}
 
 /**
  * Initialize the dealer discovery page
  */
 async function initDealerDiscovery() {
+  requestUserLocation(); // Request location first
   await loadDealers();
   initMap();
   initApplicationForm();
@@ -50,16 +106,36 @@ async function loadDealers() {
 /**
  * Render dealer list
  */
-function renderDealerList(dealers) {
+function renderDealerList(dealerData) {
   const container = document.getElementById('dealer-list');
   if (!container) return;
 
-  if (dealers.length === 0) {
+  if (dealerData.length === 0) {
     showEmptyState('No dealers found in your area');
     return;
   }
 
-  container.innerHTML = dealers.map(dealer => `
+  // Calculate distances and sort if user location is available
+  let sortedDealers = dealerData.map(dealer => {
+    if (userLocation && dealer.latitude && dealer.longitude) {
+      dealer.distance = calculateDistance(
+        userLocation.lat, userLocation.lng,
+        parseFloat(dealer.latitude), parseFloat(dealer.longitude)
+      );
+    }
+    return dealer;
+  });
+
+  // Sort by distance if we have user location
+  if (userLocation) {
+    sortedDealers = sortedDealers.sort((a, b) => {
+      if (a.distance === undefined) return 1;
+      if (b.distance === undefined) return -1;
+      return a.distance - b.distance;
+    });
+  }
+
+  container.innerHTML = sortedDealers.map(dealer => `
     <div class="dealer-card p-4 hover:bg-gray-50 cursor-pointer transition-colors" data-dealer-id="${dealer.id}">
       <div class="flex items-start gap-4">
         <!-- Logo -->
@@ -87,11 +163,13 @@ function renderDealerList(dealers) {
           ` : ''}
         </div>
         
-        <!-- Distance (placeholder) -->
+        <!-- Distance -->
         <div class="flex-shrink-0 text-right">
-          <span class="text-xs text-gray-400">
-            ${dealer.latitude && dealer.longitude ? '📍' : ''}
-          </span>
+          ${dealer.distance !== undefined ? `
+            <span class="text-sm font-medium text-[#CC0000]">${dealer.distance.toFixed(1)} mi</span>
+          ` : dealer.latitude && dealer.longitude ? `
+            <span class="text-xs text-gray-400">📍</span>
+          ` : ''}
         </div>
       </div>
       
@@ -167,14 +245,22 @@ function renderDealerList(dealers) {
       if (wasHidden) {
         details.classList.remove('hidden');
 
-        // Center map on this dealer
+        // Center map on this dealer and open popup
         const dealerId = this.dataset.dealerId;
         const dealer = dealers.find(d => d.id === dealerId);
         if (dealer?.latitude && dealer?.longitude && map) {
-          map.flyTo({
-            center: [parseFloat(dealer.longitude), parseFloat(dealer.latitude)],
-            zoom: 14
+          const lat = parseFloat(dealer.latitude);
+          const lng = parseFloat(dealer.longitude);
+          map.flyTo([lat, lng], 14);
+
+          // Find and open the corresponding marker popup
+          const marker = markers.find(m => {
+            const pos = m.getLatLng();
+            return Math.abs(pos.lat - lat) < 0.0001 && Math.abs(pos.lng - lng) < 0.0001;
           });
+          if (marker) {
+            marker.openPopup();
+          }
         }
       }
     });
@@ -287,21 +373,33 @@ function addDealerMarkers() {
   const bounds = L.latLngBounds([]);
   let hasCoords = false;
 
-  // Custom red marker icon
-  const redIcon = L.divIcon({
-    className: 'dealer-marker',
-    html: `
-      <div style="width:32px;height:32px;background:#CC0000;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 6px rgba(0,0,0,0.3);cursor:pointer;border:2px solid white;">
-        <svg style="width:16px;height:16px;color:white;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-        </svg>
-      </div>
-    `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32]
-  });
+  // Add user location marker if available
+  if (userLocation) {
+    const userIcon = L.divIcon({
+      className: 'user-marker',
+      html: `
+        <div style="width:40px;height:40px;position:relative;">
+          <div style="position:absolute;inset:0;background:#3B82F6;border-radius:50%;opacity:0.3;animation:pulse 2s infinite;"></div>
+          <div style="position:absolute;inset:8px;background:#3B82F6;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
+            <svg style="width:12px;height:12px;color:white;" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z" clip-rule="evenodd"/>
+              <circle cx="10" cy="10" r="3" fill="white"/>
+            </svg>
+          </div>
+        </div>
+      `,
+      iconSize: [40, 40],
+      iconAnchor: [20, 20]
+    });
+
+    const userMarker = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+      .bindPopup('<div style="padding:8px;text-align:center;"><strong>You are here</strong></div>')
+      .addTo(map);
+
+    markers.push(userMarker);
+    bounds.extend([userLocation.lat, userLocation.lng]);
+    hasCoords = true;
+  }
 
   dealers.forEach(dealer => {
     if (!dealer.latitude || !dealer.longitude) return;
@@ -314,16 +412,69 @@ function addDealerMarkers() {
     hasCoords = true;
     bounds.extend([lat, lng]);
 
+    // Create custom icon - use dealer logo if available, otherwise red pin
+    let dealerIcon;
+
+    if (dealer.logo) {
+      // Use dealer's actual logo
+      dealerIcon = L.divIcon({
+        className: 'dealer-logo-marker',
+        html: `
+          <div style="width:44px;height:44px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.3);border:3px solid #CC0000;overflow:hidden;">
+            <img src="${dealer.logo}" alt="${dealer.name}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;background:#CC0000;border-radius:50%;display:flex;align-items:center;justify-content:center;\\'><svg style=\\'width:20px;height:20px;color:white;\\' fill=\\'none\\' viewBox=\\'0 0 24 24\\' stroke=\\'currentColor\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' stroke-width=\\'2\\' d=\\'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4\\'/></svg></div>'">
+          </div>
+        `,
+        iconSize: [44, 44],
+        iconAnchor: [22, 44],
+        popupAnchor: [0, -44]
+      });
+    } else if (dealer.website) {
+      // Try to use favicon from website
+      const domain = dealer.website.replace(/^https?:\/\//, '').split('/')[0];
+      dealerIcon = L.divIcon({
+        className: 'dealer-favicon-marker',
+        html: `
+          <div style="width:44px;height:44px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.3);border:3px solid #CC0000;overflow:hidden;">
+            <img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64" alt="${dealer.name}" style="width:28px;height:28px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+            <div style="display:none;width:100%;height:100%;background:#CC0000;border-radius:50%;align-items:center;justify-content:center;">
+              <svg style="width:20px;height:20px;color:white;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+            </div>
+          </div>
+        `,
+        iconSize: [44, 44],
+        iconAnchor: [22, 44],
+        popupAnchor: [0, -44]
+      });
+    } else {
+      // Default red pin icon
+      dealerIcon = L.divIcon({
+        className: 'dealer-marker',
+        html: `
+          <div style="width:36px;height:36px;background:#CC0000;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 8px rgba(0,0,0,0.3);border:3px solid white;">
+            <svg style="width:18px;height:18px;color:white;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+            </svg>
+          </div>
+        `,
+        iconSize: [36, 36],
+        iconAnchor: [18, 36],
+        popupAnchor: [0, -36]
+      });
+    }
+
     // Create marker with popup
     const popupContent = `
       <div style="padding:8px;min-width:150px;">
+        ${dealer.logo ? `<img src="${dealer.logo}" alt="${dealer.name}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;margin-bottom:8px;">` : ''}
         <h3 style="font-weight:bold;margin:0 0 4px 0;color:#111;">${dealer.name}</h3>
         <p style="font-size:13px;color:#666;margin:0;">${[dealer.city, dealer.state].filter(Boolean).join(', ')}</p>
         ${dealer.phone ? `<p style="font-size:13px;color:#CC0000;margin:4px 0 0 0;">${dealer.phone}</p>` : ''}
       </div>
     `;
 
-    const marker = L.marker([lat, lng], { icon: redIcon })
+    const marker = L.marker([lat, lng], { icon: dealerIcon })
       .bindPopup(popupContent)
       .addTo(map);
 

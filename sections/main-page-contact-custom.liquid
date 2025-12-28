@@ -1,130 +1,273 @@
-<div class="w-full bg-white text-[#111111] font-sans overflow-x-hidden">
-  
-  <!-- 1. Page Header (The "Comm-Link") -->
-  <div class="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 text-center">
-    <h1 class="text-4xl md:text-5xl font-bold uppercase tracking-tighter text-[#111111] mb-4">
-      Engineering & Support
-    </h1>
-    <p class="text-gray-500 uppercase tracking-widest text-xs md:text-sm max-w-2xl mx-auto">
-      Technical questions, fitment checks, or order status. Connect directly with our team.
-    </p>
+{% comment %}
+  "The Proving Ground" - High-Tech Contact Page
+  - Dark Mode / Carbon Fiber Aesthetic
+  - Glassmorphism & Tactical UI Elements
+  - Satellite/Telemetry Map Style
+{% endcomment %}
+
+<!-- Google Fonts for "Tech" feel -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Oswald:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --racing-red: #CC0000;
+    --carbon-black: #111111;
+    --terminal-green: #00ff41;
+  }
+
+  /* Typography Overrides */
+  .font-tech-header { font-family: 'Oswald', sans-serif; }
+  .font-tech-mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* Backgrounds */
+  .bg-carbon-fiber {
+    background-color: #050505;
+    background-image: 
+      linear-gradient(45deg, #111 25%, transparent 25%, transparent 75%, #111 75%, #111),
+      linear-gradient(45deg, #111 25%, transparent 25%, transparent 75%, #111 75%, #111);
+    background-size: 4px 4px;
+    background-position: 0 0, 2px 2px;
+  }
+
+  /* Glassmorphism */
+  .glass-panel {
+    background: rgba(20, 20, 20, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  /* Animations */
+  @keyframes drawLine {
+    from { width: 0; }
+    to { width: 100%; }
+  }
+  .animate-draw-line {
+    animation: drawLine 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes radarPing {
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(3); opacity: 0; }
+  }
+  .radar-ping {
+    animation: radarPing 3s infinite ease-out;
+  }
+
+  @keyframes scanText {
+    0% { content: "Scanning..."; }
+    25% { content: "Analyzing..."; }
+    50% { content: "Verifying..."; }
+    75% { content: "Confirmed."; }
+    100% { content: "Ready."; }
+  }
+
+  /* Form Styling */
+  .input-tech {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.3s ease;
+  }
+  .input-tech:focus {
+    outline: none;
+    border-bottom-color: var(--racing-red);
+    box-shadow: 0 4px 12px -5px rgba(204, 0, 0, 0.3);
+  }
+
+  /* Map Filter for "Midnight/Neon" look */
+  .map-filter {
+    filter: invert(1) grayscale(1) contrast(1.2) brightness(0.8);
+  }
+
+  /* Card Hover Effects */
+  .tech-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .tech-card:hover {
+    transform: translateY(-5px);
+    background-color: #0a0a0a;
+  }
+  .tech-card:hover .laser-line {
+    width: 100%;
+    opacity: 1;
+  }
+</style>
+
+<div class="w-full bg-black min-h-screen text-white overflow-x-hidden font-tech-mono selection:bg-[#CC0000] selection:text-white" style="width: 100vw; margin-left: calc(50% - 50vw);">
+
+  <!-- =========================================
+       1. HERO SECTION: "The Proving Ground"
+  ========================================== -->
+  <div class="relative w-full h-[60vh] flex items-center justify-center overflow-hidden bg-carbon-fiber">
+    <!-- Dark Gradient Overlay -->
+    <div class="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black z-10 pointer-events-none"></div>
+
+    <div class="relative z-20 text-center px-4">
+      <h1 class="font-tech-header text-5xl md:text-7xl lg:text-8xl font-bold uppercase tracking-tight text-white mb-2 leading-none">
+        Systems Support<br>& Engineering
+      </h1>
+      
+      <p class="text-[#CC0000] text-xs md:text-sm tracking-[0.3em] font-bold mt-4 mb-8">
+        [ MISSION: PRECISION FITMENT & GLOBAL LOGISTICS ]
+      </p>
+
+      <!-- The Racing Red Line -->
+      <div class="h-[2px] bg-[#CC0000] mx-auto animate-draw-line" style="max-width: 200px;"></div>
+    </div>
   </div>
 
-  <!-- 2. The Split-Grid Layout -->
-  <div class="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 mb-24">
-    <div class="w-full !grid !grid-cols-1 !md:grid-cols-2 !gap-12 !lg:gap-24">
+  <!-- =========================================
+       2. SPLIT LAYOUT: "Tactical Intel & Input"
+  ========================================== -->
+  <div class="w-full max-w-[1600px] mx-auto px-6 lg:px-12 py-24 relative">
+    
+    <!-- Background "DNA" Watermark (SVG Manifold) -->
+    <div class="absolute top-0 left-0 w-full h-full opacity-[0.03] pointer-events-none z-0 flex items-center justify-center overflow-hidden">
+        <svg width="800" height="800" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="0.5" class="text-white transform -rotate-12 scale-150">
+           <path d="M20 30 Q 40 10 60 30 T 90 30" />
+           <path d="M20 40 Q 40 20 60 40 T 90 40" />
+           <path d="M20 30 L 20 40 M 90 30 L 90 40" />
+           <!-- Simple schematic lines -->
+           <circle cx="20" cy="35" r="3" />
+           <circle cx="90" cy="35" r="4" />
+        </svg>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 relative z-10">
       
-      <!-- Left Column: The "Intel" -->
-      <div class="pl-6 border-l-4 border-[#CC0000] h-fit">
-        <h2 class="text-2xl font-bold uppercase tracking-wide mb-8">Contact Information</h2>
+      <!-- LEFT COLUMN: Technical Intel -->
+      <div class="flex flex-col justify-center space-y-16">
         
-        <div class="space-y-8">
-          
-          <!-- HQ Address -->
-          <div>
-            <h3 class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Headquarters</h3>
-            <div class="flex items-start gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-[#CC0000] flex-shrink-0">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-              </svg>
-              <p class="font-mono text-sm leading-relaxed">
-                13717 Floyd Cir<br>
-                Dallas, TX 75243<br>
-                United States
-              </p>
+        <!-- Address -->
+        <div class="group relative pl-6">
+            <div class="absolute left-0 top-1 bottom-1 w-[1px] bg-gray-800 group-hover:bg-[#CC0000] transition-colors"></div>
+            <div class="font-bold text-[10px] text-[#CC0000] tracking-widest mb-2">HQ COORDINATES</div>
+            <div class="flex items-start gap-4">
+               <!-- Blueprint Pin Icon -->
+               <svg class="w-6 h-6 text-gray-400 stroke-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="square" stroke-linejoin="miter" d="M12 21s-8-5.6-8-12a8 8 0 1 1 16 0c0 6.4-8 12-8 12z" />
+                  <circle cx="12" cy="9" r="2" />
+               </svg>
+               <div class="text-gray-300 text-sm leading-relaxed">
+                  13717 Floyd Cir<br>
+                  Dallas, TX 75243<br>
+                  Sector 7 (United States)
+               </div>
             </div>
-          </div>
-
-          <!-- Email -->
-          <div>
-            <h3 class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Email Us</h3>
-            <div class="flex items-start gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-[#CC0000] flex-shrink-0">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-              </svg>
-              <a href="mailto:support@skm-ex.com" class="font-mono text-sm hover:text-[#CC0000] transition-colors border-b border-gray-200 hover:border-[#CC0000]">
-                support@skm-ex.com
-              </a>
-            </div>
-          </div>
-
-          <!-- Hours -->
-          <div>
-            <h3 class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Business Hours</h3>
-            <div class="flex items-start gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-[#CC0000] flex-shrink-0">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div class="font-mono text-sm leading-relaxed">
-                <p>Mon - Fri: 0900 - 1800 EST</p>
-                <p class="text-gray-400 text-xs mt-1">Closed Weekends</p>
-              </div>
-            </div>
-          </div>
-
         </div>
+
+        <!-- Email -->
+        <div class="group relative pl-6">
+            <div class="absolute left-0 top-1 bottom-1 w-[1px] bg-gray-800 group-hover:bg-[#CC0000] transition-colors"></div>
+            <div class="font-bold text-[10px] text-[#CC0000] tracking-widest mb-2">COMMUNICATIONS ARRAY</div>
+            <a href="mailto:support@skm-ex.com" class="text-xl md:text-2xl text-white hover:text-[#CC0000] transition-colors inline-block relative after:content-[''] after:absolute after:w-full after:scale-x-0 after:h-[1px] after:bottom-0 after:left-0 after:bg-[#CC0000] after:origin-bottom-right after:transition-transform after:duration-300 hover:after:scale-x-100 hover:after:origin-bottom-left">
+              support@skm-ex.com
+            </a>
+        </div>
+
+        <!-- Hours -->
+        <div class="group relative pl-6">
+            <div class="absolute left-0 top-1 bottom-1 w-[1px] bg-gray-800 group-hover:bg-[#CC0000] transition-colors"></div>
+            <div class="font-bold text-[10px] text-[#CC0000] tracking-widest mb-2">OPERATIONAL WINDOW</div>
+            <div class="flex items-center gap-4 text-3xl md:text-4xl font-tech-header font-bold text-gray-200">
+                09:00 <span class="text-gray-600">—</span> 18:00
+                <span class="text-sm font-tech-mono text-gray-500 ml-2">EST</span>
+            </div>
+            
+            <!-- Live Dot Logic (Simple JS or Liquid check typically, hardcoded visual prompt here for now) -->
+            <div class="flex items-center gap-2 mt-2">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                <span class="text-[10px] text-green-500 uppercase tracking-widest">System Active</span>
+            </div>
+        </div>
+
       </div>
 
-      <!-- Right Column: The "Transmission" (Form) -->
-      <div class="bg-white p-8 md:p-10 border border-gray-100 shadow-xl rounded-sm">
-        <h2 class="text-2xl font-bold uppercase tracking-wide mb-8">Send A Message</h2>
-        
-        {% form 'contact' %}
+      <!-- RIGHT COLUMN: The Command Form -->
+      <div class="glass-panel p-8 md:p-12 rounded-sm shadow-2xl relative overflow-hidden">
+        <!-- Subtle red glow corner -->
+        <div class="absolute -top-10 -right-10 w-32 h-32 bg-[#CC0000] opacity-10 blur-[50px] rounded-full"></div>
+
+        <h2 class="font-tech-header text-3xl font-bold uppercase mb-8 flex items-center gap-3">
+          <span class="w-2 h-8 bg-[#CC0000]"></span>
+          Transmit Inquiry
+        </h2>
+
+        {% form 'contact', class: "space-y-8" %}
           
           {% if form.posted_successfully? %}
-            <div class="bg-black text-white p-8 text-center border-l-4 border-[#CC0000]">
-              <h3 class="text-xl font-bold uppercase tracking-wider mb-2">Message Sent</h3>
-              <p class="text-gray-400 text-sm">We have received your message and will get back to you shortly.</p>
+            <div class="border border-green-500/30 bg-green-500/10 p-6 text-center">
+              <h3 class="text-green-500 font-bold uppercase tracking-widest mb-2">Transmission Received</h3>
+              <p class="text-gray-400 text-xs">Stand by for engineering response.</p>
             </div>
           {% else %}
-
+            
+            <!-- Default Form Errors -->
             {% if form.errors %}
-              <div class="mb-6 bg-[#CC0000] p-4 text-white text-sm font-medium">
+              <div class="border border-red-500/30 bg-red-500/10 p-4 text-red-500 text-xs">
                 {{ form.errors | default_errors }}
               </div>
             {% endif %}
 
-            <div class="space-y-5">
-              
-              <div class="!grid !grid-cols-1 !md:grid-cols-2 !gap-5">
-                <!-- Name -->
-                <div class="relative group">
-                  <input type="text" id="ContactFormName" name="contact[name]" value="{% if form.name %}{{ form.name }}{% elsif customer %}{{ customer.name }}{% endif %}" placeholder="Name" class="peer w-full h-12 bg-white border border-gray-200 text-[#111111] placeholder-transparent focus:outline-none focus:border-[#CC0000] transition-all px-4">
-                  <label for="ContactFormName" class="absolute left-4 -top-2.5 bg-white px-1 text-xs text-gray-500 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-focus:-top-2.5 peer-focus:text-[#CC0000] peer-focus:text-xs font-bold uppercase tracking-wide">Name</label>
-                </div>
-
-                <!-- Email -->
-                <div class="relative group">
-                  <input type="email" id="ContactFormEmail" name="contact[email]" value="{% if form.email %}{{ form.email }}{% elsif customer %}{{ customer.email }}{% endif %}" placeholder="Email" required class="peer w-full h-12 bg-white border border-gray-200 text-[#111111] placeholder-transparent focus:outline-none focus:border-[#CC0000] transition-all px-4">
-                  <label for="ContactFormEmail" class="absolute left-4 -top-2.5 bg-white px-1 text-xs text-gray-500 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-focus:-top-2.5 peer-focus:text-[#CC0000] peer-focus:text-xs font-bold uppercase tracking-wide">Email</label>
-                </div>
-              </div>
-
-              <!-- Phone -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <!-- Name -->
               <div class="relative group">
-                <input type="tel" id="ContactFormPhone" name="contact[phone]" value="{% if form.phone %}{{ form.phone }}{% elsif customer %}{{ customer.phone }}{% endif %}" placeholder="Phone" class="peer w-full h-12 bg-white border border-gray-200 text-[#111111] placeholder-transparent focus:outline-none focus:border-[#CC0000] transition-all px-4">
-                <label for="ContactFormPhone" class="absolute left-4 -top-2.5 bg-white px-1 text-xs text-gray-500 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-focus:-top-2.5 peer-focus:text-[#CC0000] peer-focus:text-xs font-bold uppercase tracking-wide">Phone</label>
+                <input type="text" id="ContactFormName" name="contact[name]" placeholder=" " class="input-tech peer w-full h-10 px-0" required>
+                <label for="ContactFormName" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Operative Name</label>
               </div>
 
-              <!-- Vehicle Details -->
+              <!-- Email -->
               <div class="relative group">
-                <input type="text" id="ContactFormVehicle" name="contact[vehicle_details]" placeholder="Vehicle Details" class="peer w-full h-12 bg-white border border-gray-200 text-[#111111] placeholder-transparent focus:outline-none focus:border-[#CC0000] transition-all px-4">
-                <label for="ContactFormVehicle" class="absolute left-4 -top-2.5 bg-white px-1 text-xs text-gray-500 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-focus:-top-2.5 peer-focus:text-[#CC0000] peer-focus:text-xs font-bold uppercase tracking-wide">Vehicle (Year/Make/Model)</label>
+                <input type="email" id="ContactFormEmail" name="contact[email]" placeholder=" " class="input-tech peer w-full h-10 px-0" required>
+                <label for="ContactFormEmail" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Comms ID (Email)</label>
               </div>
-
-              <!-- Message -->
-              <div class="relative group">
-                <textarea rows="6" id="ContactFormMessage" name="contact[body]" placeholder="Message" class="peer w-full bg-white border border-gray-200 text-[#111111] placeholder-transparent focus:outline-none focus:border-[#CC0000] transition-all p-4">{% if form.body %}{{ form.body }}{% endif %}</textarea>
-                <label for="ContactFormMessage" class="absolute left-4 -top-2.5 bg-white px-1 text-xs text-gray-500 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-4 peer-focus:-top-2.5 peer-focus:text-[#CC0000] peer-focus:text-xs font-bold uppercase tracking-wide">Message</label>
-              </div>
-
-              <!-- Submit Button -->
-              <button type="submit" class="w-full h-14 bg-black text-white font-bold uppercase tracking-widest hover:bg-[#CC0000] transition-colors duration-300">
-                Send Message
-              </button>
-
             </div>
+
+            <!-- Phone -->
+            <div class="relative group">
+              <input type="tel" id="ContactFormPhone" name="contact[phone]" placeholder=" " class="input-tech peer w-full h-10 px-0">
+              <label for="ContactFormPhone" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Signal Frequency (Phone)</label>
+            </div>
+
+            <!-- Smart Vehicle Input -->
+            <div class="relative group">
+              <input type="text" id="ContactFormVehicle" name="contact[vehicle_details]" placeholder=" " class="input-tech peer w-full h-10 px-0 group-hover:border-b-gray-500">
+              <label for="ContactFormVehicle" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Vehicle Config (Year/Make/Model)</label>
+              
+              <!-- Scanning Animation (CSS only for demo, normally JS triggered) -->
+              <div class="absolute right-0 top-2 text-[10px] text-[#CC0000] opacity-0 peer-focus:opacity-100 transition-opacity animate-pulse">
+                INITIALIZING SCAN...
+              </div>
+            </div>
+
+            <!-- Message -->
+            <div class="relative group">
+              <textarea id="ContactFormMessage" name="contact[body]" rows="3" placeholder=" " class="input-tech peer w-full py-2 px-0 resize-none"></textarea>
+              <label for="ContactFormMessage" class="absolute left-0 top-2 text-gray-500 text-xs uppercase tracking-widest transition-all peer-focus:-top-4 peer-focus:text-[#CC0000] peer-focus:text-[10px] peer-not-placeholder-shown:-top-4 peer-not-placeholder-shown:text-[10px] pointer-events-none">Encrypted Data Packet</label>
+            </div>
+
+            <!-- Submit Button (Tactical Toggle) -->
+            <button type="submit" class="w-full relative group overflow-hidden bg-black border border-gray-800 h-16 flex items-center justify-between px-6 transition-all hover:border-[#CC0000]">
+              <div class="absolute inset-0 w-1 h-full bg-[#CC0000] transition-all group-hover:w-2"></div>
+              
+              <span class="pl-4 font-tech-header font-bold uppercase tracking-widest text-white group-hover:text-[#CC0000] transition-colors z-10">
+                Transmit Inquiry
+              </span>
+              
+              <div class="flex items-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                <span class="w-2 h-2 rounded-full bg-[#CC0000] shadow-[0_0_10px_#CC0000]"></span>
+                <span class="text-[9px] uppercase tracking-widest">Ready</span>
+              </div>
+            </button>
+
           {% endif %}
         {% endform %}
       </div>
@@ -132,8 +275,12 @@
     </div>
   </div>
 
-  <!-- 3. The Map Section -->
-  <div class="w-full h-[400px] md:h-[500px] bg-gray-100 relative overflow-hidden grayscale contrast-[1.2] invert-[0.1]">
+  <!-- =========================================
+       3. MAP: "Global Telemetry"
+  ========================================== -->
+  <div class="w-full h-[500px] relative border-y border-gray-900 overflow-hidden bg-black">
+    
+    <!-- Using Google Maps Embed with CSS Filter for "Midnight" look -->
     <iframe 
       src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3349.560662287955!2d-96.74548842426867!3d32.90972217696144!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x864c2067d7698501%3A0x6e8e0c8b6b0c6e0!2s13717%20Floyd%20Cir%2C%20Dallas%2C%20TX%2075243!5e0!3m2!1sen!2sus!4v1700000000000!5m2!1sen!2sus" 
       width="100%" 
@@ -141,53 +288,90 @@
       style="border:0;" 
       allowfullscreen="" 
       loading="lazy" 
-      referrerpolicy="no-referrer-when-downgrade">
+      referrerpolicy="no-referrer-when-downgrade"
+      class="map-filter opacity-60 hover:opacity-100 transition-opacity duration-700">
     </iframe>
-    <!-- Custom Pin Overlay (Visual only, map handles interaction) -->
-    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-       <div class="relative">
-         <div class="w-4 h-4 bg-[#CC0000] rounded-full animate-ping absolute top-0 left-0 opacity-75"></div>
-         <div class="w-4 h-4 bg-[#CC0000] rounded-full border-2 border-white shadow-lg relative z-10"></div>
-       </div>
+
+    <!-- Overlay Grid (Simulating HUD) -->
+    <div class="absolute inset-0 pointer-events-none" 
+         style="background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 50px 50px;">
     </div>
+
+    <!-- The Radar Ping -->
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none flex items-center justify-center">
+       <div class="w-96 h-96 border border-white/5 rounded-full absolute"></div>
+       <div class="w-64 h-64 border border-white/10 rounded-full absolute"></div>
+       <div class="radar-ping w-8 h-8 bg-[#CC0000] rounded-full absolute"></div>
+       <div class="w-3 h-3 bg-white rounded-full z-10 shadow-[0_0_15px_white]"></div>
+    </div>
+
+    <!-- Coordinates Overlay -->
+    <div class="absolute bottom-8 right-8 text-right z-20">
+      <div class="text-[10px] text-gray-500 tracking-widest uppercase mb-1">Target Coordinates</div>
+      <div class="font-tech-mono text-[#CC0000] text-lg bg-black/80 px-2 py-1 border border-[#CC0000]/30 shadow-[0_0_10px_rgba(204,0,0,0.2)]">
+        32.9097° N / 96.7455° W
+      </div>
+    </div>
+
   </div>
 
-  <!-- 4. "Before You Ask" (FAQ Mini-Section) -->
-  <div class="w-full bg-[#f5f5f5] border-t border-gray-200">
-    <div class="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-16">
-      <div class="text-center mb-10">
-        <h2 class="text-xl font-bold uppercase tracking-wide">Common Questions</h2>
-        <p class="text-xs text-gray-500 uppercase tracking-widest mt-1">Check these links first</p>
+  <!-- =========================================
+       4. FOOTER: "Protocol & Documentation"
+  ========================================== -->
+  <div class="bg-[#080808] py-24 border-t border-gray-900">
+    <div class="max-w-[1600px] mx-auto px-4 md:px-8">
+      
+      <div class="flex items-center gap-4 mb-16">
+        <div class="w-2 h-2 bg-[#CC0000]"></div>
+        <h2 class="font-tech-header text-2xl text-white uppercase tracking-widest">Protocol & Documentation</h2>
+        <div class="h-[1px] bg-gray-900 flex-grow ml-4"></div>
       </div>
 
-      <div class="!grid !grid-cols-1 !md:grid-cols-3 !gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        <!-- Card 1 -->
-        <a href="/policies/shipping-policy" class="bg-white p-8 border border-gray-200 hover:border-[#CC0000] hover:shadow-lg transition-all group text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 mx-auto mb-4 text-gray-400 group-hover:text-[#CC0000] transition-colors">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.713m0-6.713l2.25-2.25m0 0l2.25 2.25m-2.25-2.25v6.713a2.25 2.25 0 01-2.25 2.25h-.5" />
-          </svg>
-          <h3 class="font-bold uppercase text-sm mb-1">Shipping Policy</h3>
-          <p class="text-xs text-gray-500">Logistics & Timelines</p>
+        <!-- Card 1: Logistics -->
+        <a href="/policies/shipping-policy" class="tech-card group block bg-[#111] h-64 relative overflow-hidden flex flex-col justify-between p-8 border border-white/5 no-underline">
+          <div class="absolute top-0 left-0 w-0 h-[2px] bg-[#CC0000] laser-line transition-all duration-300"></div>
+          
+          <div class="flex justify-between items-start">
+            <div class="font-tech-mono text-[9px] text-gray-600">DOC_NO: 75074-S</div>
+            <svg class="w-6 h-6 text-gray-700 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          </div>
+          
+          <div>
+            <h3 class="font-tech-header text-2xl text-white mb-2 uppercase group-hover:text-[#CC0000] transition-colors">Logistics Protocol</h3>
+            <p class="text-xs text-gray-500 font-tech-mono">Global Shipping & Tracking manifests.</p>
+          </div>
         </a>
 
-        <!-- Card 2 -->
-        <a href="/policies/refund-policy" class="bg-white p-8 border border-gray-200 hover:border-[#CC0000] hover:shadow-lg transition-all group text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 mx-auto mb-4 text-gray-400 group-hover:text-[#CC0000] transition-colors">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-          </svg>
-          <h3 class="font-bold uppercase text-sm mb-1">Returns & Warranty</h3>
-          <p class="text-xs text-gray-500">RMA Protocols</p>
+        <!-- Card 2: Warranty -->
+        <a href="/policies/refund-policy" class="tech-card group block bg-[#111] h-64 relative overflow-hidden flex flex-col justify-between p-8 border border-white/5 no-underline">
+          <div class="absolute top-0 left-0 w-0 h-[2px] bg-[#CC0000] laser-line transition-all duration-300"></div>
+          
+          <div class="flex justify-between items-start">
+            <div class="font-tech-mono text-[9px] text-gray-600">DOC_NO: 88421-W</div>
+            <svg class="w-6 h-6 text-gray-700 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          
+          <div>
+            <h3 class="font-tech-header text-2xl text-white mb-2 uppercase group-hover:text-[#CC0000] transition-colors">Warranty Archive</h3>
+            <p class="text-xs text-gray-500 font-tech-mono">RMA Procedures & validation.</p>
+          </div>
         </a>
 
-        <!-- Card 3 -->
-        <a href="#" class="bg-white p-8 border border-gray-200 hover:border-[#CC0000] hover:shadow-lg transition-all group text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 mx-auto mb-4 text-gray-400 group-hover:text-[#CC0000] transition-colors">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <h3 class="font-bold uppercase text-sm mb-1">Fitment Guide</h3>
-          <p class="text-xs text-gray-500">Compatibility Check</p>
+        <!-- Card 3: Fitment -->
+        <a href="#" class="tech-card group block bg-[#111] h-64 relative overflow-hidden flex flex-col justify-between p-8 border border-white/5 no-underline">
+          <div class="absolute top-0 left-0 w-0 h-[2px] bg-[#CC0000] laser-line transition-all duration-300"></div>
+          
+          <div class="flex justify-between items-start">
+            <div class="font-tech-mono text-[9px] text-gray-600">DOC_NO: 11029-F</div>
+            <svg class="w-6 h-6 text-gray-700 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+          </div>
+          
+          <div>
+            <h3 class="font-tech-header text-2xl text-white mb-2 uppercase group-hover:text-[#CC0000] transition-colors">Fitment Database</h3>
+            <p class="text-xs text-gray-500 font-tech-mono">Spec sheets & compatibility checks.</p>
+          </div>
         </a>
 
       </div>
@@ -198,11 +382,11 @@
 
 {% schema %}
 {
-  "name": "Contact Page (Custom)",
+  "name": "Contact Page (Proving)",
   "settings": [],
   "presets": [
     {
-      "name": "Contact Page (Custom)"
+      "name": "Contact Page (Proving)"
     }
   ]
 }

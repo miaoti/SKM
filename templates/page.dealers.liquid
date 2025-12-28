@@ -9,6 +9,22 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
+<style>
+  /* Ensure Leaflet map fills container */
+  #dealer-map {
+    width: 100% !important;
+  }
+  #dealer-map .leaflet-container {
+    width: 100% !important;
+    height: 100% !important;
+  }
+  /* User marker pulse animation */
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.3); opacity: 0.1; }
+  }
+</style>
+
 <div id="dealer-discovery" class="min-h-screen bg-gray-50">
   <!-- Hero Section -->
   <div class="bg-gradient-to-br from-[#111] via-[#1a1a1a] to-[#222] text-white py-16 lg:py-24">
@@ -23,35 +39,37 @@
   </div>
 
   <!-- Main Content: List + Map Split -->
-  <div class="max-w-7xl mx-auto px-4 py-8">
-    <div class="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6 lg:gap-8">
-      
-      <!-- Left: Dealer List -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden order-2 lg:order-1">
-        <div class="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-          <h2 class="font-bold text-lg uppercase tracking-wide">Dealers</h2>
-          <span id="dealer-count" class="text-sm text-gray-500">Loading...</span>
-        </div>
-        <div id="dealer-list" class="max-h-[400px] lg:max-h-[500px] overflow-y-auto">
-          <div class="p-8 text-center text-gray-400">
-            <svg class="w-8 h-8 mx-auto mb-2 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Loading dealers...
+  <div class="w-full px-4 lg:px-8 py-8">
+    <div class="max-w-[1800px] mx-auto">
+      <div class="grid grid-cols-1 lg:grid-cols-[380px_1fr] bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
+        
+        <!-- Left: Dealer List -->
+        <div class="order-2 lg:order-1 lg:border-r border-gray-200">
+          <div class="p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
+            <h2 class="font-bold text-lg uppercase tracking-wide text-gray-800">Dealers</h2>
+            <span id="dealer-count" class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">Loading...</span>
+          </div>
+          <div id="dealer-list" class="max-h-[400px] lg:max-h-[600px] overflow-y-auto">
+            <div class="p-8 text-center text-gray-400">
+              <svg class="w-8 h-8 mx-auto mb-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Loading dealers...
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Right: Map -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden order-1 lg:order-2">
-        <div id="dealer-map" class="h-[300px] lg:h-[500px] min-h-[300px] bg-gray-200">
-          <div class="h-full flex flex-col items-center justify-center text-gray-400 text-center p-8">
-            <svg class="w-12 h-12 mb-3 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span>Loading map...</span>
+        <!-- Right: Map -->
+        <div class="order-1 lg:order-2 w-full">
+          <div id="dealer-map" class="h-[300px] lg:h-[656px] min-h-[300px] w-full bg-gray-100">
+            <div class="h-full w-full flex flex-col items-center justify-center text-gray-400 text-center p-8">
+              <svg class="w-12 h-12 mb-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Loading map...</span>
+            </div>
           </div>
         </div>
       </div>
