@@ -1,0 +1,233 @@
+{% comment %}
+  Dealer Discovery Page
+  - Split-screen layout with dealer list and map
+  - Application form for becoming a dealer
+  - All logic extracted to external JS file
+{% endcomment %}
+
+<!-- Leaflet CSS & JS (100% free, no API key needed) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+<div id="dealer-discovery" class="min-h-screen bg-gray-50">
+  <!-- Hero Section -->
+  <div class="bg-gradient-to-br from-[#111] via-[#1a1a1a] to-[#222] text-white py-16 lg:py-24">
+    <div class="max-w-7xl mx-auto px-4 lg:px-8 text-center">
+      <h1 class="text-3xl lg:text-5xl font-bold uppercase tracking-tight mb-4">
+        Find a <span class="text-[#CC0000]">Dealer</span> Near You
+      </h1>
+      <p class="text-gray-400 text-lg max-w-2xl mx-auto">
+        Locate authorized SKM dealers in your area for expert installation and service.
+      </p>
+    </div>
+  </div>
+
+  <!-- Main Content: List + Map Split -->
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <div class="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6 lg:gap-8">
+      
+      <!-- Left: Dealer List -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden order-2 lg:order-1">
+        <div class="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+          <h2 class="font-bold text-lg uppercase tracking-wide">Dealers</h2>
+          <span id="dealer-count" class="text-sm text-gray-500">Loading...</span>
+        </div>
+        <div id="dealer-list" class="max-h-[400px] lg:max-h-[500px] overflow-y-auto">
+          <div class="p-8 text-center text-gray-400">
+            <svg class="w-8 h-8 mx-auto mb-2 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Loading dealers...
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Map -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden order-1 lg:order-2">
+        <div id="dealer-map" class="h-[300px] lg:h-[500px] min-h-[300px] bg-gray-200">
+          <div class="h-full flex flex-col items-center justify-center text-gray-400 text-center p-8">
+            <svg class="w-12 h-12 mb-3 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Loading map...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Become a Dealer Section -->
+  <div id="apply" class="bg-[#111] text-white py-16 lg:py-24" style="scroll-margin-top: 120px;">
+    <div class="max-w-4xl mx-auto px-4 lg:px-8">
+      <div class="text-center mb-8">
+        <button id="toggle-application-btn" class="group flex items-center justify-center gap-3 mx-auto text-2xl lg:text-4xl font-bold uppercase tracking-tight mb-4 hover:text-[#CC0000] transition-colors">
+          <span>Become a <span class="text-[#CC0000]">Dealer</span></span>
+          <svg id="app-chevron" class="w-6 h-6 lg:w-8 lg:h-8 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <p class="text-gray-400 max-w-xl mx-auto">
+          Join our network of authorized dealers and gain access to wholesale pricing, marketing support, and exclusive products.
+        </p>
+      </div>
+
+      <div id="application-container" class="grid grid-rows-[0fr] grid-cols-1 w-full transition-[grid-template-rows] duration-500 ease-out">
+        <div class="overflow-hidden min-h-0 w-full">
+        {% if customer %}
+        <!-- Application Form (Logged In) -->
+        <div id="application-section" style="background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border-radius: 16px; padding: 32px; border: 1px solid rgba(255,255,255,0.1);">
+          <form id="dealer-application-form">
+            <input type="hidden" name="customer_id" value="{{ customer.id | prepend: 'gid://shopify/Customer/' }}">
+            <input type="hidden" name="customer_email" value="{{ customer.email }}">
+            
+            <!-- Business Name - Full Width -->
+            <div style="margin-bottom: 24px;">
+              <label style="display: block; font-size: 14px; font-weight: 500; color: #d1d5db; margin-bottom: 8px;">Business Name *</label>
+              <input type="text" name="business_name" required
+                style="width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; font-size: 14px;"
+                placeholder="Your Business Name">
+            </div>
+
+            <!-- Address - Full Width -->
+            <div style="margin-bottom: 24px;">
+              <label style="display: block; font-size: 14px; font-weight: 500; color: #d1d5db; margin-bottom: 8px;">Street Address</label>
+              <input type="text" name="address" value="{{ customer.default_address.address1 }}"
+                style="width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; font-size: 14px;"
+                placeholder="123 Main Street">
+            </div>
+
+            <!-- City, State, ZIP Row -->
+            <div style="display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap;">
+              <div style="flex: 2; min-width: 150px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #d1d5db; margin-bottom: 8px;">City</label>
+                <input type="text" name="city" value="{{ customer.default_address.city }}"
+                  style="width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; font-size: 14px;"
+                  placeholder="Dallas">
+              </div>
+              <div style="flex: 1; min-width: 100px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #d1d5db; margin-bottom: 8px;">State</label>
+                <input type="text" name="state" value="{{ customer.default_address.province }}"
+                  style="width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; font-size: 14px;"
+                  placeholder="TX">
+              </div>
+              <div style="flex: 1; min-width: 100px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #d1d5db; margin-bottom: 8px;">ZIP Code</label>
+                <input type="text" name="zip" value="{{ customer.default_address.zip }}"
+                  style="width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; font-size: 14px;"
+                  placeholder="75001">
+              </div>
+            </div>
+
+            <!-- Phone and Website Row -->
+            <div style="display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 200px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #d1d5db; margin-bottom: 8px;">Phone</label>
+                <input type="tel" name="phone" value="{{ customer.default_address.phone }}"
+                  style="width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; font-size: 14px;"
+                  placeholder="(555) 123-4567">
+              </div>
+              <div style="flex: 1; min-width: 200px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #d1d5db; margin-bottom: 8px;">Website (optional)</label>
+                <input type="url" name="website"
+                  style="width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; font-size: 14px;"
+                  placeholder="https://yourbusiness.com">
+              </div>
+            </div>
+
+            <!-- Reason - Full Width -->
+            <div style="margin-bottom: 24px;">
+              <label style="display: block; font-size: 14px; font-weight: 500; color: #d1d5db; margin-bottom: 8px;">Why do you want to become a dealer?</label>
+              <textarea name="reason" rows="4"
+                style="width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; font-size: 14px; resize: none;"
+                placeholder="Tell us about your business and why you'd like to partner with SKM..."></textarea>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="pt-4">
+              <button type="submit" id="submit-application"
+                class="w-full py-4 bg-[#CC0000] hover:bg-[#aa0000] text-white font-bold uppercase tracking-wider rounded-lg transition-all duration-300 flex items-center justify-center gap-2">
+                <span>Submit Application</span>
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                </svg>
+              </button>
+            </div>
+          </form>
+
+          <!-- Success Message (hidden by default) -->
+          <div id="application-success" class="hidden text-center py-8">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
+              <svg class="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <h3 class="text-xl font-bold mb-2">Application Submitted!</h3>
+            <p class="text-gray-400">We'll review your application and get back to you within 2-3 business days.</p>
+          </div>
+        </div>
+      {% else %}
+        <!-- Login Required -->
+        <div class="bg-white/5 backdrop-blur rounded-2xl p-8 border border-white/10 text-center">
+          <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[#CC0000]/20 flex items-center justify-center">
+            <svg class="w-8 h-8 text-[#CC0000]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold mb-2">Login Required</h3>
+          <p class="text-gray-400 mb-6">Please log in or create an account to apply for dealer status.</p>
+          <a href="/account/login?return_url=/pages/dealers?expand_app=true" 
+            class="inline-flex items-center gap-2 px-8 py-3 bg-[#CC0000] hover:bg-[#aa0000] text-white font-bold uppercase tracking-wider rounded-lg transition-all duration-300">
+            <span>Log In to Apply</span>
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+            </svg>
+          </a>
+        </div>
+      {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('toggle-application-btn');
+    const container = document.getElementById('application-container');
+    const chevron = document.getElementById('app-chevron');
+    
+    // Check if we should auto-expand (e.g. if returning from login)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('expand_app')) {
+      container.classList.remove('grid-rows-[0fr]');
+      container.classList.add('grid-rows-[1fr]');
+      chevron.classList.add('rotate-180');
+    }
+
+    btn.addEventListener('click', () => {
+      const isExpanded = container.classList.contains('grid-rows-[1fr]');
+      
+      if (isExpanded) {
+        container.classList.remove('grid-rows-[1fr]');
+        container.classList.add('grid-rows-[0fr]');
+        chevron.classList.remove('rotate-180');
+      } else {
+        container.classList.remove('grid-rows-[0fr]');
+        container.classList.add('grid-rows-[1fr]');
+        chevron.classList.add('rotate-180');
+      }
+    });
+
+    // Also expand if success message is present (handled by other script, but just in case)
+    const successMsg = document.getElementById('application-success');
+    if (successMsg && !successMsg.classList.contains('hidden')) {
+      container.classList.remove('grid-rows-[0fr]');
+      container.classList.add('grid-rows-[1fr]');
+      chevron.classList.add('rotate-180');
+    }
+  });
+</script>
+
+<script src="{{ 'dealer-discovery.js' | asset_url }}" defer></script>

@@ -153,17 +153,69 @@ async function refreshProductTypeComboBox(inputId, value) {
     }
 }
 
+/**
+ * Render the Product Types list (read-only display)
+ */
+async function renderTypesList() {
+    const typesList = document.getElementById('types-list');
+    if (!typesList) return;
+
+    // Force refresh cache
+    cachedCategories = [];
+    const categories = await fetchCategories();
+
+    if (categories.length === 0) {
+        typesList.innerHTML = '<div class="text-xs text-gray-400 text-center py-3">No product types yet. Set a type on a product to see it here.</div>';
+        return;
+    }
+
+    let html = '';
+    categories.forEach(cat => {
+        html += `
+        <div class="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50">
+          <span class="text-sm text-gray-700">${cat.name}</span>
+          <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">${cat.count}</span>
+        </div>
+        `;
+    });
+
+    typesList.innerHTML = html;
+}
+
+/**
+ * Setup Product Types display panel
+ */
+function setupTypesManagement() {
+    const refreshBtn = document.getElementById('btn-refresh-types');
+
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+            cachedCategories = [];
+            await renderTypesList();
+        });
+    }
+
+    // Initial render
+    renderTypesList();
+}
+
 // Export for use in admin dashboard
 window.AdminCategories = {
     fetchCategories,
     initProductTypeComboBox,
     initAllProductTypeComboBoxes,
-    refreshProductTypeComboBox
+    refreshProductTypeComboBox,
+    renderTypesList,
+    setupTypesManagement
 };
 
 // Auto-initialize on DOM ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAllProductTypeComboBoxes);
+    document.addEventListener('DOMContentLoaded', () => {
+        initAllProductTypeComboBoxes();
+        setupTypesManagement();
+    });
 } else {
     initAllProductTypeComboBoxes();
+    setupTypesManagement();
 }

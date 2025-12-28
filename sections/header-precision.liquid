@@ -24,7 +24,7 @@
   </style>
 {% endif %}
 
-<header-precision class="fixed top-[36px] left-0 w-full z-[999] transition-all duration-300 group {% unless header_is_transparent %}scrolled{% endunless %}" data-transparent="{{ header_is_transparent }}">
+<header-precision class="fixed top-[36px] left-0 w-full z-[2000] transition-all duration-300 group {% unless header_is_transparent %}scrolled{% endunless %}" data-transparent="{{ header_is_transparent }}">
   <!-- The Alert Line is rendered separately above this, or we can include it here if we want it part of the sticky group -->
   
   <div class="header-container h-[80px] px-4 lg:px-8 flex items-center justify-between transition-colors duration-300 bg-transparent group-[.scrolled]:bg-white group-[.scrolled]:shadow-sm">
@@ -107,7 +107,7 @@
 
         {%- for link in menu_links -%}
             <li class="h-full flex items-center group/link relative px-2">
-              <a href="{{ link.url }}" class="text-[13px] font-medium uppercase tracking-[0.2em] text-white group-[.scrolled]:text-[#111111] transition-colors duration-300 block">
+              <a href="{{ link.url }}" data-title="{{ link.title | downcase }}" class="text-[13px] font-medium uppercase tracking-[0.2em] text-white group-[.scrolled]:text-[#111111] transition-colors duration-300 block">
                 {{ link.title }}
               </a>
               <span class="absolute bottom-[28px] left-0 h-[2px] bg-[#CC0000] w-0 transition-all duration-300 group-hover/link:w-full"></span>
@@ -231,46 +231,114 @@
 
     </div>
   </div>
-</header-precision>
-
-<!-- Category Navigation Bar -->
-<nav id="category-nav" class="fixed top-[116px] left-0 w-full z-[998] bg-[#1a1a1a] border-b border-[#333]">
-  <div class="max-w-[1920px] mx-auto px-4 lg:px-8">
-    <div class="flex items-center justify-center gap-2 h-10 overflow-x-auto scrollbar-hide">
-      <div id="category-links" class="flex items-center gap-1 lg:gap-2">
-        <span class="text-[10px] text-gray-500 uppercase tracking-wider">Loading...</span>
+  
+  <!-- Category Navigation Bar (YMM Integrated) - Inside header for unified movement -->
+  <nav id="category-nav" class="w-full z-[1999] nav-hidden">
+    <div class="max-w-[1920px] mx-auto px-4 lg:px-8">
+      <div class="flex items-center justify-center gap-2 h-10 overflow-x-auto scrollbar-hide">
+        <!-- Vehicle Badge (shown when vehicle selected) -->
+        <div id="vehicle-badge" class="hidden flex items-center gap-2 mr-2">
+          <span class="flex items-center gap-1.5 px-3 py-1 bg-[#CC0000]/20 border border-[#CC0000]/40 rounded-full text-xs font-medium text-white">
+            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 17h14M7 13h.01M17 13h.01M6 9h12l-1.5-4.5a1 1 0 00-.95-.5H8.45a1 1 0 00-.95.5L6 9z"/></svg>
+            <span id="vehicle-name">Vehicle</span>
+          </span>
+          <button id="btn-clear-vehicle" class="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10" title="Clear Vehicle">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div id="category-links" class="flex items-center gap-1 lg:gap-2">
+          <span class="text-[10px] text-gray-500 uppercase tracking-wider">Loading...</span>
+        </div>
       </div>
     </div>
-  </div>
-</nav>
+  </nav>
+</header-precision>
 
 <script>
 (function() {
+  const API_BASE = 'https://skm-inventory-api.miaotingshuo.workers.dev';
+  const VEHICLE_KEY = 'skm_garage_vehicle';
+  
+  // Get saved vehicle from localStorage
+  const getVehicle = () => {
+    try {
+      return JSON.parse(localStorage.getItem(VEHICLE_KEY) || 'null');
+    } catch { return null; }
+  };
+  
+  // Build vehicle display name
+  const getVehicleName = (v) => {
+    if (!v) return '';
+    return `${v.year} ${v.make} ${v.model}${v.submodel ? ' ' + v.submodel : ''}`;
+  };
+  
+  // Clear vehicle and redirect
+  const clearVehicle = () => {
+    localStorage.removeItem(VEHICLE_KEY);
+    window.location.href = '/collections/all';
+  };
+  
   const loadCategories = async () => {
     try {
-      const res = await fetch('https://skm-inventory-api.miaotingshuo.workers.dev/categories');
+      const vehicle = getVehicle();
+      const vehicleBadge = document.getElementById('vehicle-badge');
+      const vehicleName = document.getElementById('vehicle-name');
+      const clearBtn = document.getElementById('btn-clear-vehicle');
+      
+      // Show/hide vehicle badge
+      if (vehicle && vehicleBadge) {
+        vehicleBadge.classList.remove('hidden');
+        vehicleBadge.classList.add('flex');
+        if (vehicleName) vehicleName.textContent = getVehicleName(vehicle);
+        if (clearBtn) clearBtn.addEventListener('click', clearVehicle);
+      }
+      
+      // Build API URL with optional vehicleId
+      let apiUrl = `${API_BASE}/categories`;
+      if (vehicle && vehicle.id) {
+        apiUrl += `?vehicleId=${encodeURIComponent(vehicle.id)}`;
+      }
+      
+      const res = await fetch(apiUrl);
       if (!res.ok) return;
       const data = await res.json();
       
       const container = document.getElementById('category-links');
-      if (!container || !data.data || data.data.length === 0) {
-        container.innerHTML = '<a href="/collections/all" class="category-link">All Products</a>';
+      if (!container) return;
+      
+      if (!data.data || data.data.length === 0) {
+        container.innerHTML = vehicle 
+          ? '<span class="text-xs text-gray-400">No parts for this vehicle</span>'
+          : '<a href="/collections/all" class="category-link">All Products</a>';
         return;
       }
       
-      // Build category links - use type query for products
-      let html = '<a href="/collections/all" class="category-link active">All</a>';
-      data.data.forEach(cat => {
-        // Use Shopify's product type filter in URL
-        const filterUrl = `/collections/all?filter.p.product_type=${encodeURIComponent(cat.name)}`;
-        html += `<a href="${filterUrl}" class="category-link" data-type="${cat.name}">${cat.name} <span class="text-[9px] opacity-60">(${cat.count})</span></a>`;
-      });
+      // Build category links - use clean ?type= parameter for client-side filtering
+      let html = '';
+      
+      if (vehicle && vehicle.id) {
+        // With vehicle: combine vehicle filter AND type parameter
+        const vehicleFilter = `filter.p.m.custom.fits_vehicles=${encodeURIComponent(vehicle.id)}`;
+        html += `<a href="/collections/all?${vehicleFilter}" class="category-link active">All</a>`;
+        data.data.forEach(cat => {
+          // Combine vehicle filter with type parameter
+          const url = `/collections/all?${vehicleFilter}&type=${encodeURIComponent(cat.name)}`;
+          html += `<a href="${url}" class="category-link" data-type="${cat.name}">${cat.name} <span class="text-[9px] opacity-60">(${cat.count})</span></a>`;
+        });
+      } else {
+        // Without vehicle: just filter by type
+        html += '<a href="/collections/all" class="category-link active">All</a>';
+        data.data.forEach(cat => {
+          const url = `/collections/all?type=${encodeURIComponent(cat.name)}`;
+          html += `<a href="${url}" class="category-link" data-type="${cat.name}">${cat.name} <span class="text-[9px] opacity-60">(${cat.count})</span></a>`;
+        });
+      }
       
       container.innerHTML = html;
       
-      // Highlight active category based on current URL
+      // Highlight active category based on ?type= parameter
       const urlParams = new URLSearchParams(window.location.search);
-      const activeType = urlParams.get('filter.p.product_type');
+      const activeType = urlParams.get('type');
       if (activeType) {
         container.querySelectorAll('.category-link').forEach(link => {
           link.classList.remove('active');
@@ -284,52 +352,212 @@
     }
   };
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadCategories);
-  } else {
-    loadCategories();
-  }
-})();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadCategories);
+    } else {
+      loadCategories();
+    }
+  })();
+
+  // Catalog Hover Logic for Category Nav
+  (function() {
+    const catNav = document.getElementById('category-nav');
+    // We need to wait for DOM or standard load
+    const initNav = () => {
+      const catalogLink = document.querySelector('a[data-title="catalog"]');
+      if (!catNav || !catalogLink) return;
+
+      const isCollectionAll = window.location.pathname === '/collections/all';
+
+      // Function to show
+      const show = () => {
+        catNav.classList.remove('nav-hidden');
+        catNav.classList.add('nav-visible');
+      };
+
+      // Function to hide
+      const hide = () => {
+        if (isCollectionAll) return; // Lock open on /collections/all
+        catNav.classList.remove('nav-visible');
+        catNav.classList.add('nav-hidden');
+      };
+
+      // Initial State
+      if (isCollectionAll) {
+        show();
+      } else {
+        catNav.classList.add('nav-hidden');
+      }
+
+      // Hover Events with Debounce
+      let timeout;
+      const cancelHide = () => clearTimeout(timeout);
+      const scheduleHide = () => {
+        timeout = setTimeout(hide, 150); // Small delay to bridge gap
+      };
+
+      // Hover on Catalog Link
+      catalogLink.parentElement.addEventListener('mouseenter', () => {
+        cancelHide();
+        show();
+      });
+      catalogLink.parentElement.addEventListener('mouseleave', scheduleHide);
+
+      // Hover on the Nav Bar itself (so it doesn't disappear when using it)
+      catNav.addEventListener('mouseenter', () => {
+        cancelHide();
+        show();
+      });
+      catNav.addEventListener('mouseleave', scheduleHide);
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initNav);
+    } else {
+      initNav();
+    }
+  })();
 </script>
 
 <style>
+  /* Premium Racing Category Navigation */
   #category-nav {
     scrollbar-width: none;
     -ms-overflow-style: none;
+    background: linear-gradient(180deg, #ffffff 0%, #f8f8f8 100%);
+    border-bottom: 1px solid rgba(204, 0, 0, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease-in-out;
+  }
+  
+  /* Start hidden state */
+  #category-nav.nav-hidden {
+    height: 0;
+    opacity: 0;
+    visibility: hidden;
+    overflow: hidden;
+    padding: 0;
+    border: none;
+  }
+  
+  /* Visible state */
+  #category-nav.nav-visible {
+    height: 40px; /* Matched to h-10 from tailwind */
+    opacity: 1;
+    visibility: visible;
   }
   #category-nav::-webkit-scrollbar {
     display: none;
   }
-  .category-link {
-    display: inline-block;
-    padding: 6px 12px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: rgba(255, 255, 255, 0.6);
-    white-space: nowrap;
-    transition: all 0.2s;
-    border-radius: 4px;
+  
+  /* Vehicle Badge - Racing Style */
+  #vehicle-badge > span:first-child {
+    background: linear-gradient(135deg, rgba(204, 0, 0, 0.15) 0%, rgba(204, 0, 0, 0.08) 100%);
+    border: 1px solid rgba(204, 0, 0, 0.4);
+    color: #CC0000;
+    box-shadow: 0 0 12px rgba(204, 0, 0, 0.15);
+    backdrop-filter: blur(10px);
+    animation: vehiclePulse 2s ease-in-out infinite;
   }
-  .category-link:hover {
-    color: white;
-    background: rgba(204, 0, 0, 0.2);
+  @keyframes vehiclePulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(204, 0, 0, 0.15); }
+    50% { box-shadow: 0 0 20px rgba(204, 0, 0, 0.25); }
   }
-  .category-link.active {
+  
+  #btn-clear-vehicle {
+    color: #999;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  #btn-clear-vehicle:hover {
     color: #CC0000;
     background: rgba(204, 0, 0, 0.1);
+    transform: rotate(90deg);
   }
+  
+  /* Category Links - Racing Style */
+  .category-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #555555;
+    white-space: nowrap;
+    text-decoration: none;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Animated underline effect */
+  .category-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #CC0000, transparent);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(-50%);
+  }
+  
+  .category-link:hover {
+    color: #CC0000;
+    background: linear-gradient(180deg, rgba(204, 0, 0, 0.08) 0%, rgba(204, 0, 0, 0.03) 100%);
+  }
+  .category-link:hover::after {
+    width: 80%;
+  }
+  
+  /* Active State - Racing Red */
+  .category-link.active {
+    color: #CC0000;
+    background: linear-gradient(180deg, rgba(204, 0, 0, 0.12) 0%, rgba(204, 0, 0, 0.05) 100%);
+    font-weight: 800;
+  }
+  .category-link.active::after {
+    width: 60%;
+    background: #CC0000;
+    box-shadow: 0 0 8px rgba(204, 0, 0, 0.6);
+  }
+  
+  /* Count Badge */
+  .category-link span {
+    opacity: 0.5;
+    font-size: 9px;
+    font-weight: 500;
+    transition: opacity 0.3s;
+  }
+  .category-link:hover span,
+  .category-link.active span {
+    opacity: 0.7;
+  }
+  
+  /* Loading Animation */
+  #category-links span:only-child {
+    animation: loadingPulse 1.5s ease-in-out infinite;
+  }
+  @keyframes loadingPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+  }
+  
+  /* Responsive */
   @media (max-width: 1024px) {
     .category-link {
-      padding: 4px 8px;
+      padding: 6px 12px;
       font-size: 10px;
     }
   }
 </style>
 
 <!-- Mobile Menu Drawer -->
-<dialog id="mobile-menu-drawer" class="fixed inset-y-0 left-0 z-[1000] w-[85vw] max-w-[400px] h-[100dvh] max-h-[100dvh] bg-white p-0 m-0 border-r border-gray-100 shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm open:animate-slide-in-left outline-none">
+<dialog id="mobile-menu-drawer" class="fixed inset-y-0 left-0 z-[3000] w-[85vw] max-w-[400px] h-[100dvh] max-h-[100dvh] bg-white p-0 m-0 border-r border-gray-100 shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm open:animate-slide-in-left outline-none">
   <div class="flex flex-col h-full bg-white">
     <!-- Header -->
     <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-white">
@@ -408,7 +636,7 @@
 </dialog>
 
 <!-- Search Drawer -->
-<dialog id="search-drawer" class="fixed inset-0 w-[100vw] bg-transparent z-[1000] p-0 m-0 backdrop:bg-black/60 open:animate-slide-down overflow-hidden">
+<dialog id="search-drawer" class="fixed inset-0 w-[100vw] bg-transparent z-[3000] p-0 m-0 backdrop:bg-black/60 open:animate-slide-down overflow-hidden">
   <div class="fixed top-0 left-0 right-0 w-[100vw] bg-white px-0 py-6 shadow-md">
      <div class="w-[100vw] box-border flex items-center justify-between gap-4 border-b-2 border-gray-200 focus-within:border-[#CC0000] transition-colors pb-4">
        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-gray-400">

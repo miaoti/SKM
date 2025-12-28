@@ -120,6 +120,37 @@
           const isActive = document.getElementById('ymm-filter-status').dataset.active === 'true';
           const productCount = parseInt(document.getElementById('ymm-filter-status').dataset.count || '0');
           
+          // Product Type Filtering
+          const typeParam = urlParams.get('type');
+          if (typeParam) {
+            const products = document.querySelectorAll('[data-product-type]');
+            let visibleCount = 0;
+            products.forEach(product => {
+              const productType = product.dataset.productType;
+              if (productType !== typeParam) {
+                product.style.display = 'none';
+              } else {
+                visibleCount++;
+              }
+            });
+            
+            // Update product count display if exists
+            const countEl = document.querySelector('.collection-product-count');
+            if (countEl) {
+              countEl.textContent = `${visibleCount} ${visibleCount === 1 ? 'item' : 'items'}`;
+            }
+            
+            // Show no results if all products hidden
+            if (visibleCount === 0) {
+              const noResults = document.getElementById('ymm-no-results');
+              if (noResults) {
+                noResults.querySelector('h2').textContent = `No ${typeParam} products found.`;
+                noResults.querySelector('p').textContent = `We don't have any ${typeParam} parts in this collection.`;
+                noResults.classList.remove('hidden');
+              }
+            }
+          }
+          
           if (hasYmmParam) {
             if (productCount === 0) {
               // Valid search, but no results found
@@ -150,6 +181,7 @@
             class="product-grid__item product-grid__item--{{ forloop.index0 }}"
             data-page="{{ paginate.current_page }}"
             data-product-id="{{ product.id }}"
+            data-product-type="{{ product.type | escape }}"
             ref="cards[]"
           >
             {% # theme-check-disable %}

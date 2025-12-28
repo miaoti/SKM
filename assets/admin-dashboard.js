@@ -70,7 +70,7 @@
 
   function $(id) { return document.getElementById(id); }
 
-  // Expose context for external scripts
+  // Expose context for external scripts - switchToTab added after function is defined
   window.AdminDashboard = { API_BASE, api, toast, S };
 
   // ==========================================
@@ -109,6 +109,7 @@
     $('tab-orders').classList.toggle('hidden', tabName !== 'orders');
     $('tab-vehicles').classList.toggle('hidden', tabName !== 'vehicles');
     $('tab-customers').classList.toggle('hidden', tabName !== 'customers');
+    if ($('tab-dealers')) $('tab-dealers').classList.toggle('hidden', tabName !== 'dealers');
     if ($('tab-profile')) $('tab-profile').classList.toggle('hidden', tabName !== 'profile');
 
     // Hide product sidebar when on orders, vehicles, or customers tab
@@ -139,6 +140,9 @@
       loadOrders();
     }
   }
+
+  // Expose switchToTab for external scripts (deep linking from email)
+  window.AdminDashboard.switchToTab = switchToTab;
 
   // Tab Click Handlers
   document.querySelectorAll('.tab').forEach(t => {

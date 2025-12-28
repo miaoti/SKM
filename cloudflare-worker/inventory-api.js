@@ -79,9 +79,10 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // Authentication check (skip for health check and B2B storefront endpoints)
-    const publicPaths = ["/health", "/b2b/checkout", "/b2b/cart-preview", "/checkout/create", "/shop/profile", "/categories"];
-    if (!publicPaths.includes(path)) {
+    // Authentication check (skip for health check, B2B storefront, and public dealer endpoints)
+    const publicPaths = ["/health", "/b2b/checkout", "/b2b/cart-preview", "/checkout/create", "/shop/profile", "/categories", "/dealers", "/apply-dealer", "/my-dealer"];
+    const isPublicDealerPath = path.startsWith("/dealers/") && request.method === "GET";
+    if (!publicPaths.includes(path) && !isPublicDealerPath) {
       const clientKey = request.headers.get("X-Admin-Key");
       if (clientKey !== env.ADMIN_SECRET) {
         return errorResponse("Unauthorized", 401);
@@ -148,7 +149,8 @@ export default {
         // CATEGORIES ROUTES (Product Types)
         // ==========================================
         case path === "/categories" && request.method === "GET":
-          return jsonResponse(await listCategories(env));
+          const vehicleIdParam = url.searchParams.get("vehicleId") || "";
+          return jsonResponse(await listCategories(env, vehicleIdParam));
 
         // ==========================================
         // PRODUCT ROUTES
@@ -436,6 +438,82 @@ export default {
         case path.match(/^\/orders\/[^/]+\/send-receipt$/) && request.method === "POST":
           const receiptOrderId = path.split("/")[2];
           return jsonResponse(await sendOrderReceipt(env, receiptOrderId));
+
+        // ==========================================
+        // DEALER MANAGEMENT ROUTES
+        // ==========================================
+        // Initialize dealer metaobject schemas (admin only)
+        case path === "/schema/init-dealers" && request.method === "POST":
+          return jsonResponse(await initDealerSchemas(env));
+
+        // Backfill geocoding for existing dealers (admin only)
+        case path.replace(/\/$/, "") === "/admin/backfill-geocoding" && request.method === "POST":
+          return jsonResponse(await backfillGeocoding(env));
+
+        // List all dealers (public: active only, admin: can filter)
+        case path === "/dealers" && request.method === "GET":
+          const dealerStatus = url.searchParams.get("status") || "active";
+
+          // Security check: Only allow 'active' status without admin key
+          if (dealerStatus !== "active") {
+            const clientKey = request.headers.get("X-Admin-Key");
+            if (clientKey !== env.ADMIN_SECRET) {
+              return errorResponse("Unauthorized: Admin key required to view inactive dealers", 401);
+            }
+          }
+
+          return jsonResponse(await listDealers(env, dealerStatus));
+
+        // Get single dealer (public)
+        case path.match(/^\/dealers\/[^/]+$/) && request.method === "GET":
+          const getDealerId = decodeURIComponent(path.split("/").pop());
+          return jsonResponse(await getDealer(env, getDealerId));
+
+        // Create dealer (admin only)
+        case path === "/dealers" && request.method === "POST":
+          const createDealerBody = await request.json();
+          return jsonResponse(await createDealer(env, createDealerBody));
+
+        // Update dealer (admin or owner)
+        case path.match(/^\/dealers\/[^/]+$/) && request.method === "PUT":
+          const updateDealerId = decodeURIComponent(path.split("/").pop());
+          const updateDealerBody = await request.json();
+          return jsonResponse(await updateDealer(env, updateDealerId, updateDealerBody));
+
+        // Delete dealer (admin only)
+        case path.match(/^\/dealers\/[^/]+$/) && request.method === "DELETE":
+          const deleteDealerId = decodeURIComponent(path.split("/").pop());
+          return jsonResponse(await deleteDealer(env, deleteDealerId));
+
+        // Apply to become a dealer (logged-in customer)
+        case path === "/apply-dealer" && request.method === "POST":
+          const applyDealerBody = await request.json();
+          return jsonResponse(await applyForDealer(env, applyDealerBody));
+
+        // List dealer applications (admin only)
+        case path === "/dealer-applications" && request.method === "GET":
+          const appStatus = url.searchParams.get("status") || "";
+          return jsonResponse(await listDealerApplications(env, appStatus));
+
+        // Get single application (admin only)
+        case path.match(/^\/dealer-applications\/[^/]+$/) && request.method === "GET":
+          const getAppId = path.split("/").pop();
+          return jsonResponse(await getDealerApplication(env, getAppId));
+
+        // Process application (approve/reject) - admin only
+        case path === "/process-application" && request.method === "POST":
+          const processBody = await request.json();
+          return jsonResponse(await processApplication(env, processBody));
+
+        // Get current customer's dealer profile (B2B only)
+        case path === "/my-dealer" && request.method === "GET":
+          const myDealerCustomerId = url.searchParams.get("customerId");
+          return jsonResponse(await getMyDealer(env, myDealerCustomerId));
+
+        // Update own dealer profile (B2B only)
+        case path === "/my-dealer" && request.method === "PUT":
+          const myDealerUpdateBody = await request.json();
+          return jsonResponse(await updateMyDealer(env, myDealerUpdateBody));
 
         default:
           return errorResponse("Not Found", 404);
@@ -877,8 +955,13 @@ async function removeCustomerTags(env, customerId, tags) {
 // CATEGORY OPERATIONS (Product Types)
 // ============================================
 
-async function listCategories(env) {
-  // Fetch all products to extract unique product types
+async function listCategories(env, vehicleId = "") {
+  // If vehicleId is provided, filter products by vehicle fitment
+  if (vehicleId) {
+    return await listCategoriesForVehicle(env, vehicleId);
+  }
+
+  // Standard: Fetch all products to extract unique product types
   const query = `
     query ListProductTypes($first: Int!, $after: String) {
       products(first: $first, after: $after) {
@@ -925,6 +1008,69 @@ async function listCategories(env) {
     .sort((a, b) => b.count - a.count);
 
   return { success: true, data: categories, count: categories.length };
+}
+
+/**
+ * List categories filtered by products that fit a specific vehicle
+ */
+async function listCategoriesForVehicle(env, vehicleId) {
+  // Query products with fits_vehicles metafield using Admin API syntax
+  const query = `
+    query ListProductTypesForVehicle($first: Int!, $after: String) {
+      products(first: $first, after: $after) {
+        edges {
+          node {
+            productType
+            metafield(namespace: "custom", key: "fits_vehicles") {
+              value
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `;
+
+  const typeCounts = {};
+  let hasNextPage = true;
+  let cursor = null;
+
+  // Paginate through products and filter by vehicle fitment
+  while (hasNextPage) {
+    const result = await shopifyGraphQL(env, query, {
+      first: 250,
+      after: cursor
+    });
+
+    for (const edge of result.products.edges) {
+      // Check if product has fits_vehicles metafield containing the vehicle ID
+      const fitsVehicles = edge.node.metafield?.value || "";
+      if (fitsVehicles.includes(vehicleId)) {
+        const type = edge.node.productType;
+        if (type && type.trim() !== '') {
+          const normalizedType = type.trim();
+          typeCounts[normalizedType] = (typeCounts[normalizedType] || 0) + 1;
+        }
+      }
+    }
+
+    hasNextPage = result.products.pageInfo.hasNextPage;
+    cursor = result.products.pageInfo.endCursor;
+  }
+
+  // Convert to array and sort by count (descending)
+  const categories = Object.entries(typeCounts)
+    .map(([name, count]) => ({
+      name,
+      count,
+      handle: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  return { success: true, data: categories, count: categories.length, vehicleFiltered: true };
 }
 
 // ============================================
@@ -6820,4 +6966,970 @@ async function shopifyGraphQL(env, query, variables = {}) {
   }
 
   return json.data;
+}
+
+// ============================================
+// DEALER MANAGEMENT OPERATIONS
+// ============================================
+
+/**
+ * Initialize Dealer and Dealer_Application metaobject schemas
+ */
+async function initDealerSchemas(env) {
+  // Check if Dealer schema exists
+  const checkQuery = `
+    query CheckDealerSchema {
+      metaobjectDefinitionByType(type: "dealer") {
+        id
+        name
+      }
+      appMetaobjectDefinitionByType: metaobjectDefinitionByType(type: "dealer_application") {
+        id
+        name
+      }
+    }
+  `;
+
+  const checkResult = await shopifyGraphQL(env, checkQuery, {});
+  const results = { dealer: null, dealer_application: null };
+
+  // Create Dealer schema if not exists
+  if (!checkResult.metaobjectDefinitionByType) {
+    const createDealerSchema = `
+      mutation CreateDealerDefinition {
+        metaobjectDefinitionCreate(definition: {
+          type: "dealer"
+          name: "Dealer"
+          displayNameKey: "name"
+          access: { storefront: PUBLIC_READ }
+          fieldDefinitions: [
+            { key: "name", name: "Business Name", type: "single_line_text_field", required: true }
+            { key: "logo", name: "Logo", type: "file_reference" }
+            { key: "address", name: "Street Address", type: "single_line_text_field" }
+            { key: "city", name: "City", type: "single_line_text_field" }
+            { key: "state", name: "State", type: "single_line_text_field" }
+            { key: "zip", name: "ZIP Code", type: "single_line_text_field" }
+            { key: "country", name: "Country", type: "single_line_text_field" }
+            { key: "latitude", name: "Latitude", type: "number_decimal" }
+            { key: "longitude", name: "Longitude", type: "number_decimal" }
+            { key: "phone", name: "Phone", type: "single_line_text_field" }
+            { key: "email", name: "Email", type: "single_line_text_field" }
+            { key: "website", name: "Website", type: "url" }
+            { key: "hours", name: "Business Hours", type: "json" }
+            { key: "customer_id", name: "Customer ID", type: "single_line_text_field" }
+            { key: "status", name: "Status", type: "single_line_text_field" }
+          ]
+        }) {
+          metaobjectDefinition { id name }
+          userErrors { field message }
+        }
+      }
+    `;
+    const dealerResult = await shopifyGraphQL(env, createDealerSchema, {});
+    results.dealer = dealerResult.metaobjectDefinitionCreate;
+  } else {
+    results.dealer = { existing: true, id: checkResult.metaobjectDefinitionByType.id };
+  }
+
+  // Create Dealer_Application schema if not exists
+  if (!checkResult.appMetaobjectDefinitionByType) {
+    const createAppSchema = `
+      mutation CreateDealerApplicationDefinition {
+        metaobjectDefinitionCreate(definition: {
+          type: "dealer_application"
+          name: "Dealer Application"
+          displayNameKey: "business_name"
+          access: { storefront: NONE }
+          fieldDefinitions: [
+            { key: "status", name: "Status", type: "single_line_text_field", required: true }
+            { key: "business_name", name: "Business Name", type: "single_line_text_field", required: true }
+            { key: "raw_data", name: "Application Data", type: "json" }
+            { key: "customer_id", name: "Customer ID", type: "single_line_text_field" }
+            { key: "customer_email", name: "Customer Email", type: "single_line_text_field" }
+            { key: "submitted_at", name: "Submitted At", type: "date_time" }
+            { key: "processed_at", name: "Processed At", type: "date_time" }
+            { key: "processed_by", name: "Processed By", type: "single_line_text_field" }
+            { key: "notes", name: "Admin Notes", type: "multi_line_text_field" }
+          ]
+        }) {
+          metaobjectDefinition { id name }
+          userErrors { field message }
+        }
+      }
+    `;
+    const appResult = await shopifyGraphQL(env, createAppSchema, {});
+    results.dealer_application = appResult.metaobjectDefinitionCreate;
+  } else {
+    results.dealer_application = { existing: true, id: checkResult.appMetaobjectDefinitionByType.id };
+  }
+
+  return { success: true, schemas: results };
+}
+
+/**
+ * List all active dealers
+ */
+async function listDealers(env, statusFilter = 'active') {
+  const query = `
+     query ListDealers($first: Int!) {
+       metaobjects(type: "dealer", first: $first) {
+         edges {
+           node {
+             id
+             handle
+             fields {
+               key
+               value
+               reference {
+                 ... on MediaImage {
+                   image { url }
+                 }
+               }
+             }
+           }
+         }
+       }
+     }
+   `;
+
+  const result = await shopifyGraphQL(env, query, { first: 250 });
+
+  const dealers = result.metaobjects.edges.map(edge => {
+    const fields = {};
+    edge.node.fields.forEach(f => {
+      if (f.key === 'logo' && f.reference?.image?.url) {
+        fields[f.key] = f.reference.image.url;
+      } else if (f.key === 'hours' && f.value) {
+        try { fields[f.key] = JSON.parse(f.value); } catch { fields[f.key] = f.value; }
+      } else {
+        fields[f.key] = f.value;
+      }
+    });
+    return {
+      id: edge.node.id,
+      handle: edge.node.handle,
+      ...fields
+    };
+  }).filter(d => statusFilter === 'all' || d.status === statusFilter);
+
+  return { success: true, data: dealers, count: dealers.length };
+}
+
+/**
+ * Get single dealer by ID
+ */
+async function getDealer(env, id) {
+  const gid = id.startsWith('gid://') ? id : `gid://shopify/Metaobject/${id}`;
+
+  const query = `
+    query GetDealer($id: ID!) {
+      metaobject(id: $id) {
+        id
+        handle
+        fields {
+          key
+          value
+          reference {
+            ... on MediaImage {
+              image { url }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const result = await shopifyGraphQL(env, query, { id: gid });
+
+  console.log('[getDealer] Input ID:', id);
+  console.log('[getDealer] GID used:', gid);
+  console.log('[getDealer] GraphQL result:', JSON.stringify(result));
+
+  if (!result.metaobject) {
+    return { success: false, error: "Dealer not found" };
+  }
+
+  const fields = {};
+  result.metaobject.fields.forEach(f => {
+    if (f.key === 'logo' && f.reference?.image?.url) {
+      fields[f.key] = f.reference.image.url;
+    } else if (f.key === 'hours' && f.value) {
+      try { fields[f.key] = JSON.parse(f.value); } catch { fields[f.key] = f.value; }
+    } else {
+      fields[f.key] = f.value;
+    }
+  });
+
+  return {
+    success: true,
+    data: {
+      id: result.metaobject.id,
+      handle: result.metaobject.handle,
+      ...fields
+    }
+  };
+}
+
+/**
+ * Create a new dealer
+ */
+async function createDealer(env, data) {
+  const fields = [];
+
+  const fieldMappings = ['name', 'address', 'city', 'state', 'zip', 'country', 'phone', 'email', 'website', 'customer_id', 'status'];
+  fieldMappings.forEach(key => {
+    if (data[key]) {
+      fields.push({ key, value: data[key] });
+    }
+  });
+
+  // Auto-geocode if missing coordinates but address is provided
+  if (!data.latitude && !data.longitude && data.address && data.city) {
+    const coords = await geocodeAddress(data.address, data.city, data.state, data.zip);
+    if (coords) {
+      data.latitude = coords.lat;
+      data.longitude = coords.lng;
+    }
+  }
+
+  if (data.latitude) fields.push({ key: 'latitude', value: String(data.latitude) });
+  if (data.longitude) fields.push({ key: 'longitude', value: String(data.longitude) });
+  if (data.hours) fields.push({ key: 'hours', value: JSON.stringify(data.hours) });
+  if (!data.status) fields.push({ key: 'status', value: 'active' });
+
+  const mutation = `
+    mutation CreateDealer($metaobject: MetaobjectCreateInput!) {
+      metaobjectCreate(metaobject: $metaobject) {
+        metaobject {
+          id
+          handle
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  const result = await shopifyGraphQL(env, mutation, {
+    metaobject: {
+      type: "dealer",
+      fields
+    }
+  });
+
+  if (result.metaobjectCreate.userErrors?.length > 0) {
+    return { success: false, errors: result.metaobjectCreate.userErrors };
+  }
+
+  return { success: true, data: result.metaobjectCreate.metaobject };
+}
+
+/**
+ * Update dealer
+ */
+async function updateDealer(env, id, data) {
+  const gid = id.startsWith('gid://') ? id : `gid://shopify/Metaobject/${id}`;
+
+  const fields = [];
+  const fieldMappings = ['name', 'address', 'city', 'state', 'zip', 'country', 'phone', 'email', 'website', 'status'];
+  fieldMappings.forEach(key => {
+    if (data[key] !== undefined) {
+      fields.push({ key, value: data[key] });
+    }
+  });
+
+  // Auto-geocode if address fields are being updated or lat/lng is missing
+  if (data.address || data.city || data.state || data.zip) {
+    // If updating address but not providing coordinates, we should try to geocode
+    if (!data.latitude && !data.longitude) {
+      // NOTE: Ideally we'd need the FULL address (including existing fields if partial update), 
+      // but simpler logic is: if any address part changes, we try to geocode with what we have 
+      // relative to the dealer's current info. 
+      // HOWEVER, fetching the current dealer first adds latency. 
+      // For now, we assume if address is updated, enough info is provided or available.
+      // Better strategy: Only geocode if at least Address and City are present in data.
+
+      if (data.address && data.city) {
+        const coords = await geocodeAddress(data.address, data.city, data.state, data.zip);
+        if (coords) {
+          data.latitude = coords.lat;
+          data.longitude = coords.lng;
+        }
+      }
+    }
+  }
+
+  if (data.latitude !== undefined) fields.push({ key: 'latitude', value: String(data.latitude) });
+  if (data.longitude !== undefined) fields.push({ key: 'longitude', value: String(data.longitude) });
+  if (data.hours !== undefined) fields.push({ key: 'hours', value: JSON.stringify(data.hours) });
+
+  const mutation = `
+    mutation UpdateDealer($id: ID!, $metaobject: MetaobjectUpdateInput!) {
+      metaobjectUpdate(id: $id, metaobject: $metaobject) {
+        metaobject { id handle }
+        userErrors { field message }
+      }
+    }
+  `;
+
+  const result = await shopifyGraphQL(env, mutation, {
+    id: gid,
+    metaobject: { fields }
+  });
+
+  if (result.metaobjectUpdate.userErrors?.length > 0) {
+    return { success: false, errors: result.metaobjectUpdate.userErrors };
+  }
+
+  return { success: true, data: result.metaobjectUpdate.metaobject };
+}
+
+/**
+ * Delete dealer
+ */
+async function deleteDealer(env, id) {
+  const gid = id.startsWith('gid://') ? id : `gid://shopify/Metaobject/${id}`;
+
+  // Step 1: Get the dealer first to find the customer_id
+  const dealerResult = await getDealer(env, gid);
+
+  if (dealerResult.success && dealerResult.data.customer_id) {
+    // Remove 'b2b' and 'dealer' tags from the customer
+    await removeCustomerTags(env, dealerResult.data.customer_id, ['b2b', 'dealer']);
+  }
+
+  const mutation = `
+    mutation DeleteDealer($id: ID!) {
+      metaobjectDelete(id: $id) {
+        deletedId
+        userErrors { field message }
+      }
+    }
+  `;
+
+  const result = await shopifyGraphQL(env, mutation, { id: gid });
+
+  if (result.metaobjectDelete.userErrors?.length > 0) {
+    return { success: false, errors: result.metaobjectDelete.userErrors };
+  }
+  return { success: true, deletedId: result.metaobjectDelete.deletedId };
+}
+
+/**
+ * Helper: Geocode address using Nominatim (OpenStreetMap)
+ */
+async function geocodeAddress(address, city, state, zip) {
+  try {
+    const query = [address, city, state, zip, "USA"].filter(Boolean).join(", ");
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
+
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "SKM-Inventory-Manager/1.0 (miaotingshuo890@gmail.com)"
+      }
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (data && data.length > 0) {
+      return {
+        lat: data[0].lat,
+        lng: data[0].lon
+      };
+    }
+  } catch (error) {
+    console.error("Geocoding error:", error);
+  }
+  return null;
+}
+
+/**
+ * Backfill geocoding for existing dealers
+ */
+async function backfillGeocoding(env) {
+  const result = await listDealers(env);
+  if (!result.success) return result;
+
+  const dealers = result.data;
+  let updatedCount = 0;
+  let skippedCount = 0;
+  let failedCount = 0;
+  const logs = [];
+
+  for (const dealer of dealers) {
+    // Check if missing coordinates
+    if (!dealer.latitude && !dealer.longitude && dealer.address && dealer.city) {
+      try {
+        logs.push(`Geocoding dealer: ${dealer.name} (${dealer.address}, ${dealer.city})`);
+
+        // Rate limiting: wait 1.2 seconds between requests
+        await new Promise(resolve => setTimeout(resolve, 1200));
+
+        const coords = await geocodeAddress(dealer.address, dealer.city, dealer.state, dealer.zip);
+
+        if (coords) {
+          // Update the dealer
+          const updateResult = await updateDealer(env, dealer.id, {
+            latitude: coords.lat,
+            longitude: coords.lng
+          });
+
+          if (updateResult.success) {
+            updatedCount++;
+            logs.push(`  -> Success: ${coords.lat}, ${coords.lng}`);
+          } else {
+            failedCount++;
+            logs.push(`  -> Update failed: ${JSON.stringify(updateResult.errors)}`);
+          }
+        } else {
+          failedCount++;
+          logs.push(`  -> Geocoding failed (no results)`);
+        }
+      } catch (e) {
+        failedCount++;
+        logs.push(`  -> Error: ${e.message}`);
+      }
+    } else {
+      skippedCount++;
+    }
+  }
+
+  return {
+    success: true,
+    total: dealers.length,
+    updated: updatedCount,
+    skipped: skippedCount,
+    failed: failedCount,
+    logs
+  };
+}
+
+/**
+ * Get favicon URL for a website using Google's Favicon API
+ * @param {string} websiteUrl - The website URL
+ * @returns {string|null} The favicon URL or null if no website provided
+ */
+function getFaviconUrl(websiteUrl) {
+  if (!websiteUrl) return null;
+  try {
+    // Extract domain from URL
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
+  } catch (e) {
+    console.error('[getFaviconUrl] Error parsing website URL:', e);
+    return null;
+  }
+}
+
+/**
+ * Apply to become a dealer (submit application)
+ */
+async function applyForDealer(env, data) {
+  if (!data.customer_id || !data.customer_email) {
+    return { success: false, error: "Customer ID and email are required" };
+  }
+
+  // Check for existing pending application from this customer
+  const existingQuery = `
+    query FindExistingApplication($first: Int!) {
+      metaobjects(type: "dealer_application", first: $first) {
+        edges {
+          node {
+            id
+            fields {
+              key
+              value
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const existingResult = await shopifyGraphQL(env, existingQuery, { first: 250 });
+
+  // Find ALL existing pending applications from this customer
+  const existingApps = existingResult.metaobjects?.edges?.filter(edge => {
+    const customerIdField = edge.node.fields.find(f => f.key === 'customer_id');
+    const statusField = edge.node.fields.find(f => f.key === 'status');
+    return customerIdField?.value === data.customer_id && statusField?.value === 'pending';
+  }) || [];
+
+  // Delete ALL old pending applications from this customer
+  if (existingApps.length > 0) {
+    console.log(`[applyForDealer] Deleting ${existingApps.length} old applications from customer ${data.customer_id}`);
+
+    const deleteMutation = `
+      mutation DeleteDealerApplication($id: ID!) {
+        metaobjectDelete(id: $id) {
+          deletedId
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    // Delete each old application
+    for (const app of existingApps) {
+      try {
+        await shopifyGraphQL(env, deleteMutation, { id: app.node.id });
+      } catch (err) {
+        console.error(`Failed to delete old application ${app.node.id}:`, err);
+      }
+    }
+  }
+
+  // Extract favicon URL from website if provided
+  const faviconUrl = getFaviconUrl(data.website);
+  if (faviconUrl) {
+    data.favicon_url = faviconUrl;
+  }
+
+  const fields = [
+    { key: 'status', value: 'pending' },
+    { key: 'business_name', value: data.business_name || 'Unnamed Business' },
+    { key: 'customer_id', value: data.customer_id },
+    { key: 'customer_email', value: data.customer_email },
+    { key: 'submitted_at', value: new Date().toISOString() },
+    { key: 'raw_data', value: JSON.stringify(data) }
+  ];
+
+  // Always create a new application
+  // Create new application
+  const createMutation = `
+      mutation CreateDealerApplication($metaobject: MetaobjectCreateInput!) {
+        metaobjectCreate(metaobject: $metaobject) {
+          metaobject {
+            id
+            handle
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+  console.log('[applyForDealer] Creating application with fields:', JSON.stringify(fields));
+
+  const result = await shopifyGraphQL(env, createMutation, {
+    metaobject: {
+      type: "dealer_application",
+      fields
+    }
+  });
+
+  console.log('[applyForDealer] Shopify result:', JSON.stringify(result));
+
+  if (result.metaobjectCreate?.userErrors?.length > 0) {
+    console.error('[applyForDealer] User errors:', result.metaobjectCreate.userErrors);
+    return { success: false, errors: result.metaobjectCreate.userErrors };
+  }
+
+  if (!result.metaobjectCreate?.metaobject?.id) {
+    console.error('[applyForDealer] No metaobject returned - possible schema mismatch');
+    return { success: false, error: 'Failed to create application - schema may not be initialized' };
+  }
+
+  // Send email notification to shop owner (optional - requires RESEND_API_KEY)
+  if (env.RESEND_API_KEY && env.SHOP_OWNER_EMAIL) {
+    try {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'SKM Dealer Applications <onboarding@resend.dev>',
+          to: env.SHOP_OWNER_EMAIL,
+          subject: `🏪 New Dealer Application: ${data.business_name || 'New Business'}`,
+          text: `New dealer application from ${data.business_name || 'New Business'}. Email: ${data.customer_email}. Phone: ${data.phone || 'N/A'}. Address: ${data.address || ''}, ${data.city || ''}, ${data.state || ''} ${data.zip || ''}. Review at: https://skm-ex.myshopify.com/pages/admin-dashboard`,
+          html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); padding: 32px 40px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700;">SKM Performance</h1>
+              <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">Dealer Application Notification</p>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px;">
+              <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 16px 20px; border-radius: 0 8px 8px 0; margin-bottom: 32px;">
+                <p style="margin: 0; color: #991b1b; font-weight: 600; font-size: 16px;">🎉 New Application Received!</p>
+                <p style="margin: 8px 0 0 0; color: #7f1d1d; font-size: 14px;">A potential dealer is interested in partnering with SKM.</p>
+              </div>
+              
+              <h2 style="margin: 0 0 24px 0; color: #18181b; font-size: 20px; font-weight: 600;">Business Details</h2>
+              
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 32px;">
+                <tr>
+                  <td style="padding: 12px 0; border-bottom: 1px solid #e4e4e7;">
+                    <span style="color: #71717a; font-size: 14px;">Business Name</span><br>
+                    <span style="color: #18181b; font-size: 16px; font-weight: 500;">${data.business_name || 'Not provided'}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; border-bottom: 1px solid #e4e4e7;">
+                    <span style="color: #71717a; font-size: 14px;">Contact Email</span><br>
+                    <a href="mailto:${data.customer_email}" style="color: #dc2626; font-size: 16px; font-weight: 500; text-decoration: none;">${data.customer_email}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; border-bottom: 1px solid #e4e4e7;">
+                    <span style="color: #71717a; font-size: 14px;">Phone</span><br>
+                    <span style="color: #18181b; font-size: 16px; font-weight: 500;">${data.phone || 'Not provided'}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; border-bottom: 1px solid #e4e4e7;">
+                    <span style="color: #71717a; font-size: 14px;">Location</span><br>
+                    <span style="color: #18181b; font-size: 16px; font-weight: 500;">${[data.address, data.city, data.state, data.zip].filter(Boolean).join(', ') || 'Not provided'}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; border-bottom: 1px solid #e4e4e7;">
+                    <span style="color: #71717a; font-size: 14px;">Website</span><br>
+                    <a href="${data.website || '#'}" style="color: #dc2626; font-size: 16px; font-weight: 500; text-decoration: none;">${data.website || 'Not provided'}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0;">
+                    <span style="color: #71717a; font-size: 14px;">Reason for Applying</span><br>
+                    <span style="color: #18181b; font-size: 16px; font-weight: 500;">${data.reason || 'Not provided'}</span>
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- CTA Button -->
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <a href="https://skm-ex.myshopify.com/pages/admin-dashboard?tab=dealers&app=${encodeURIComponent(result.metaobjectCreate.metaobject.id)}" style="display: inline-block; background-color: #dc2626; color: #ffffff; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; text-decoration: none;">
+                      Review Application →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f4f4f5; padding: 24px 40px; text-align: center;">
+              <p style="margin: 0; color: #71717a; font-size: 12px;">
+                This is an automated notification from SKM Performance.<br>
+                © ${new Date().getFullYear()} SKM Performance. All rights reserved.
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+          `
+        })
+      });
+    } catch (emailError) {
+      console.error('Failed to send notification email:', emailError);
+      // Don't fail the application if email fails
+    }
+  }
+
+  return {
+    success: true,
+    message: "Application submitted successfully! We'll review it and get back to you soon.",
+    applicationId: result.metaobjectCreate.metaobject.id
+  };
+}
+
+/**
+ * List dealer applications (admin only)
+ */
+async function listDealerApplications(env, statusFilter = "") {
+  const query = `
+    query ListDealerApplications($first: Int!) {
+      metaobjects(type: "dealer_application", first: $first, reverse: true) {
+        edges {
+          node {
+            id
+            handle
+            fields {
+              key
+              value
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const result = await shopifyGraphQL(env, query, { first: 250 });
+
+  console.log('[listDealerApplications] Query result:', JSON.stringify(result));
+  console.log('[listDealerApplications] Status filter:', statusFilter);
+
+  const applications = result.metaobjects?.edges?.map(edge => {
+    const fields = {};
+    edge.node.fields.forEach(f => {
+      if (f.key === 'raw_data' && f.value) {
+        try { fields[f.key] = JSON.parse(f.value); } catch { fields[f.key] = f.value; }
+      } else {
+        fields[f.key] = f.value;
+      }
+    });
+    return {
+      id: edge.node.id,
+      handle: edge.node.handle,
+      ...fields
+    };
+  }).filter(app => !statusFilter || app.status === statusFilter) || [];
+
+  return { success: true, data: applications, count: applications?.length || 0 };
+}
+
+/**
+ * Get single dealer application
+ */
+async function getDealerApplication(env, id) {
+  // Decode URL-encoded ID (frontend encodes it to handle slashes in GID)
+  const decodedId = decodeURIComponent(id);
+  const gid = decodedId.startsWith('gid://') ? decodedId : `gid://shopify/Metaobject/${decodedId}`;
+
+  const query = `
+    query GetDealerApplication($id: ID!) {
+      metaobject(id: $id) {
+        id
+        handle
+        fields {
+          key
+          value
+        }
+      }
+    }
+  `;
+
+  const result = await shopifyGraphQL(env, query, { id: gid });
+
+  if (!result.metaobject) {
+    return { success: false, error: "Application not found" };
+  }
+
+  const fields = {};
+  result.metaobject.fields.forEach(f => {
+    if (f.key === 'raw_data' && f.value) {
+      try { fields[f.key] = JSON.parse(f.value); } catch { fields[f.key] = f.value; }
+    } else {
+      fields[f.key] = f.value;
+    }
+  });
+
+  return {
+    success: true,
+    data: {
+      id: result.metaobject.id,
+      handle: result.metaobject.handle,
+      ...fields
+    }
+  };
+}
+
+/**
+ * Process application (approve or reject)
+ */
+async function processApplication(env, data) {
+  const { applicationId, action, notes, processedBy } = data;
+  let emailStatus = '';
+
+  if (!applicationId || !action) {
+    return { success: false, error: "applicationId and action are required" };
+  }
+
+  if (!['approve', 'reject'].includes(action)) {
+    return { success: false, error: "Action must be 'approve' or 'reject'" };
+  }
+
+  // Get the application first
+  const appResult = await getDealerApplication(env, applicationId);
+  if (!appResult.success) {
+    return appResult;
+  }
+
+  const application = appResult.data;
+  const gid = applicationId.startsWith('gid://') ? applicationId : `gid://shopify/Metaobject/${applicationId}`;
+
+  // Update application status
+  const updateFields = [
+    { key: 'status', value: action === 'approve' ? 'approved' : 'rejected' },
+    { key: 'processed_at', value: new Date().toISOString() }
+  ];
+  if (notes) updateFields.push({ key: 'notes', value: notes });
+  if (processedBy) updateFields.push({ key: 'processed_by', value: processedBy });
+
+  const updateMutation = `
+    mutation UpdateApplication($id: ID!, $metaobject: MetaobjectUpdateInput!) {
+      metaobjectUpdate(id: $id, metaobject: $metaobject) {
+        metaobject { id }
+        userErrors { field message }
+      }
+    }
+  `;
+
+  await shopifyGraphQL(env, updateMutation, {
+    id: gid,
+    metaobject: { fields: updateFields }
+  });
+
+  let dealerId = null;
+
+  if (action === 'approve') {
+    // Create the Dealer metaobject
+    const rawData = application.raw_data || {};
+    const dealerData = {
+      name: application.business_name || rawData.business_name,
+      address: rawData.address,
+      city: rawData.city,
+      state: rawData.state,
+      zip: rawData.zip,
+      country: rawData.country || 'United States',
+      phone: rawData.phone,
+      email: application.customer_email,
+      website: rawData.website,
+      hours: rawData.hours,
+      latitude: rawData.latitude,
+      longitude: rawData.longitude,
+      customer_id: application.customer_id,
+      status: 'active'
+    };
+
+    const dealerResult = await createDealer(env, dealerData);
+    if (dealerResult.success) {
+      dealerId = dealerResult.data.id;
+    }
+
+    // Add 'b2b' tag to customer
+    if (application.customer_id) {
+      await addCustomerTags(env, application.customer_id, ['b2b', 'dealer']);
+    }
+  } else if (action === 'reject') {
+    // Email is now handled by frontend via mailto link
+  }
+
+  return {
+    success: true,
+    message: action === 'approve' ? 'Application approved! Dealer created and customer tagged.' : 'Application rejected.',
+    dealerId,
+    customerId: application.customer_id
+  };
+}
+
+/**
+ * Get current customer's dealer profile (B2B only)
+ */
+async function getMyDealer(env, customerId) {
+  if (!customerId) {
+    return { success: false, error: "Customer ID is required" };
+  }
+
+  const query = `
+    query GetDealerByCustomer($first: Int!, $query: String!) {
+      metaobjects(type: "dealer", first: $first, query: $query) {
+        edges {
+          node {
+            id
+            handle
+            fields {
+              key
+              value
+              reference {
+                ... on MediaImage {
+                  image { url }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const result = await shopifyGraphQL(env, query, {
+    first: 1,
+    query: `fields.customer_id:${customerId}`
+  });
+
+  if (!result.metaobjects.edges.length) {
+    return { success: false, error: "No dealer profile found for this customer" };
+  }
+
+  const node = result.metaobjects.edges[0].node;
+  const fields = {};
+  node.fields.forEach(f => {
+    if (f.key === 'logo' && f.reference?.image?.url) {
+      fields[f.key] = f.reference.image.url;
+    } else if (f.key === 'hours' && f.value) {
+      try { fields[f.key] = JSON.parse(f.value); } catch { fields[f.key] = f.value; }
+    } else {
+      fields[f.key] = f.value;
+    }
+  });
+
+  return {
+    success: true,
+    data: {
+      id: node.id,
+      handle: node.handle,
+      ...fields
+    }
+  };
+}
+
+/**
+ * Update own dealer profile (B2B only)
+ */
+async function updateMyDealer(env, data) {
+  const { customerId, ...updateData } = data;
+
+  if (!customerId) {
+    return { success: false, error: "Customer ID is required" };
+  }
+
+  // Get the dealer first to verify ownership
+  const dealerResult = await getMyDealer(env, customerId);
+  if (!dealerResult.success) {
+    return dealerResult;
+  }
+
+  // Only allow updating certain fields
+  const allowedFields = ['phone', 'website', 'hours', 'address', 'city', 'state', 'zip'];
+  const filteredData = {};
+  allowedFields.forEach(key => {
+    if (updateData[key] !== undefined) {
+      filteredData[key] = updateData[key];
+    }
+  });
+
+  return await updateDealer(env, dealerResult.data.id, filteredData);
 }

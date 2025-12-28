@@ -413,6 +413,7 @@ Form Handling
 | **Header** | `sections/header-precision.liquid` | Main site header with logo, nav, utilities |
 | **Header Logo** | `sections/header-precision.liquid` (lines 41-96) | Dynamic logo from shop profile API |
 | **Header JS** | `assets/header-precision.js` | Scroll behavior, mobile menu |
+| **Category Nav Bar** | `sections/header-precision.liquid` (lines 234-362) | Product type navigation with YMM integration |
 | **Footer** | `sections/blueprint-footer.liquid` | Site footer with social links, logo |
 | **Footer Social Icons** | `sections/blueprint-footer.liquid` (lines 84-103) | Twitter, Instagram, Facebook, YouTube |
 | **Favicon** | `sections/header-precision.liquid` (JS) | Dynamic favicon from shop profile |
@@ -445,6 +446,7 @@ Form Handling
 |-----------|------|-------------|
 | **Template** | `templates/collection.json` | Page configuration |
 | **Main Collection** | `sections/main-collection.liquid` | Product grid with filters |
+| **Type Filter JS** | `sections/main-collection.liquid` (lines 116-175) | Client-side product type filtering via `?type=` param |
 | **Product Card** | `snippets/product-card.liquid` | Individual product cards |
 | **Filters** | `snippets/collection-filters.liquid` | Filter sidebar |
 
@@ -499,6 +501,7 @@ Form Handling
 |----------|------|---------|
 | **Shop Profile** | `cloudflare-worker/inventory-api.js` | `GET/PUT /shop/profile` |
 | **Logo Upload** | `cloudflare-worker/inventory-api.js` | `POST /shop/logo/upload` |
+| **Categories** | `cloudflare-worker/inventory-api.js` | `GET /categories?vehicleId=` - Product type counts (YMM filtered) |
 | **Products** | `cloudflare-worker/inventory-api.js` | CRUD `/products/*` |
 | **Vehicles** | `cloudflare-worker/inventory-api.js` | CRUD `/vehicles/*` |
 | **Customers** | `cloudflare-worker/inventory-api.js` | CRUD `/customers/*` |
@@ -523,7 +526,39 @@ Form Handling
 | File | Purpose | Used In |
 |------|---------|---------|
 | `assets/admin-profile.js` | Profile tab functionality | Admin Dashboard |
+| `assets/admin-categories.js` | Category/product type management | Admin Dashboard |
 | `assets/header-precision.js` | Header scroll/sticky behavior | All pages |
+| `assets/ymm.js` | YMM vehicle search & filtering | Homepage, Collection |
 | `assets/cart.js` | Cart functionality | Cart drawer |
 | `assets/product-form.js` | Add to cart, variant selection | Product pages |
 | `assets/predictive-search.js` | Search autocomplete | Header search |
+
+---
+
+## Category Navigation Bar (YMM Integrated)
+
+**Location:** Inside `header-precision` element (lines 234-362)
+
+### Features:
+- **Dynamic Categories** - Fetches product types from `/categories` API with counts
+- **Vehicle Badge** - Shows selected vehicle with clear button when YMM active
+- **Filtered Counts** - When vehicle selected, shows only categories with matching products
+- **Clean URLs** - Uses `/collections/all?type=Exhaust` parameter (no ugly search syntax)
+- **Client-Side Filtering** - Collection page JS filters products by `data-product-type` attribute
+
+### URL Parameters:
+| Parameter | Purpose | Example |
+|-----------|---------|--------|
+| `type` | Filter by product type | `/collections/all?type=Exhaust` |
+| `filter.p.m.custom.fits_vehicles` | Filter by vehicle | `/collections/all?filter.p.m.custom.fits_vehicles=gid://...` |
+| Combined | Both filters | `/collections/all?filter.p.m.custom.fits_vehicles=...&type=Exhaust` |
+
+### Data Flow:
+```
+1. Page Load → loadCategories() in header-precision.liquid
+2. Check localStorage for 'skm_garage_vehicle'
+3. Fetch /categories (with vehicleId if vehicle selected)
+4. Render category links with counts
+5. On click → Navigate to /collections/all?type=CategoryName
+6. Collection page JS filters products by data-product-type attribute
+```

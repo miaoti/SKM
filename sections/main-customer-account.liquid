@@ -45,6 +45,8 @@
         </a>
       </div>
 
+
+
       <!-- Upgrade to Dealer / B2B Card -->
       {% unless customer.tags contains 'b2b' %}
         <div class="bg-[#111111] p-6 border-l-4 border-red-600 shadow-lg relative overflow-hidden group">
@@ -69,22 +71,241 @@
                 </div>
                 <p class="text-gray-500 text-xs mt-1">Our team is reviewing your profile.</p>
               {% else %}
-                <input type="hidden" name="contact[body]" value="User {{ customer.email }} (ID: {{ customer.id }}) requests upgrade to B2B Business Account.">
-                <input type="hidden" name="contact[email]" value="{{ customer.email }}">
-                
-                <button type="submit" class="w-full py-3 bg-[#CC0000] text-white text-xs font-bold uppercase tracking-widest hover:bg-red-700 hover:scale-[1.02] transition-all duration-200 shadow-lg shadow-red-900/20">
+                <a href="/pages/find-a-dealer#apply" class="block w-full py-3 bg-[#CC0000] text-white text-xs font-bold uppercase tracking-widest hover:bg-red-700 hover:scale-[1.02] transition-all duration-200 shadow-lg shadow-red-900/20 text-center">
                   Apply For Business Account
-                </button>
+                </a>
               {% endif %}
             {% endform %}
           </div>
         </div>
       {% endunless %}
-
     </div>
 
     <!-- Main Content (Right Column) -->
     <div class="lg:col-span-9">
+      
+      {%comment%} B2B DEALER DASHBOARD {%endcomment%}
+      {% if customer.tags contains 'b2b' %}
+        <div class="mb-10 relative group">
+          <div class="bg-[#111111] border border-[#222222] rounded-sm overflow-hidden shadow-xl transition-all duration-300 hover:border-[#CC0000]/30">
+            <!-- Header (Always Visible) -->
+            <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-white/5 transition-colors" onclick="toggleDealerProfile(this)">
+              <div class="flex items-center gap-4">
+                <div class="w-10 h-10 bg-[#CC0000]/10 border border-[#CC0000]/30 rounded-full flex items-center justify-center text-[#CC0000]">
+                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
+                   </svg>
+                </div>
+                <div>
+                  <h2 class="text-lg font-bold uppercase tracking-wider text-white flex items-center gap-3">
+                    My Dealer Store
+                    <span class="px-2 py-0.5 text-[10px] bg-[#CC0000] text-white rounded-full">B2B</span>
+                  </h2>
+                  <p class="text-xs text-gray-400 mt-0.5" id="store-name-preview">Loading store details...</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                 <span class="text-[10px] text-green-500 uppercase tracking-wider font-bold bg-green-900/20 px-2 py-1 rounded border border-green-900/30">Active Dealer</span>
+                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-gray-500 transition-transform duration-300" id="profile-arrow">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                 </svg>
+              </div>
+            </div>
+
+            <!-- Content (Expandable) -->
+            <div id="dealer-profile-content" class="hidden border-t border-[#222222] bg-[#0d0d0d] p-6 sm:p-8">
+               <p class="text-center text-gray-500 py-8">Loading profile data...</p>
+            </div>
+          </div>
+        </div>
+
+        <script>
+        (function() {
+          const API = 'https://skm-inventory-api.miaotingshuo.workers.dev';
+          const customerId = '{{ customer.id | prepend: "gid://shopify/Customer/" }}';
+          let dealerData = null;
+
+          window.toggleDealerProfile = function(header) {
+             const content = document.getElementById('dealer-profile-content');
+             const arrow = document.getElementById('profile-arrow');
+             
+             if (content.classList.contains('hidden')) {
+               content.classList.remove('hidden');
+               arrow.style.transform = 'rotate(180deg)';
+               loadDealerStore(true); // Always call render when opening
+             } else {
+               content.classList.add('hidden');
+               arrow.style.transform = 'rotate(0deg)';
+             }
+          }
+
+          async function loadDealerStore(isExpanded = false) {
+             if (!isExpanded) {
+               // Initial lightweight load for preview text
+               try {
+                 const res = await fetch(`${API}/my-dealer?customerId=${encodeURIComponent(customerId)}`);
+                 const data = await res.json();
+                 if(data.success && data.data) {
+                    dealerData = data.data;
+                    document.getElementById('store-name-preview').textContent = dealerData.name || 'Set up your store profile';
+                 }
+               } catch(e) { console.error(e); }
+               return;
+             }
+
+             // Full Render
+             const container = document.getElementById('dealer-profile-content');
+             
+             // Optimization: If form is already rendered, don't re-render
+             if (container.querySelector('#b2b-name')) return;
+
+             if (!dealerData) {
+                try {
+                   const res = await fetch(`${API}/my-dealer?customerId=${encodeURIComponent(customerId)}`);
+                   const data = await res.json();
+                   if (!data.success) throw new Error(data.message);
+                   dealerData = data.data;
+                } catch(e) {
+                   container.innerHTML = `<p class="text-red-500 text-center">Failed to load: ${e.message}</p>`;
+                   return;
+                }
+             }
+
+             if (!dealerData) return;
+             
+             // Extract hours safely
+             let hoursText = '';
+             if (typeof dealerData.hours === 'string') hoursText = dealerData.hours;
+             else if (dealerData.hours?.display) hoursText = dealerData.hours.display;
+             else if (dealerData.hours?.text) hoursText = dealerData.hours.text;
+             else if (typeof dealerData.hours === 'object') hoursText = JSON.stringify(dealerData.hours, null, 2);
+
+             container.innerHTML = `
+               <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <!-- Column 1: Identity & Contact -->
+                  <div class="space-y-6">
+                     <h3 class="text-xs font-bold uppercase tracking-widest text-[#666] border-b border-[#333] pb-2">Business Identity</h3>
+                     
+                     <div>
+                        <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">Store Name</label>
+                        <input type="text" id="b2b-name" value="${dealerData.name || ''}" class="w-full bg-[#1a1a1a] border border-[#333] text-white text-sm px-3 py-2 rounded focus:border-[#CC0000] focus:ring-0 transition-colors">
+                     </div>
+
+                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                           <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">Phone</label>
+                           <input type="tel" id="b2b-phone" value="${dealerData.phone || ''}" class="w-full bg-[#1a1a1a] border border-[#333] text-white text-sm px-3 py-2 rounded focus:border-[#CC0000] focus:ring-0 transition-colors">
+                        </div>
+                        <div>
+                           <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">Website</label>
+                           <input type="url" id="b2b-website" value="${dealerData.website || ''}" class="w-full bg-[#1a1a1a] border border-[#333] text-white text-sm px-3 py-2 rounded focus:border-[#CC0000] focus:ring-0 transition-colors">
+                        </div>
+                     </div>
+
+                     <div>
+                        <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">Business Hours</label>
+                        <textarea id="b2b-hours" rows="4" class="w-full bg-[#1a1a1a] border border-[#333] text-white text-sm px-3 py-2 rounded focus:border-[#CC0000] focus:ring-0 transition-colors placeholder-gray-600" placeholder="Mon-Fri: 9am - 6pm\nSat: 10am - 4pm">${hoursText}</textarea>
+                        <p class="text-[10px] text-gray-500 mt-1">Free text format supported.</p>
+                     </div>
+                  </div>
+
+                  <!-- Column 2: Location -->
+                  <div class="space-y-6">
+                     <h3 class="text-xs font-bold uppercase tracking-widest text-[#666] border-b border-[#333] pb-2">Store Location</h3>
+                     
+                     <div>
+                        <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">Street Address</label>
+                        <input type="text" id="b2b-address" value="${dealerData.address || ''}" class="w-full bg-[#1a1a1a] border border-[#333] text-white text-sm px-3 py-2 rounded focus:border-[#CC0000] focus:ring-0 transition-colors">
+                     </div>
+
+                     <div class="grid grid-cols-2 gap-4">
+                        <div>
+                           <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">City</label>
+                           <input type="text" id="b2b-city" value="${dealerData.city || ''}" class="w-full bg-[#1a1a1a] border border-[#333] text-white text-sm px-3 py-2 rounded focus:border-[#CC0000] focus:ring-0 transition-colors">
+                        </div>
+                        <div>
+                           <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">State / Prov</label>
+                           <input type="text" id="b2b-state" value="${dealerData.state || ''}" class="w-full bg-[#1a1a1a] border border-[#333] text-white text-sm px-3 py-2 rounded focus:border-[#CC0000] focus:ring-0 transition-colors">
+                        </div>
+                     </div>
+
+                     <div class="grid grid-cols-2 gap-4">
+                         <div>
+                           <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">ZIP / Postal</label>
+                           <input type="text" id="b2b-zip" value="${dealerData.zip || ''}" class="w-full bg-[#1a1a1a] border border-[#333] text-white text-sm px-3 py-2 rounded focus:border-[#CC0000] focus:ring-0 transition-colors">
+                        </div>
+                         <div>
+                           <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">Country</label>
+                           <input type="text" id="b2b-country" value="${dealerData.country || 'United States'}" class="w-full bg-[#1a1a1a] border border-[#333] text-white text-sm px-3 py-2 rounded focus:border-[#CC0000] focus:ring-0 transition-colors">
+                        </div>
+                     </div>
+
+                     <div class="bg-[#222] p-4 rounded text-xs text-gray-400 mt-4 border border-[#333] flex items-start gap-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 shrink-0">
+                           <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                           <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                        </svg>
+                        <p>Your location on the "Find a Dealer" map will automatically update when you save your address.</p>
+                     </div>
+                  </div>
+               </div>
+
+               <!-- Actions -->
+               <div class="mt-8 pt-6 border-t border-[#222] flex justify-end">
+                  <button onclick="saveB2BProfile(this)" class="px-8 py-3 bg-[#CC0000] hover:bg-[#aa0000] text-white font-bold uppercase tracking-wider rounded transition-all shadow-lg shadow-red-900/20 text-xs">
+                     Update Store Profile
+                  </button>
+               </div>
+             `;
+          }
+
+          window.saveB2BProfile = async function(btn) {
+             const originalText = btn.textContent;
+             btn.textContent = 'Saving...';
+             btn.disabled = true;
+
+             const payload = {
+                customerId,
+                name: document.getElementById('b2b-name').value,
+                phone: document.getElementById('b2b-phone').value,
+                website: document.getElementById('b2b-website').value,
+                address: document.getElementById('b2b-address').value,
+                city: document.getElementById('b2b-city').value,
+                state: document.getElementById('b2b-state').value,
+                zip: document.getElementById('b2b-zip').value,
+                country: document.getElementById('b2b-country').value,
+                hours: { display: document.getElementById('b2b-hours').value }
+             };
+
+             try {
+                const res = await fetch(`${API}/my-dealer`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                   alert('Profile updated! Map location will refresh shortly.');
+                   dealerData = null; // Force reload next time
+                   loadDealerStore(true);
+                   document.getElementById('store-name-preview').textContent = payload.name;
+                } else {
+                   throw new Error(data.error || 'Unknown error');
+                }
+             } catch(e) {
+                alert('Save failed: ' + e.message);
+             } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+             }
+          }
+
+          // Init
+          loadDealerStore(false);
+        })();
+        </script>
+      {% endif %}
       
       {% comment %} ==========================================
          ADMIN COMMAND CENTER ENTRY POINT
