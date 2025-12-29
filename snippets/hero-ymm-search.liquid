@@ -1,0 +1,179 @@
+{{ 'ymm.css' | asset_url | stylesheet_tag }}
+
+{%- liquid
+  assign sf_token = 'c9e546201d3f991f9c3f576e0d1cf4ee'
+  assign collection_handle = 'all'
+  assign unique_id = 'modal-' | append: section.id
+-%}
+
+<style>
+  .modal-ymm-container {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  
+  .modal-ymm-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1.5rem;
+    align-items: end;
+  }
+  
+  @media (max-width: 768px) {
+    .modal-ymm-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .modal-ymm-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+  }
+  
+  .modal-ymm-field {
+    flex: 1;
+    min-width: 140px;
+  }
+  
+  .modal-ymm-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 10px;
+    color: #CC0000;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  
+  .modal-ymm-select {
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: white;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23CC0000' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 40px;
+  }
+  
+  .modal-ymm-select:hover,
+  .modal-ymm-select:focus {
+    border-color: #CC0000;
+    box-shadow: 0 0 20px rgba(204, 0, 0, 0.2);
+    outline: none;
+  }
+  
+  .modal-ymm-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .modal-ymm-button {
+    padding: 14px 32px;
+    background: #CC0000;
+    border: none;
+    color: white;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: inherit;
+  }
+  
+  .modal-ymm-button:hover {
+    background: #aa0000;
+    box-shadow: 0 0 30px rgba(204, 0, 0, 0.4);
+  }
+  
+  .modal-ymm-status {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 0.05em;
+  }
+</style>
+
+<div class="modal-ymm-container">
+  <div class="modal-ymm-grid">
+    
+    {%- comment -%} Input Fields {%- endcomment -%}
+    <div class="modal-ymm-fields">
+      
+      {%- comment -%} YEAR {%- endcomment -%}
+      <div class="modal-ymm-field">
+        <label class="modal-ymm-label">Year</label>
+        <select id="ymm-year-{{ unique_id }}" data-role="ymm-year" class="modal-ymm-select">
+          <option value="">Select Year</option>
+        </select>
+      </div>
+
+      {%- comment -%} MAKE {%- endcomment -%}
+      <div class="modal-ymm-field">
+        <label class="modal-ymm-label">Make</label>
+        <select id="ymm-make-{{ unique_id }}" data-role="ymm-make" disabled class="modal-ymm-select">
+          <option value="">Select Make</option>
+        </select>
+      </div>
+
+      {%- comment -%} MODEL {%- endcomment -%}
+      <div class="modal-ymm-field">
+        <label class="modal-ymm-label">Model</label>
+        <select id="ymm-model-{{ unique_id }}" data-role="ymm-model" disabled class="modal-ymm-select">
+          <option value="">Select Model</option>
+        </select>
+      </div>
+
+      {%- comment -%} SUBMODEL {%- endcomment -%}
+      <div class="modal-ymm-field" data-role="ymm-submodel-container" style="display: none;">
+        <label class="modal-ymm-label">Submodel</label>
+        <select id="ymm-submodel-{{ unique_id }}" data-role="ymm-submodel" disabled class="modal-ymm-select">
+          <option value="">Select Submodel</option>
+        </select>
+      </div>
+    </div>
+
+    {%- comment -%} SEARCH BUTTON {%- endcomment -%}
+    <div>
+      <button type="button" data-role="ymm-submit" class="modal-ymm-button">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <span>Search</span>
+      </button>
+    </div>
+  </div>
+  
+  {%- comment -%} Status {%- endcomment -%}
+  <div class="ymm-status modal-ymm-status" aria-live="polite">SELECT VEHICLE TO SEARCH</div>
+</div>
+
+{%- comment -%} YMM Configuration {%- endcomment -%}
+<script type="application/json" id="ymm-config-{{ unique_id }}">
+  {
+    "collectionHandle": {{ collection_handle | json }},
+    "showSubmodel": true,
+    "showEngine": false,
+    "storefrontAccessToken": {{ sf_token | json }},
+    "apiVersion": "2025-01",
+    "rootId": {{ unique_id | json }}
+  }
+</script>
+
+{% unless is_modal %}
+<script src="{{ 'ymm.js' | asset_url }}" defer="defer"></script>
+{% endunless %}
