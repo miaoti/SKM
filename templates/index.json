@@ -90,9 +90,9 @@
       ],
       "settings": {
         "heading": "HEAR THE POWER.",
-        "audio_idle": "https://github.com/miaoti/SKM/raw/refs/heads/main/Pictures/Contact/Video/Idle.mp3",
-        "audio_3000": "https://github.com/miaoti/SKM/raw/refs/heads/main/Pictures/Contact/Video/3000.mp3",
-        "audio_redline": "",
+        "audio_idle": "https://cdn.shopify.com/s/files/1/0792/0477/8242/files/Idle.mp3?v=1766974336",
+        "audio_3000": "https://cdn.shopify.com/s/files/1/0792/0477/8242/files/3000.mp3?v=1766974336",
+        "audio_redline": "https://cdn.shopify.com/s/files/1/0792/0477/8242/files/set-the-world-on-fire-88810.mp3?v=1766974475",
         "audio_url": "https://github.com/miaoti/SKM/raw/refs/heads/main/Pictures/Contact/Video/Idle.mp3"
       }
     },
