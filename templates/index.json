@@ -12,7 +12,7 @@
     "hero_ymm": {
       "type": "hero-ymm",
       "settings": {
-        "video": "shopify://files/videos/3752531-hd_1920_1080_24fps.mp4",
+        "video": "shopify://files/videos/Cinematic_Metal_Metamorphosis_Video_bd7a01c8-98c0-40d6-b769-5c49702c06eb.mp4",
         "heading": "UNLEASH THE SOUND.",
         "collection_handle": "all",
         "storefront_access_token": ""
@@ -26,7 +26,8 @@
           "settings": {
             "icon_svg": "",
             "title": "304 Stainless Steel",
-            "text": "High-grade materials for maximum durability and corrosion resistance."
+            "text": "High-grade materials for maximum durability and corrosion resistance.",
+            "specs": ""
           }
         },
         "feature_2": {
@@ -34,7 +35,8 @@
           "settings": {
             "icon_svg": "",
             "title": "Mandrel Bent",
-            "text": "Smooth bends ensure unrestricted airflow and optimal performance."
+            "text": "Smooth bends ensure unrestricted airflow and optimal performance.",
+            "specs": ""
           }
         },
         "feature_3": {
@@ -42,7 +44,8 @@
           "settings": {
             "icon_svg": "",
             "title": "Dyno Proven",
-            "text": "Tested and tuned to deliver real horsepower and torque gains."
+            "text": "Tested and tuned to deliver real horsepower and torque gains.",
+            "specs": ""
           }
         }
       },
@@ -52,8 +55,7 @@
         "feature_3"
       ],
       "settings": {
-        "heading": "PRECISION ENGINEERED",
-        "subtext": "304 Stainless Steel. Mandrel Bent. Dyno Proven."
+        "heading": "PRECISION ENGINEERED"
       }
     },
     "showroom": {
@@ -88,7 +90,7 @@
       ],
       "settings": {
         "heading": "HEAR THE POWER.",
-        "video_url": ""
+        "audio_url": ""
       }
     },
     "garage_hotspots": {
@@ -99,8 +101,10 @@
           "settings": {
             "top": 40,
             "left": 60,
+            "code": "WELD_01",
             "title": "Anti-Drone Tech",
-            "text": "Cancels out specific frequencies to eliminate cabin drone."
+            "text": "Cancels out specific frequencies to eliminate cabin drone.",
+            "specs": "TECH: TIG_PRECISION // GAS: ARGON_PURGE"
           }
         },
         "hotspot_2": {
@@ -108,8 +112,10 @@
           "settings": {
             "top": 65,
             "left": 30,
+            "code": "WELD_01",
             "title": "TIG Welded",
-            "text": "Hand-welded joints for superior strength and aesthetics."
+            "text": "Hand-welded joints for superior strength and aesthetics.",
+            "specs": "TECH: TIG_PRECISION // GAS: ARGON_PURGE"
           }
         }
       },

@@ -1,43 +1,175 @@
 {{ 'ymm.css' | asset_url | stylesheet_tag }}
 
 <div class="hero-ymm-section relative h-screen w-full overflow-hidden" data-section-id="{{ section.id }}">
+  {%- comment -%} BACKDROP: Video or Image from Shopify settings {%- endcomment -%}
   {%- if section.settings.video != blank -%}
-    <div class="absolute inset-0 z-0">
-      {{ section.settings.video | video_tag: autoplay: true, loop: true, muted: true, controls: false, class: "w-full h-full object-cover" }}
-      <div class="absolute inset-0 bg-black/40"></div>
+    <div class="absolute inset-0 z-0 hero-backdrop" id="hero-backdrop-{{ section.id }}">
+      {{ section.settings.video | video_tag: autoplay: true, loop: true, muted: true, controls: false, class: "w-full h-full object-cover transition-all duration-700" }}
+      <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80"></div>
+    </div>
+  {%- elsif section.settings.background_image != blank -%}
+    <div class="absolute inset-0 z-0 hero-backdrop" id="hero-backdrop-{{ section.id }}">
+      {{ section.settings.background_image | image_url: width: 2000 | image_tag: class: "w-full h-full object-cover transition-all duration-700" }}
+      <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80"></div>
     </div>
   {%- else -%}
-    <div class="absolute inset-0 z-0 bg-gray-900">
-      {{ 'lifestyle-1' | placeholder_svg_tag: 'w-full h-full object-cover opacity-50' }}
-    </div>
+    <div class="absolute inset-0 z-0 bg-gradient-to-b from-gray-900 to-black"></div>
   {%- endif -%}
+
+  {%- comment -%} HUD Scanline Overlay {%- endcomment -%}
+  <div class="hud-scanline"></div>
 
   {%- liquid
     assign sf_token = section.settings.storefront_access_token | default: 'c9e546201d3f991f9c3f576e0d1cf4ee'
+    assign collection_handle = section.settings.collection_handle | default: 'all'
+    assign unique_id = 'hero-' | append: section.id
   -%}
 
   <div class="relative z-10 flex flex-col items-center justify-center h-full px-4 text-center">
+    
+    {%- comment -%} Configuration Warning {%- endcomment -%}
     {% if sf_token == blank %}
       <div class="bg-red-500 text-white p-4 mb-4 rounded font-bold">
         ⚠️ CONFIGURATION REQUIRED: Please add a Storefront Access Token in the section settings.
       </div>
     {% endif %}
-    <h1 class="text-5xl md:text-7xl font-bold text-white mb-8 tracking-tight uppercase" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">
-      {{ section.settings.heading | default: "UNLEASH THE SOUND" }}
+
+    {%- comment -%} MAIN HEADER: Thin weight, extra spacing {%- endcomment -%}
+    <h1 class="hud-header text-4xl md:text-6xl lg:text-7xl text-white mb-4 leading-tight">
+      {{ section.settings.heading | default: "ACOUSTIC ENGINEERING. REFINED." }}
     </h1>
 
-    {% render 'hero-ymm-search', section: section, is_modal: false %}
+    {%- comment -%} Subheading {%- endcomment -%}
+    <p class="hud-mono text-gray-400 mb-12 tracking-widest text-xs">
+      [ INITIALIZE VEHICLE DIAGNOSTIC SEQUENCE ]
+    </p>
+
+    {%- comment -%} =========================================
+         DIAGNOSTIC BAR: YMM Interface
+         Uses the original YMM functionality integrated with new styling
+    ========================================== {%- endcomment -%}
+    <div class="ymm-diagnostic-bar w-full max-w-4xl">
+      <div class="diagnostic-container bg-black/80 backdrop-blur-md border border-white/10 p-6 md:p-8">
+        
+        {%- comment -%} Status Line {%- endcomment -%}
+        <div class="flex items-center justify-between mb-6 pb-4 border-b border-white/5">
+          <div class="hud-mono text-xs text-[#CC0000] tracking-widest">VEHICLE IDENTIFICATION</div>
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            <span class="hud-mono text-green-500 text-[10px]">ONLINE</span>
+          </div>
+        </div>
+
+        {%- comment -%} YMM Input Grid - Centered, responsive {%- endcomment -%}
+        <div class="ymm-search-grid flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
+          
+          {%- comment -%} YEAR {%- endcomment -%}
+          <div class="ymm-search-field w-full md:w-auto md:min-w-[140px]">
+            <label class="hud-mono text-[10px] text-gray-500 block mb-2 tracking-widest">INPUT_YEAR:</label>
+            <div class="relative">
+              <select id="ymm-year-{{ unique_id }}" data-role="ymm-year" class="diagnostic-select w-full">
+                <option value="">Select Year</option>
+              </select>
+            </div>
+          </div>
+
+          {%- comment -%} MAKE {%- endcomment -%}
+          <div class="ymm-search-field w-full md:w-auto md:min-w-[160px]">
+            <label class="hud-mono text-[10px] text-gray-500 block mb-2 tracking-widest">SELECT_MAKE:</label>
+            <div class="relative">
+              <select id="ymm-make-{{ unique_id }}" data-role="ymm-make" disabled class="diagnostic-select w-full">
+                <option value="">Select Make</option>
+              </select>
+            </div>
+          </div>
+
+          {%- comment -%} MODEL {%- endcomment -%}
+          <div class="ymm-search-field w-full md:w-auto md:min-w-[180px]">
+            <label class="hud-mono text-[10px] text-gray-500 block mb-2 tracking-widest">MODEL_ID:</label>
+            <div class="relative">
+              <select id="ymm-model-{{ unique_id }}" data-role="ymm-model" disabled class="diagnostic-select w-full">
+                <option value="">Select Model</option>
+              </select>
+            </div>
+          </div>
+
+          {%- comment -%} SUBMODEL (Controlled by ymm.js) {%- endcomment -%}
+          <div class="ymm-search-field w-full md:w-auto md:min-w-[160px]" data-role="ymm-submodel-container" id="submodel-container-{{ unique_id }}" style="display: none;">
+            <label class="hud-mono text-[10px] text-gray-500 block mb-2 tracking-widest">SUBMODEL:</label>
+            <div class="relative">
+              <select id="ymm-submodel-{{ unique_id }}" data-role="ymm-submodel" disabled class="diagnostic-select w-full">
+                <option value="">Select Submodel</option>
+              </select>
+            </div>
+          </div>
+
+          {%- comment -%} SEARCH BUTTON {%- endcomment -%}
+          <div class="ymm-search-field w-full md:w-auto mt-4 md:mt-0 md:self-end">
+            <button type="button" data-role="ymm-submit" class="group w-full md:w-auto px-10 h-[46px] bg-transparent border-2 border-white/50 text-white font-bold uppercase tracking-widest text-xs hover:bg-[#CC0000] hover:border-[#CC0000] transition-all duration-300 flex items-center justify-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="opacity-70 group-hover:opacity-100">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+              </svg>
+              <span>Search</span>
+            </button>
+          </div>
+        </div>
+
+        {%- comment -%} Status Output {%- endcomment -%}
+        <div class="ymm-status mt-6 pt-4 border-t border-white/5 hud-mono text-[10px] text-gray-600 text-center" aria-live="polite">
+          SELECT VEHICLE TO BEGIN
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Scroll Indicator {%- endcomment -%}
+    <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-bounce opacity-50">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="text-white">
+        <path d="M12 5v14M5 12l7 7 7-7"/>
+      </svg>
+    </div>
   </div>
 
-  {% comment %} 
-    The config is now inside the snippet, but we keep the script reference here or in the snippet.
-    The snippet includes 'ymm.js' only if not modal, or we rely on main theme loading it.
-  {% endcomment %}
+  {%- comment -%} YMM Configuration - MUST be inside the data-section-id element {%- endcomment -%}
+  <script type="application/json" id="ymm-config-{{ unique_id }}">
+    {
+      "collectionHandle": {{ collection_handle | json }},
+      "showSubmodel": true,
+      "showEngine": false,
+      "storefrontAccessToken": {{ sf_token | json }},
+      "apiVersion": "2025-01",
+      "rootId": {{ unique_id | json }}
+    }
+  </script>
 </div>
+
+{%- comment -%} Background blur effect on selection {%- endcomment -%}
+<script>
+  (function() {
+    const backdrop = document.getElementById('hero-backdrop-{{ section.id }}');
+    if (backdrop) {
+      const selects = document.querySelectorAll('[data-role="ymm-year"], [data-role="ymm-make"], [data-role="ymm-model"], [data-role="ymm-submodel"]');
+      selects.forEach(select => {
+        select.addEventListener('change', function() {
+          const media = backdrop.querySelector('video, img');
+          if (media) {
+            media.classList.add('blur-sm', 'scale-105');
+            setTimeout(() => {
+              media.classList.remove('blur-sm', 'scale-105');
+            }, 600);
+          }
+        });
+      });
+    }
+  })();
+</script>
+
+{%- comment -%} Load the original YMM JS {%- endcomment -%}
+<script src="{{ 'ymm.js' | asset_url }}" defer="defer"></script>
 
 {% schema %}
 {
-  "name": "Hero YMM Centerpiece",
+  "name": "Hero: Acoustic Command",
   "settings": [
     {
       "type": "video",
@@ -45,10 +177,15 @@
       "label": "Background Video"
     },
     {
+      "type": "image_picker",
+      "id": "background_image",
+      "label": "Background Image (Fallback)"
+    },
+    {
       "type": "text",
       "id": "heading",
       "label": "Heading",
-      "default": "UNLEASH THE SOUND"
+      "default": "ACOUSTIC ENGINEERING. REFINED."
     },
     {
       "type": "text",
@@ -65,7 +202,7 @@
   ],
   "presets": [
     {
-      "name": "Hero YMM Centerpiece"
+      "name": "Hero: Acoustic Command"
     }
   ]
 }

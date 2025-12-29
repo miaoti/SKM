@@ -1,63 +1,118 @@
+<!-- =========================================
+     THE CURATED GALLERY: Premium Product Showcase
+     Asymmetric grid with laser line effects and B2B pricing
+========================================== -->
+
 <div class="py-24 bg-white">
   <div class="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="mb-12">
-      <h2 class="text-4xl font-bold text-gray-900 tracking-tight" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">
-        {{ section.settings.heading | default: "The Redline Collection" }}<span class="text-[#CC0000]">.</span>
-      </h2>
+    
+    <!-- Section Header -->
+    <div class="mb-16 flex items-end justify-between">
+      <div>
+        <div class="hud-spec-label mb-3">[ PRODUCT_ARCHIVE ]</div>
+        <h2 class="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">
+          {{ section.settings.heading | default: "The Curated Gallery" }}<span class="text-[#CC0000]">.</span>
+        </h2>
+      </div>
+      <a href="/collections/{{ section.settings.collection.handle | default: 'all' }}" class="hidden md:flex items-center gap-2 hud-mono text-xs text-gray-500 hover:text-[#CC0000] transition-colors">
+        VIEW_FULL_CATALOG
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <!-- Asymmetric Product Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1">
       {%- for product in section.settings.collection.products limit: section.settings.products_to_show -%}
-        <div class="group relative bg-[#F5F5F5] aspect-square overflow-hidden transition-all duration-300 hover:border-4 hover:border-[#CC0000]">
-          <a href="{{ product.url }}" class="block w-full h-full relative flex items-center justify-center">
-            <div class="w-3/4 h-3/4 transition-transform duration-500 group-hover:scale-110">
+        <div class="product-card-hud group relative bg-[#FAFAFA] aspect-square overflow-hidden">
+          <a href="{{ product.url }}" class="block w-full h-full relative flex items-center justify-center p-8">
+            
+            <!-- Product Image -->
+            <div class="w-full h-full transition-transform duration-700 group-hover:scale-105">
               {%- if product.featured_image != blank -%}
                 {{ product.featured_image | image_url: width: 800 | image_tag: class: "w-full h-full object-contain mix-blend-multiply", loading: 'lazy' }}
               {%- else -%}
-                {{ 'product-1' | placeholder_svg_tag: 'w-full h-full object-contain opacity-50' }}
+                {{ 'product-1' | placeholder_svg_tag: 'w-full h-full object-contain opacity-20' }}
               {%- endif -%}
             </div>
             
-            <div class="absolute top-4 left-4">
-              {%- if product.available -%}
-                <span class="text-xs font-bold text-[#CC0000] uppercase tracking-wider bg-white/80 px-2 py-1 backdrop-blur-sm">In Stock</span>
-              {%- else -%}
-                 <span class="text-xs font-bold text-gray-500 uppercase tracking-wider bg-white/80 px-2 py-1 backdrop-blur-sm">Sold Out</span>
-              {%- endif -%}
+            <!-- Hover Overlay: Technical Specs -->
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+            
+            <!-- Spec Overlay (Top Right) -->
+            <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 delay-100 transform translate-x-2 group-hover:translate-x-0">
+              <div class="hud-mono text-[10px] text-white bg-black/80 backdrop-blur-sm px-3 py-2 border border-white/10">
+                {%- if product.metafields.custom.weight_reduction != blank -%}
+                  WEIGHT: {{ product.metafields.custom.weight_reduction }}
+                {%- else -%}
+                  SKU: {{ product.variants.first.sku | default: product.id }}
+                {%- endif -%}
+                {%- if product.metafields.custom.flow_increase != blank -%}
+                  <span class="text-[#CC0000]"> | FLOW: {{ product.metafields.custom.flow_increase }}</span>
+                {%- endif -%}
+              </div>
             </div>
 
-            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300"></div>
-
-            <div class="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm px-6 py-4 opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
-               <h3 class="text-lg font-bold text-gray-900 mb-1">{{ product.title }}</h3>
-               <div class="text-[#CC0000] font-mono font-bold">
-                 {% render 'price', product_resource: product %}
-               </div>
+            <!-- Product Info (Bottom) -->
+            <div class="absolute bottom-0 left-0 right-0 p-6 transform translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out">
+              <h3 class="text-lg font-bold text-white mb-2 line-clamp-2">{{ product.title }}</h3>
+              
+              <!-- Price Display - Using theme's price snippet for proper logic -->
+              <div class="flex items-center gap-3">
+                <div class="hud-mono text-[#CC0000] text-sm font-bold">
+                  {% render 'price', product_resource: product %}
+                </div>
+              </div>
             </div>
+            
+            <!-- Laser Line Effect -->
+            <div class="laser-line"></div>
           </a>
+          
+          <!-- Stock Status Badge -->
+          <div class="absolute top-4 left-4 z-10">
+            {%- if product.available -%}
+              <span class="hud-mono text-[9px] text-green-500 bg-black/80 backdrop-blur-sm px-2 py-1 tracking-widest">IN_STOCK</span>
+            {%- else -%}
+              <span class="hud-mono text-[9px] text-red-500 bg-black/80 backdrop-blur-sm px-2 py-1 tracking-widest">SOLD_OUT</span>
+            {%- endif -%}
+          </div>
         </div>
       {%- else -%}
-        {%- for i in (1..4) -%}
-           <div class="group relative bg-[#F5F5F5] aspect-square overflow-hidden transition-all duration-300 hover:border-4 hover:border-[#CC0000]">
-             <div class="w-full h-full flex items-center justify-center">
-               {{ 'product-' | append: i | placeholder_svg_tag: 'w-1/2 h-1/2 opacity-20' }}
-             </div>
-           </div>
+        {%- for i in (1..8) -%}
+          <div class="product-card-hud group relative bg-[#FAFAFA] aspect-square overflow-hidden">
+            <div class="w-full h-full flex items-center justify-center">
+              {{ 'product-' | append: i | placeholder_svg_tag: 'w-1/2 h-1/2 opacity-10' }}
+            </div>
+            <div class="laser-line"></div>
+          </div>
         {%- endfor -%}
       {%- endfor -%}
+    </div>
+
+    <!-- Bottom CTA -->
+    <div class="mt-12 text-center">
+      <a href="/collections/{{ section.settings.collection.handle | default: 'all' }}" 
+         class="inline-flex items-center gap-3 px-8 py-4 bg-black text-white hud-mono text-sm tracking-widest hover:bg-[#CC0000] transition-colors duration-300">
+        ANALYZE_FULL_CATALOG
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
     </div>
   </div>
 </div>
 
 {% schema %}
 {
-  "name": "Showroom Masonry",
+  "name": "Curated Gallery",
   "settings": [
     {
       "type": "text",
       "id": "heading",
       "label": "Heading",
-      "default": "The Redline Collection"
+      "default": "The Curated Gallery"
     },
     {
       "type": "collection",
@@ -68,7 +123,7 @@
       "type": "range",
       "id": "products_to_show",
       "min": 4,
-      "max": 12,
+      "max": 16,
       "step": 4,
       "default": 8,
       "label": "Products to show"
@@ -76,7 +131,7 @@
   ],
   "presets": [
     {
-      "name": "Showroom Masonry"
+      "name": "Curated Gallery"
     }
   ]
 }

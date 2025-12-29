@@ -1,0 +1,300 @@
+/* =============================================================================
+   SKM COMMAND CENTER - Global Design System
+   High-tech HUD aesthetic for premium automotive engineering
+============================================================================= */
+
+:root {
+  /* Core Colors */
+  --skm-racing-red: #CC0000;
+  --skm-obsidian: #0a0a0a;
+  --skm-carbon: #111111;
+  --skm-steel: #1a1a1a;
+  --skm-chrome: #f5f5f5;
+  --skm-blueprint-line: rgba(128, 128, 128, 0.3);
+  
+  /* Typography */
+  --font-display: 'Helvetica Now Display', 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  
+  /* Spacing */
+  --hud-gap: 2rem;
+}
+
+/* =============================================================================
+   CUSTOM CURSOR - Red Crosshair
+============================================================================= */
+body.command-center-theme {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cline x1='12' y1='0' x2='12' y2='10' stroke='%23CC0000' stroke-width='1'/%3E%3Cline x1='12' y1='14' x2='12' y2='24' stroke='%23CC0000' stroke-width='1'/%3E%3Cline x1='0' y1='12' x2='10' y2='12' stroke='%23CC0000' stroke-width='1'/%3E%3Cline x1='14' y1='12' x2='24' y2='12' stroke='%23CC0000' stroke-width='1'/%3E%3Ccircle cx='12' cy='12' r='3' fill='none' stroke='%23CC0000' stroke-width='1'/%3E%3C/svg%3E") 12 12, crosshair;
+}
+
+body.command-center-theme a,
+body.command-center-theme button,
+body.command-center-theme [role="button"],
+body.command-center-theme input,
+body.command-center-theme select {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cline x1='12' y1='0' x2='12' y2='10' stroke='%23CC0000' stroke-width='1.5'/%3E%3Cline x1='12' y1='14' x2='12' y2='24' stroke='%23CC0000' stroke-width='1.5'/%3E%3Cline x1='0' y1='12' x2='10' y2='12' stroke='%23CC0000' stroke-width='1.5'/%3E%3Cline x1='14' y1='12' x2='24' y2='12' stroke='%23CC0000' stroke-width='1.5'/%3E%3Ccircle cx='12' cy='12' r='4' fill='%23CC0000' fill-opacity='0.2' stroke='%23CC0000' stroke-width='1'/%3E%3C/svg%3E") 12 12, pointer;
+}
+
+/* =============================================================================
+   SCROLL PROGRESS BAR
+============================================================================= */
+.scroll-progress-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: transparent;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.scroll-progress-bar {
+  height: 100%;
+  background: var(--skm-racing-red);
+  width: 0%;
+  transition: width 0.1s ease-out;
+  box-shadow: 0 0 10px var(--skm-racing-red);
+}
+
+.scroll-progress-label {
+  position: fixed;
+  top: 6px;
+  right: 16px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--skm-racing-red);
+  letter-spacing: 0.1em;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.scroll-progress-label.visible {
+  opacity: 1;
+}
+
+/* =============================================================================
+   HUD TYPOGRAPHY SYSTEM
+============================================================================= */
+.hud-header {
+  font-family: var(--font-display);
+  font-weight: 100;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.hud-header-bold {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.hud-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+
+.hud-prompt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.hud-spec-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--skm-racing-red);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+/* =============================================================================
+   BLUEPRINT GRID SYSTEM
+============================================================================= */
+.blueprint-grid {
+  background-image: 
+    linear-gradient(var(--skm-blueprint-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--skm-blueprint-line) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+.blueprint-divider {
+  height: 1px;
+  background: var(--skm-blueprint-line);
+  width: 100%;
+}
+
+.blueprint-divider-vertical {
+  width: 1px;
+  background: var(--skm-blueprint-line);
+  height: 100%;
+}
+
+/* =============================================================================
+   HUD EFFECTS
+============================================================================= */
+.hud-scanline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.hud-glow {
+  box-shadow: 0 0 20px rgba(204, 0, 0, 0.3);
+}
+
+.hud-border {
+  border: 1px solid rgba(204, 0, 0, 0.3);
+}
+
+/* Laser line effect */
+.laser-line {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--skm-racing-red);
+  box-shadow: 0 0 8px var(--skm-racing-red);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.group:hover .laser-line,
+.laser-line-active {
+  width: 100%;
+}
+
+/* =============================================================================
+   DIAGNOSTIC INPUT STYLING
+============================================================================= */
+.diagnostic-input {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 12px 16px;
+  transition: all 0.3s ease;
+}
+
+.diagnostic-input:focus {
+  outline: none;
+  border-color: var(--skm-racing-red);
+  box-shadow: 0 0 15px rgba(204, 0, 0, 0.2);
+}
+
+.diagnostic-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.diagnostic-select {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 12px 16px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23CC0000' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 40px;
+  cursor: pointer;
+}
+
+.diagnostic-select:focus {
+  outline: none;
+  border-color: var(--skm-racing-red);
+  box-shadow: 0 0 15px rgba(204, 0, 0, 0.2);
+}
+
+/* =============================================================================
+   ANIMATION KEYFRAMES
+============================================================================= */
+@keyframes pulse-red {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes draw-line {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-pulse-red {
+  animation: pulse-red 2s ease-in-out infinite;
+}
+
+.animate-draw-line {
+  animation: draw-line 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+
+/* =============================================================================
+   B2B PRICE STYLING
+============================================================================= */
+.price-retail {
+  font-family: var(--font-mono);
+  color: #666;
+  font-size: 12px;
+}
+
+.price-retail.struck {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.price-wholesale {
+  font-family: var(--font-mono);
+  color: var(--skm-racing-red);
+  font-weight: 700;
+  animation: pulse-red 1.5s ease-in-out infinite;
+}
+
+/* =============================================================================
+   RESPONSIVE UTILITIES
+============================================================================= */
+@media (max-width: 768px) {
+  .hud-header {
+    letter-spacing: 0.15em;
+  }
+  
+  .scroll-progress-label {
+    display: none;
+  }
+}

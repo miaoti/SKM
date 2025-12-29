@@ -1,60 +1,147 @@
-<div class="py-24 bg-white">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<!-- =========================================
+     METALLURGY & ASSEMBLY: Exploded View Archive
+     Technical hotspots revealing engineering details
+========================================== -->
+
+<div class="py-24 bg-white relative overflow-hidden">
+  <!-- Blueprint Grid Background -->
+  <div class="absolute inset-0 blueprint-grid opacity-30"></div>
+  
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    
+    <!-- Section Header -->
     <div class="mb-12 text-center">
-      <h2 class="text-4xl font-bold text-gray-900 tracking-tight" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">
-        {{ section.settings.heading | default: "THE GARAGE" }}
+      <div class="hud-spec-label mb-3">[ COMPONENT_ANALYSIS ]</div>
+      <h2 class="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">
+        {{ section.settings.heading | default: "METALLURGY & ASSEMBLY" }}
       </h2>
+      <p class="mt-4 text-gray-500 hud-mono text-sm max-w-2xl mx-auto">
+        Every component engineered for precision. Hover to analyze individual elements.
+      </p>
     </div>
     
-    <div class="relative w-full aspect-[16/9] rounded-none overflow-hidden bg-gray-100">
+    <!-- Exploded View Container -->
+    <div class="relative w-full aspect-[16/9] rounded-none overflow-visible bg-gradient-to-b from-gray-50 to-white border border-gray-200">
+      
+      <!-- Main Image -->
       {%- if section.settings.image != blank -%}
-        {{ section.settings.image | image_url: width: 2000 | image_tag: class: "w-full h-full object-cover" }}
+        {{ section.settings.image | image_url: width: 2000 | image_tag: class: "w-full h-full object-contain" }}
       {%- else -%}
-        {{ 'lifestyle-1' | placeholder_svg_tag: 'w-full h-full object-cover opacity-50' }}
+        <div class="w-full h-full flex items-center justify-center">
+          {{ 'lifestyle-1' | placeholder_svg_tag: 'w-3/4 h-3/4 object-contain opacity-30' }}
+          <div class="absolute inset-0 flex items-center justify-center">
+            <p class="hud-mono text-sm text-gray-400">[ UPLOAD_EXPLODED_VIEW_IMAGE ]</p>
+          </div>
+        </div>
       {%- endif -%}
 
+      <!-- Technical Hotspots -->
       {%- for block in section.blocks -%}
-        <div class="absolute group" style="top: {{ block.settings.top }}%; left: {{ block.settings.left }}%;">
-           <div class="relative flex items-center justify-center w-8 h-8 cursor-pointer">
-             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-             <span class="relative inline-flex rounded-full h-4 w-4 bg-[#CC0000]"></span>
-           </div>
-           
-           <!-- Tooltip -->
-           <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-10">
-             <div class="bg-black text-white p-4 text-sm rounded-none shadow-xl relative">
-               <h4 class="font-bold text-[#CC0000] uppercase mb-1">{{ block.settings.title }}</h4>
-               <p class="text-gray-300">{{ block.settings.text }}</p>
-               <!-- Arrow -->
-               <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-2 border-8 border-transparent border-t-black"></div>
-             </div>
-           </div>
+        <div class="hotspot-container absolute group" 
+             style="top: {{ block.settings.top }}%; left: {{ block.settings.left }}%;"
+             {{ block.shopify_attributes }}>
+          
+          <!-- Pulsing Hotspot -->
+          <div class="relative flex items-center justify-center w-10 h-10 cursor-pointer">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#CC0000] opacity-40"></span>
+            <span class="relative inline-flex rounded-full h-4 w-4 bg-[#CC0000] border-2 border-white shadow-lg"></span>
+            
+            <!-- Connector Line -->
+            <div class="absolute w-8 h-[1px] bg-[#CC0000] opacity-0 group-hover:opacity-100 transition-opacity" 
+                 style="left: 100%; top: 50%;"></div>
+          </div>
+          
+          <!-- Technical Tooltip -->
+          <div class="absolute z-20 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300
+                      {% if block.settings.left > 50 %}right-full mr-4{% else %}left-full ml-4{% endif %}
+                      top-1/2 -translate-y-1/2">
+            <div class="bg-black text-white p-5 text-sm w-72 shadow-2xl border border-[#CC0000]/30 relative">
+              
+              <!-- Tooltip Header -->
+              <div class="flex items-center gap-2 mb-3 pb-3 border-b border-white/10">
+                <div class="w-2 h-2 bg-[#CC0000]"></div>
+                <span class="hud-spec-label text-[#CC0000]">{{ block.settings.code | default: "COMPONENT_01" }}</span>
+              </div>
+              
+              <!-- Tooltip Title -->
+              <h4 class="font-bold text-white uppercase mb-2 tracking-wide">{{ block.settings.title }}</h4>
+              
+              <!-- Tooltip Description -->
+              <p class="text-gray-400 text-xs leading-relaxed mb-4">{{ block.settings.text }}</p>
+              
+              <!-- Technical Specs -->
+              {%- if block.settings.specs != blank -%}
+                <div class="hud-mono text-[10px] text-[#CC0000] border-t border-white/10 pt-3">
+                  {{ block.settings.specs }}
+                </div>
+              {%- endif -%}
+              
+              <!-- Arrow -->
+              <div class="absolute top-1/2 -translate-y-1/2
+                          {% if block.settings.left > 50 %}
+                            -right-2 border-l-8 border-l-black border-y-8 border-y-transparent
+                          {% else %}
+                            -left-2 border-r-8 border-r-black border-y-8 border-y-transparent
+                          {% endif %}">
+              </div>
+            </div>
+          </div>
+        </div>
+      {%- endfor -%}
+      
+      <!-- Corner Annotations -->
+      <div class="absolute top-4 left-4 hud-mono text-[10px] text-gray-400">
+        REV: 2.0 | SCALE: 1:1
+      </div>
+      <div class="absolute top-4 right-4 hud-mono text-[10px] text-gray-400">
+        DWG: SKM-EX-001
+      </div>
+      <div class="absolute bottom-4 left-4 hud-mono text-[10px] text-gray-400">
+        MATERIAL: 304 STAINLESS STEEL
+      </div>
+      <div class="absolute bottom-4 right-4 hud-mono text-[10px] text-gray-400">
+        TOLERANCE: ±0.5mm
+      </div>
+    </div>
+    
+    <!-- Component Legend -->
+    <div class="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {%- for block in section.blocks limit: 4 -%}
+        <div class="p-4 border border-gray-200 bg-white hover:border-[#CC0000] transition-colors cursor-pointer group">
+          <div class="flex items-start gap-3">
+            <div class="w-3 h-3 bg-[#CC0000] mt-1 flex-shrink-0"></div>
+            <div>
+              <div class="hud-spec-label text-[9px] mb-1">{{ block.settings.code | default: "COMPONENT" }}</div>
+              <h5 class="font-bold text-gray-900 text-sm uppercase group-hover:text-[#CC0000] transition-colors">{{ block.settings.title }}</h5>
+            </div>
+          </div>
         </div>
       {%- endfor -%}
     </div>
+    
   </div>
 </div>
 
 {% schema %}
 {
-  "name": "Garage Hotspots",
+  "name": "Metallurgy & Assembly",
   "settings": [
     {
       "type": "text",
       "id": "heading",
       "label": "Heading",
-      "default": "THE GARAGE"
+      "default": "METALLURGY & ASSEMBLY"
     },
     {
       "type": "image_picker",
       "id": "image",
-      "label": "Garage Image"
+      "label": "Exploded View Image"
     }
   ],
   "blocks": [
     {
       "type": "hotspot",
-      "name": "Hotspot",
+      "name": "Component Hotspot",
       "settings": [
         {
           "type": "range",
@@ -78,30 +165,66 @@
         },
         {
           "type": "text",
+          "id": "code",
+          "label": "Component Code",
+          "default": "WELD_01"
+        },
+        {
+          "type": "text",
           "id": "title",
           "label": "Title",
-          "default": "Feature"
+          "default": "TIG Precision Weld"
         },
         {
           "type": "textarea",
           "id": "text",
           "label": "Description",
-          "default": "Feature description goes here."
+          "default": "Hand-welded joints using argon-purged TIG welding for superior strength and aesthetics."
+        },
+        {
+          "type": "text",
+          "id": "specs",
+          "label": "Technical Specs",
+          "default": "TECH: TIG_PRECISION // GAS: ARGON_PURGE"
         }
       ]
     }
   ],
   "presets": [
     {
-      "name": "Garage Hotspots",
+      "name": "Metallurgy & Assembly",
       "blocks": [
         {
           "type": "hotspot",
           "settings": {
-            "top": 40,
+            "top": 35,
             "left": 60,
-            "title": "Anti-Drone Tech",
-            "text": "Cancels out specific frequencies to eliminate cabin drone."
+            "code": "WELD_01",
+            "title": "TIG Precision Weld",
+            "text": "Hand-welded joints using argon-purged TIG welding for superior penetration and aesthetic finish.",
+            "specs": "TECH: TIG_PRECISION // GAS: ARGON_PURGE"
+          }
+        },
+        {
+          "type": "hotspot",
+          "settings": {
+            "top": 55,
+            "left": 30,
+            "code": "VALVE_01",
+            "title": "Exhaust Valve Assembly",
+            "text": "Electronic butterfly valve for active sound management. Compatible with B2B dealership control systems.",
+            "specs": "CONTROL: ECU_INTEGRATED // VOLTAGE: 12V DC"
+          }
+        },
+        {
+          "type": "hotspot",
+          "settings": {
+            "top": 70,
+            "left": 75,
+            "code": "FLANGE_01",
+            "title": "304SS Mounting Flange",
+            "text": "Precision-machined flange with integrated gasket groove for leak-free connection.",
+            "specs": "GRADE: 304L // SURFACE: #4 BRUSHED"
           }
         }
       ]
