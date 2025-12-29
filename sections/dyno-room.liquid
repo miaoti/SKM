@@ -62,7 +62,7 @@
           </button>
         </div>
         
-        <p class="hud-mono text-xs text-gray-500 text-center mt-4">CLICK TO INITIALIZE AUDIO SEQUENCE</p>
+        <p class="hud-mono text-xs text-gray-500 text-center mt-4" id="audio-status-text-{{ section.id }}">CLICK TO INITIALIZE AUDIO SEQUENCE</p>
       </div>
     </div>
     
@@ -136,9 +136,7 @@
 </div>
 
 <!-- Audio Element -->
-{%- if section.settings.audio_url != blank -%}
-  <audio id="audio-player-{{ section.id }}" src="{{ section.settings.audio_url }}" preload="metadata"></audio>
-{%- endif -%}
+<audio id="audio-player-{{ section.id }}" src="{{ section.settings.audio_idle | default: section.settings.audio_url }}" preload="metadata"></audio>
 
 <!-- Sonic Laboratory Script -->
 <script>
@@ -146,25 +144,48 @@
   const sectionId = '{{ section.id }}';
   let isPlaying = false;
   let animationInterval;
+  let currentRpm = 'idle';
+  
+  // Audio Sources Map
+  const audioSources = {
+    'idle': "{{ section.settings.audio_idle | default: section.settings.audio_url }}",
+    '3000': "{{ section.settings.audio_3000 | default: section.settings.audio_url }}",
+    'redline': "{{ section.settings.audio_redline | default: section.settings.audio_url }}"
+  };
   
   // Toggle audio playback
   window.toggleAudio = function(id) {
     const playIcon = document.getElementById('play-icon-' + id);
     const pauseIcon = document.getElementById('pause-icon-' + id);
     const audioPlayer = document.getElementById('audio-player-' + id);
+    const statusText = document.getElementById('audio-status-text-' + id);
     
     isPlaying = !isPlaying;
     
     if (isPlaying) {
       playIcon.classList.add('hidden');
       pauseIcon.classList.remove('hidden');
-      if (audioPlayer) audioPlayer.play();
+      if (audioPlayer) {
+        // Ensure source is set correctly before playing (just in case)
+        if (!audioPlayer.src || audioPlayer.src !== audioSources[currentRpm]) {
+            audioPlayer.src = audioSources[currentRpm];
+        }
+        audioPlayer.play().catch(e => {
+            console.error("Audio play failed:", e);
+            statusText.textContent = "AUDIO ERROR - CHECK CONSOLE";
+            isPlaying = false;
+            playIcon.classList.remove('hidden');
+            pauseIcon.classList.add('hidden');
+        });
+      }
       startVisualization(id);
+      if (statusText) statusText.textContent = "PLAYING SEQUENCE: " + currentRpm.toUpperCase();
     } else {
       playIcon.classList.remove('hidden');
       pauseIcon.classList.add('hidden');
       if (audioPlayer) audioPlayer.pause();
       stopVisualization(id);
+      if (statusText) statusText.textContent = "SEQUENCE PAUSED";
     }
   };
   
@@ -175,21 +196,30 @@
     const dbValue = document.getElementById('db-value-' + id);
     const hpValue = document.getElementById('hp-value-' + id);
     
+    // Intensity multiplier based on RPM
+    let intensity = 1;
+    if (currentRpm === '3000') intensity = 1.2;
+    if (currentRpm === 'redline') intensity = 1.5;
+
     animationInterval = setInterval(() => {
       // Animate bars
       bars.forEach(bar => {
-        const height = Math.random() * 80 + 20;
-        bar.style.height = height + '%';
+        const height = (Math.random() * 80 + 20) * intensity;
+        bar.style.height = Math.min(height, 100) + '%';
       });
       
       // Update dB meter
-      const db = Math.floor(Math.random() * 30 + 80);
-      if (dbMeter) dbMeter.style.width = (db / 120 * 100) + '%';
+      const baseDb = currentRpm === 'idle' ? 85 : (currentRpm === '3000' ? 95 : 105);
+      const randomVar = Math.random() * 5;
+      const db = Math.floor(baseDb + randomVar);
+      
+      if (dbMeter) dbMeter.style.width = Math.min((db / 120 * 100), 100) + '%';
       if (dbValue) dbValue.textContent = db + ' dB';
       
       // Update HP
-      const hp = Math.floor(Math.random() * 10 + 20);
-      if (hpValue) hpValue.textContent = '+' + hp + ' HP';
+      // Keep static HP display usually, or animate slightly? Let's just animate slightly
+      // const hp = Math.floor(Math.random() * 10 + 20);
+      // if (hpValue) hpValue.textContent = '+' + hp + ' HP';
       
     }, 100);
   }
@@ -204,18 +234,40 @@
     
     const dbMeter = document.getElementById('db-meter-' + id);
     const dbValue = document.getElementById('db-value-' + id);
-    const hpValue = document.getElementById('hp-value-' + id);
+   // const hpValue = document.getElementById('hp-value-' + id);
     
     if (dbMeter) dbMeter.style.width = '0%';
     if (dbValue) dbValue.textContent = '0 dB';
-    if (hpValue) hpValue.textContent = '+0 HP';
+    // if (hpValue) hpValue.textContent = '+0 HP';
   }
   
-  // RPM toggle
+  // RPM toggle logic
   document.querySelectorAll('.rpm-toggle').forEach(btn => {
     btn.addEventListener('click', function() {
+      const sectionId = '{{ section.id }}';
+      const newRpm = this.getAttribute('data-rpm');
+      
+      // Update UI
       document.querySelectorAll('.rpm-toggle').forEach(b => b.classList.remove('active', 'border-[#CC0000]', 'text-[#CC0000]'));
       this.classList.add('active', 'border-[#CC0000]', 'text-[#CC0000]');
+      
+      currentRpm = newRpm;
+      
+      // Switch Audio Source
+      const audioPlayer = document.getElementById('audio-player-' + sectionId);
+      const statusText = document.getElementById('audio-status-text-' + sectionId);
+      
+      if (audioPlayer) {
+          const wasPlaying = !audioPlayer.paused;
+          audioPlayer.src = audioSources[newRpm];
+          
+          if (wasPlaying) {
+              audioPlayer.play();
+              if (statusText) statusText.textContent = "PLAYING SEQUENCE: " + currentRpm.toUpperCase();
+          } else {
+             if (statusText) statusText.textContent = "SEQUENCE READY: " + currentRpm.toUpperCase();
+          }
+      }
     });
   });
 })();
@@ -257,9 +309,32 @@
       "default": "THE SONIC LABORATORY"
     },
     {
+      "type": "header",
+      "content": "Audio Configuration"
+    },
+    {
+      "type": "url",
+      "id": "audio_idle",
+      "label": "Audio: Idle (MP3)",
+      "info": "Audio track for Idle state"
+    },
+    {
+      "type": "url",
+      "id": "audio_3000",
+      "label": "Audio: 3000 RPM (MP3)",
+      "info": "Audio track for 3000 RPM state"
+    },
+    {
+      "type": "url",
+      "id": "audio_redline",
+      "label": "Audio: Redline (MP3)",
+      "info": "Audio track for Redline state"
+    },
+    {
       "type": "url",
       "id": "audio_url",
-      "label": "Exhaust Audio URL (MP3)"
+      "label": "Legacy Audio (Fallback)",
+      "info": "Used if specific tracks above are not set."
     }
   ],
   "blocks": [
