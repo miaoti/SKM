@@ -423,15 +423,14 @@
       {% endif %}
       {% comment %} END ADMIN ENTRY POINT {% endcomment %}
       
+       {% paginate customer.orders by 20 %}
       <div class="mb-8">
         <h2 class="text-xl font-bold uppercase tracking-tight text-[#111111] flex items-center gap-3">
           ORDER HISTORY
-          <span class="bg-[#111111] text-white text-[10px] px-2 py-0.5 rounded-full">{{ customer.orders_count }}</span>
+          <span class="bg-[#111111] text-white text-[10px] px-2 py-0.5 rounded-full">{{ customer.orders.size }}</span>
         </h2>
         <p class="text-gray-500 text-xs mt-1">Track the status of your performance upgrades.</p>
       </div>
-
-      {% paginate customer.orders by 20 %}
         {%- if customer.orders.size > 0 -%}
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
