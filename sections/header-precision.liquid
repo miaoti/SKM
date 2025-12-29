@@ -232,11 +232,11 @@
     </div>
   </div>
   
-  <!-- Category Navigation Bar (YMM Integrated) - Inside header for unified movement -->
+  <!-- Category Navigation Bar (Type Selection) - Inside header for unified movement -->
   <nav id="category-nav" class="w-full z-[1999] nav-hidden">
     <div class="max-w-[1920px] mx-auto px-4 lg:px-8">
       <div class="flex items-center justify-center gap-2 h-10 overflow-x-auto scrollbar-hide">
-        <!-- Vehicle Badge (shown when vehicle selected) -->
+        <!-- Vehicle Badge (shown when vehicle selected, BUT hidden on collection page) -->
         <div id="vehicle-badge" class="hidden flex items-center gap-2 mr-2">
           <span class="flex items-center gap-1.5 px-3 py-1 bg-[#CC0000]/20 border border-[#CC0000]/40 rounded-full text-xs font-medium text-white">
             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 17h14M7 13h.01M17 13h.01M6 9h12l-1.5-4.5a1 1 0 00-.95-.5H8.45a1 1 0 00-.95.5L6 9z"/></svg>
@@ -284,11 +284,18 @@
       const vehicleBadge = document.getElementById('vehicle-badge');
       const vehicleName = document.getElementById('vehicle-name');
       const clearBtn = document.getElementById('btn-clear-vehicle');
+      const isCollectionPage = window.location.pathname.includes('/collections/');
       
-      // Show/hide vehicle badge
+      // Show/hide vehicle badge (BUT hide on collection pages where we have the HUD bar)
       if (vehicle && vehicleBadge) {
-        vehicleBadge.classList.remove('hidden');
-        vehicleBadge.classList.add('flex');
+        if (!isCollectionPage) {
+           vehicleBadge.classList.remove('hidden');
+           vehicleBadge.classList.add('flex');
+        } else {
+           vehicleBadge.classList.add('hidden');
+           vehicleBadge.classList.remove('flex');
+        }
+        
         if (vehicleName) vehicleName.textContent = getVehicleName(vehicle);
         if (clearBtn) clearBtn.addEventListener('click', clearVehicle);
       }

@@ -25,23 +25,47 @@
 {% comment %} We always render this full-width, as the child blocks have width: page/full settings {% endcomment %}
 <div class="section-background color-{{ section.settings.color_scheme }}"></div>
 
-<!-- Reset Vehicle Button - OUTSIDE the grid -->
-<div class="ymm-vehicle-selector">
-  <button onclick="document.getElementById('ymm-reset-modal').showModal()" class="ymm-vehicle-button">
-    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-    </svg>
-    <span>Select Different Vehicle</span>
-  </button>
+<!-- HUD Vehicle Command Bar -->
+<div class="collection-hud-bar">
+  <div class="collection-hud-inner">
+    <div class="collection-hud-left">
+      <span class="collection-hud-indicator"></span>
+      <span class="collection-hud-label">VEHICLE CONFIGURATION</span>
+      <span class="collection-hud-vehicle" id="current-vehicle-display">NO VEHICLE SELECTED</span>
+    </div>
+    <button onclick="document.getElementById('ymm-reset-modal').showModal()" class="collection-hud-button">
+      <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+      </svg>
+      <span>Configure</span>
+    </button>
+  </div>
 </div>
 
-<!-- YMM Reset Modal -->
+<script>
+  // Display current vehicle from localStorage
+  document.addEventListener('DOMContentLoaded', function() {
+    const vehicleData = localStorage.getItem('skm_garage_vehicle');
+    if (vehicleData) {
+      try {
+        const v = JSON.parse(vehicleData);
+        const display = document.getElementById('current-vehicle-display');
+        if (display && v.year && v.make && v.model) {
+          display.textContent = `${v.year} ${v.make} ${v.model}${v.submodel ? ' ' + v.submodel : ''}`;
+          display.classList.add('collection-hud-vehicle--active');
+        }
+      } catch(e) {}
+    }
+  });
+</script>
+
+<!-- YMM Configuration Modal -->
 <dialog id="ymm-reset-modal" class="ymm-modal-dialog">
   <div class="ymm-modal-content" data-section-id="{{ section.id }}-modal">
     <div class="ymm-modal-header">
       <h3 class="ymm-modal-title">
         <span class="ymm-modal-indicator"></span>
-        Configure Vehicle
+        VEHICLE IDENTIFICATION SYSTEM
       </h3>
       <button onclick="document.getElementById('ymm-reset-modal').close()" class="ymm-modal-close">
         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -91,25 +115,43 @@
 
       <div id="ymm-filter-status" data-active="{{ ymm_active }}" data-count="{{ collection.products_count }}"></div>
       
-      <!-- No Results Message (Valid Search, No Products) -->
-      <div id="ymm-no-results" class="hidden py-16 md:py-32 px-4 text-center" style="grid-column: 1 / -1;">
-        <h2 class="text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">No products found.</h2>
-        <p class="text-sm md:text-base text-gray-600">We don't have any parts for this vehicle configuration yet.</p>
+      <!-- No Results Message - HUD Style -->
+      <div id="ymm-no-results" class="hidden" style="grid-column: 1 / -1;">
+        <div class="hud-no-results">
+          <div class="hud-no-results-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="M21 21l-4.35-4.35"/>
+              <path d="M8 8l6 6"/>
+              <path d="M14 8l-6 6"/>
+            </svg>
+          </div>
+          <h2 class="hud-no-results-title">NO MATCHING COMPONENTS</h2>
+          <p class="hud-no-results-text">The current vehicle configuration returned zero compatible systems.</p>
+          <button onclick="document.getElementById('ymm-reset-modal').showModal()" class="hud-no-results-button">
+            RECONFIGURE VEHICLE
+          </button>
+        </div>
       </div>
 
-      <!-- Admin Configuration Warning (Invalid Search) -->
-      <div id="ymm-admin-warning" class="hidden py-8 md:py-12 px-4 text-center border border-red-200 rounded-lg bg-red-50 mx-4 md:mx-0 my-4 md:my-8" style="grid-column: 1 / -1;">
-        <h3 class="text-lg md:text-xl font-bold text-red-600 mb-2">Configuration Required</h3>
-        <p class="text-sm md:text-base text-gray-700 mb-4">The vehicle filter is active in the URL but was ignored by Shopify.</p>
-        <div class="text-xs md:text-sm text-gray-600 bg-white p-3 md:p-4 rounded border border-gray-200 inline-block text-left max-w-full overflow-x-auto">
-          <p class="mb-2"><strong>Action Required:</strong></p>
-          <ol class="list-decimal pl-4 md:pl-5 space-y-1">
-            <li>Go to Shopify Admin > <strong>Search & Discovery</strong> App > <strong>Filters</strong>.</li>
-            <li>Click <strong>Add filter</strong>.</li>
-            <li>Select <strong>Product metafields</strong>.</li>
-            <li>Choose <strong>Fits Vehicles</strong> (custom.fits_vehicles).</li>
-            <li>Save.</li>
-          </ol>
+      <!-- Admin Configuration Warning - HUD Style -->
+      <div id="ymm-admin-warning" class="hidden" style="grid-column: 1 / -1;">
+        <div class="hud-admin-warning">
+          <div class="hud-warning-header">
+            <span class="hud-warning-indicator"></span>
+            <span>SYSTEM CONFIGURATION REQUIRED</span>
+          </div>
+          <p class="hud-warning-text">Vehicle filter detected in URL but was not processed by the server.</p>
+          <div class="hud-warning-steps">
+            <p style="margin-bottom: 0.5rem; font-weight: bold; color: #CC0000;">ACTION REQUIRED:</p>
+            <ol>
+              <li>Navigate to Shopify Admin → <strong>Search & Discovery</strong> App → <strong>Filters</strong></li>
+              <li>Click <strong>Add filter</strong></li>
+              <li>Select <strong>Product metafields</strong></li>
+              <li>Choose <strong>Fits Vehicles</strong> (custom.fits_vehicles)</li>
+              <li>Save configuration</li>
+            </ol>
+          </div>
         </div>
       </div>
 
@@ -222,49 +264,213 @@
 </results-list>
 
 {% stylesheet %}
-  /* YMM Vehicle Selector - Full Width Bar */
-  .ymm-vehicle-selector {
+  /* ========================================
+     COLLECTION HUD COMMAND BAR
+     ======================================== */
+  .collection-hud-bar {
     width: 100%;
-    background: #111111;
-    padding: 12px 16px;
-    display: flex;
-    justify-content: center;
-    margin-bottom: 16px;
+    background: linear-gradient(180deg, #0a0a0a 0%, #111111 100%);
+    border-bottom: 1px solid rgba(204, 0, 0, 0.3);
+    padding: 0;
   }
 
-  .ymm-vehicle-button {
+  .collection-hud-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  @media (min-width: 768px) {
+    .collection-hud-inner {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
+
+  .collection-hud-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .collection-hud-indicator {
+    width: 8px;
+    height: 8px;
+    background: #CC0000;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+    flex-shrink: 0;
+  }
+
+  .collection-hud-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+
+  .collection-hud-vehicle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.4);
+    font-weight: 500;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .collection-hud-vehicle--active {
+    color: #CC0000;
+    border-color: rgba(204, 0, 0, 0.3);
+    background: rgba(204, 0, 0, 0.1);
+  }
+
+  .collection-hud-button {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 16px;
+    padding: 10px 20px;
     background: transparent;
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: rgba(255, 255, 255, 0.8);
-    font-family: monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.1em;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
   }
 
-  .ymm-vehicle-button:hover {
+  .collection-hud-button:hover {
     color: white;
     border-color: #CC0000;
-    box-shadow: 0 0 15px rgba(204, 0, 0, 0.5);
+    background: rgba(204, 0, 0, 0.1);
+    box-shadow: 0 0 20px rgba(204, 0, 0, 0.3);
   }
 
-  @media screen and (min-width: 750px) {
-    .ymm-vehicle-selector {
-      padding: 16px 24px;
-      justify-content: flex-end;
-    }
+  /* ========================================
+     HUD NO RESULTS MESSAGE
+     ======================================== */
+  .hud-no-results {
+    background: linear-gradient(180deg, #0a0a0a 0%, #111111 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 4rem 2rem;
+    text-align: center;
+    margin: 2rem;
+  }
 
-    .ymm-vehicle-button {
-      font-size: 12px;
-      padding: 10px 20px;
-    }
+  .hud-no-results-icon {
+    color: rgba(204, 0, 0, 0.5);
+    margin-bottom: 1.5rem;
+  }
+
+  .hud-no-results-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    letter-spacing: 0.1em;
+    margin: 0 0 1rem 0;
+  }
+
+  .hud-no-results-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0 0 2rem 0;
+  }
+
+  .hud-no-results-button {
+    display: inline-block;
+    padding: 12px 24px;
+    background: #CC0000;
+    border: none;
+    color: white;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .hud-no-results-button:hover {
+    background: #aa0000;
+    box-shadow: 0 0 30px rgba(204, 0, 0, 0.4);
+  }
+
+  /* ========================================
+     HUD ADMIN WARNING
+     ======================================== */
+  .hud-admin-warning {
+    background: linear-gradient(180deg, #1a0a0a 0%, #111111 100%);
+    border: 1px solid rgba(204, 0, 0, 0.3);
+    padding: 2rem;
+    margin: 2rem;
+  }
+
+  .hud-warning-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #CC0000;
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+  }
+
+  .hud-warning-indicator {
+    width: 10px;
+    height: 10px;
+    background: #CC0000;
+    border-radius: 50%;
+    animation: pulse 1s infinite;
+  }
+
+  .hud-warning-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0 0 1.5rem 0;
+  }
+
+  .hud-warning-steps {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 1.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .hud-warning-steps ol {
+    margin: 0;
+    padding-left: 1.5rem;
+    list-style: decimal;
+  }
+
+  .hud-warning-steps li {
+    margin-bottom: 0.5rem;
+  }
+
+  .hud-warning-steps strong {
+    color: white;
+  }
+
+  /* ========================================
+     ORIGINAL VEHICLE SELECTOR (deprecated, kept for compatibility)
+     ======================================== */
+  .ymm-vehicle-selector {
+    display: none;
   }
 
   /* YMM Modal Styles */

@@ -106,6 +106,10 @@ I have set up the following Metaobjects and Metafields in my Shopify Admin. Plea
 | `/b2b/cart-preview` | POST | Preview cart with B2B pricing |
 | `/checkout/create` | POST | Universal checkout with addon pricing |
 | `/setup/metafield-definitions` | POST | Ensure variant metafield definitions exist |
+| `/dealers` | GET | List public dealers (active only) or all (admin) |
+| `/dealers/{id}` | GET/PUT/DELETE | Manage specific dealer |
+| `/dealer-applications` | GET/POST | Create application or list pending (admin) |
+| `/process-application` | POST | Approve/Reject dealer application (admin) |
 
 ### Variant Update Payload
 ```json
@@ -168,6 +172,7 @@ I have set up the following Metaobjects and Metafields in my Shopify Admin. Plea
   - Customer management with B2B tagging
   - **NEW:** Automatic product-level metafield updates when variants are saved
   - **NEW:** Decimal-precise price input handling
+  - **NEW:** Dealers Management (Active Dealer CRUD, Pending Application Review)
 
 ---
 
@@ -175,6 +180,7 @@ I have set up the following Metaobjects and Metafields in my Shopify Admin. Plea
 
 ### Product Page
 - `sections/main-product-precision.liquid` - Main product section with B2B/discount logic
+- **Category Nav Bar** | `sections/header-precision.liquid` (lines 234-362) | **UPDATED:** Auto-hides on most pages, appearing only on "Catalog" hover. Always visible on `/collections/all`.
 - `snippets/buy-buttons-precision.liquid` - Add to cart with variant price switching
 - `snippets/price.liquid` - Price display component with variant iteration logic
 
@@ -195,6 +201,11 @@ I have set up the following Metaobjects and Metafields in my Shopify Admin. Plea
 - `sections/main-customer-addresses.liquid` - Address management ("Shipping Destinations")
 - `sections/main-page-contact-custom.liquid` - Contact page with engineering theme
 
+### Dealers Page
+- `templates/page.dealers.liquid` - Dealer Discovery (Map, List, Application)
+- `assets/dealer-discovery.js` - Map logic, Geolocation, Application Form handling
+- `assets/admin-dealers.js` - Admin side management logic
+
 ---
 
 ## 9. Recent Updates & Fixes
@@ -211,6 +222,18 @@ I have set up the following Metaobjects and Metafields in my Shopify Admin. Plea
 - **Uppercase tracking typography** for headers
 - **Garage/Driver terminology** for customer features
 - **Performance metrics** display (dyno charts, specs)
+
+### Dealers System (Dec 2024)
+- **Dealer Discovery Page:** Map-based locator with geolocation
+- **Dealer Application:** Integrated application form for customers
+- **Admin Management:** Full workflow for approving/rejecting applications
+- **Leaflet Integration:** Open-source map solution (no API keys)
+
+### Command Center UI Overhaul (Dec 2024)
+- **Hero YMM:** Acoustic Command redesign with blur effects, auto-sizing fields
+- **Collection HUD:** New command bar with vehicle configuration display
+- **Header Logic:** HUD Type Selection auto-hides/shows based on context
+- **Dark Mode Messages:** No-results and Admin warnings updated to HUD theme
 
 ### Mobile Responsiveness
 - **Responsive grids** (1-4 columns based on screen size)

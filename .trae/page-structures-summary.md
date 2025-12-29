@@ -12,9 +12,9 @@ SKM is a high-performance exhaust system Shopify store with a sophisticated auto
 ### Structure:
 ```
 Hero Section (hero-ymm)
-├── Background video (3752531-hd_1920_1080_24fps.mp4)
-├── Heading: "UNLEASH THE SOUND."
-└── YMM (Year-Make-Model) search integration
+├── Background video (3752531-hd_1920_1080_24fps.mp4) with Blur Scan Effect
+├── Header: "VEHICLE IDENTIFICATION" (Diagnostic Theme)
+└── NEW: Auto-sizing YMM fields + Right-aligned Search Button (Command Center Style)
 
 Engineering Value Proposition
 ├── 3 Feature blocks:
@@ -89,8 +89,9 @@ Product Recommendations
 ### Structure:
 ```
 Collection Header
-├── Dynamic collection title
-└── Collection description
+├── NEW: HUD Vehicle Command Bar (Active Vehicle Display + Configure Button)
+├── Collection Title & Description
+└── YMM Configuration Modal (Dark HUD styling)
 
 Filter & Sort Bar
 ├── Horizontal filter style
@@ -343,6 +344,40 @@ Form Handling
 - Professional contact information
 - Clean split-grid layout
 - Consistent branding
+
+---
+
+## 10. Dealer Discovery Page
+**Template:** `templates/page.dealers.liquid` (Custom Liquid)
+**Frontend Logic:** `assets/dealer-discovery.js`
+
+### Structure:
+```
+Hero Section
+├── Title: "Find a Dealer Near You"
+└── Subtitle description
+
+Split-Screen Content
+├── Left Column: Dealer List
+│   ├── Loading state / Empty state
+│   ├── Scrollable list of dealers
+│   └── Distance calculation (miles)
+└── Right Column: Interactive Map
+    ├── Leaflet.js map integration
+    ├── Dealer markers
+    └── User location marker
+
+Become a Dealer Section
+├── Collapsible application form
+├── Business & Contact fields
+└── "Submit Application" logic
+```
+
+**Key Features:**
+- **Interactive Map:** Uses Leaflet/OpenStreetMap (no API key required)
+- **Geolocation:** Requests user location to sort dealers by distance
+- **Dealer Application:** Integrated form for customers to apply
+- **Real-time Data:** Fetches dealers from Cloudflare Worker API
 
 ---
 
