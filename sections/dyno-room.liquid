@@ -20,11 +20,12 @@
         
         <!-- Audio Waveform Display -->
         <div id="sonic-visualizer-{{ section.id }}" class="relative h-48 bg-black/50 border border-white/10 overflow-hidden rounded-sm">
-          <!-- Waveform bars (CSS animated) -->
+          <!-- Waveform bars -->
           <div class="flex items-end justify-center gap-1 h-full p-4" id="waveform-bars-{{ section.id }}">
             {%- for i in (1..32) -%}
-              <div class="waveform-bar w-2 bg-gradient-to-t from-[#CC0000] to-[#ff4444] rounded-t-sm transition-all duration-100" 
-                   style="height: {{ i | modulo: 8 | times: 10 | plus: 20 }}%; animation-delay: {{ i | times: 50 }}ms;"></div>
+              <!-- Initial static height for "ready" state -->
+              <div class="waveform-bar w-2 bg-gradient-to-t from-[#CC0000] to-[#ff4444] rounded-t-sm transition-[height] duration-75" 
+                   style="height: 10%;"></div>
             {%- endfor -%}
           </div>
           
@@ -96,11 +97,11 @@
       <!-- dB Meter -->
       <div class="mb-8">
         <div class="flex items-center justify-between mb-2">
-          <span class="hud-mono text-xs text-gray-500">DECIBEL_OUTPUT</span>
+          <span class="hud-mono text-xs text-gray-500 db-label-text">DECIBEL_OUTPUT</span>
           <span id="db-value-{{ section.id }}" class="hud-mono text-sm text-[#CC0000]">0 dB</span>
         </div>
         <div class="h-2 bg-white/10 rounded-full overflow-hidden">
-          <div id="db-meter-{{ section.id }}" class="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-[#CC0000] w-0 transition-all duration-100 rounded-full"></div>
+          <div id="db-meter-{{ section.id }}" class="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-[#CC0000] w-0 transition-all duration-75 rounded-full"></div>
         </div>
         <div class="flex justify-between mt-1 hud-mono text-[10px] text-gray-600">
           <span>0</span>
@@ -110,48 +111,102 @@
         </div>
       </div>
       
-      <!-- Horsepower Graph -->
-      <div>
-        <div class="flex items-center justify-between mb-2">
-          <span class="hud-mono text-xs text-gray-500">HORSEPOWER_GAIN</span>
-          <span id="hp-value-{{ section.id }}" class="hud-mono text-sm text-green-500">+0 HP</span>
-        </div>
-        <div class="h-16 bg-white/5 rounded-sm relative overflow-hidden" id="hp-graph-{{ section.id }}">
-          <!-- Graph will be drawn via JS -->
-          <svg class="w-full h-full">
-            <path id="hp-path-{{ section.id }}" d="M0 60" stroke="#CC0000" stroke-width="2" fill="none" class="transition-all duration-500"></path>
-            <path id="hp-area-{{ section.id }}" d="M0 60" stroke="none" fill="url(#hp-gradient-{{ section.id }})" opacity="0.3"></path>
-            <defs>
-              <linearGradient id="hp-gradient-{{ section.id }}" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" style="stop-color:#CC0000;stop-opacity:0.5" />
-                <stop offset="100%" style="stop-color:#CC0000;stop-opacity:0" />
-              </linearGradient>
-            </defs>
-          </svg>
-        </div>
-      </div>
+      <!-- HP Graph Removed as requested -->
       
     </div>
   </div>
 </div>
 
-<!-- Audio Element -->
-<audio id="audio-player-{{ section.id }}" src="{{ section.settings.audio_idle | default: section.settings.audio_url }}" preload="metadata"></audio>
+<!-- Audio Element with crossorigin for Web Audio API -->
+<audio id="audio-player-{{ section.id }}" crossorigin="anonymous" src="{{ section.settings.audio_idle | default: section.settings.audio_url }}" preload="metadata"></audio>
 
 <!-- Sonic Laboratory Script -->
 <script>
 (function() {
   const sectionId = '{{ section.id }}';
   let isPlaying = false;
-  let animationInterval;
   let currentRpm = 'idle';
   
-  // Audio Sources Map
-  const audioSources = {
+  // Real-time Audio Context Vars
+  let audioContext = null;
+  let analyser = null;
+  let source = null;
+  let animationFrameId = null;
+  let isFallbackMode = false;
+  
+  // Audio Sources Map - Raw Settings
+  const rawSources = {
     'idle': "{{ section.settings.audio_idle | default: section.settings.audio_url }}",
     '3000': "{{ section.settings.audio_3000 | default: section.settings.audio_url }}",
     'redline': "{{ section.settings.audio_redline | default: section.settings.audio_url }}"
   };
+
+  // Helper: fix GitHub Raw URLs to ensure CORS works
+  // github.com/.../raw/... -> raw.githubusercontent.com/...
+  function getProxiedUrl(url) {
+    if (!url) return '';
+    // Handle "github.com/USER/REPO/raw/refs/heads/BRANCH/PATH"
+    if (url.includes('github.com') && url.includes('/raw/')) {
+        return url.replace(
+            /https:\/\/github\.com\/([^\/]+)\/([^\/]+)\/raw\/refs\/heads\/([^\/]+)\/(.+)/, 
+            'https://raw.githubusercontent.com/$1/$2/$3/$4'
+        ).replace(
+            /https:\/\/github\.com\/([^\/]+)\/([^\/]+)\/raw\/([^\/]+)\/(.+)/,
+            'https://raw.githubusercontent.com/$1/$2/$3/$4'
+        );
+    }
+    return url;
+  }
+  
+  // Final processed sources
+  const audioSources = {
+      'idle': getProxiedUrl(rawSources['idle']),
+      '3000': getProxiedUrl(rawSources['3000']),
+      'redline': getProxiedUrl(rawSources['redline'])
+  };
+  
+  // Initialize Web Audio API
+  function initAudioContext() {
+    if (audioContext || isFallbackMode) return; 
+    
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioContext();
+        
+        const audioPlayer = document.getElementById('audio-player-' + sectionId);
+        if (!audioPlayer) return;
+        
+        // Create Analyser
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 64; 
+        
+        // Connect Audio Node -> Analyser -> Destination
+        if (!source) {
+            source = audioContext.createMediaElementSource(audioPlayer);
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+        }
+    } catch (e) {
+        console.warn("Web Audio API failed, enabling fallback:", e);
+        enableFallbackMode();
+    }
+  }
+
+  function enableFallbackMode() {
+      if (isFallbackMode) return;
+      isFallbackMode = true;
+      console.log("Enabling audio fallback mode (Visualizer simulated)");
+      
+      const audioPlayer = document.getElementById('audio-player-' + sectionId);
+      if (audioPlayer) {
+          // Remove crossorigin to allow non-CORS playback
+          audioPlayer.removeAttribute('crossorigin');
+          // Reload src to apply attribute change
+          const currentSrc = audioPlayer.src;
+          audioPlayer.src = '';
+          audioPlayer.src = currentSrc; 
+      }
+  }
   
   // Toggle audio playback
   window.toggleAudio = function(id) {
@@ -160,85 +215,147 @@
     const audioPlayer = document.getElementById('audio-player-' + id);
     const statusText = document.getElementById('audio-status-text-' + id);
     
+    // Attempt init content if not fallback
+    if (!isFallbackMode && !audioContext) {
+      initAudioContext();
+    }
+    
+    // Resume context if suspended
+    if (audioContext && audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+    
     isPlaying = !isPlaying;
     
     if (isPlaying) {
       playIcon.classList.add('hidden');
       pauseIcon.classList.remove('hidden');
       if (audioPlayer) {
-        // Ensure source is set correctly before playing (just in case)
+        // Switch source if needed
         if (!audioPlayer.src || audioPlayer.src !== audioSources[currentRpm]) {
             audioPlayer.src = audioSources[currentRpm];
         }
-        audioPlayer.play().catch(e => {
-            console.error("Audio play failed:", e);
-            statusText.textContent = "AUDIO ERROR - CHECK CONSOLE";
-            isPlaying = false;
-            playIcon.classList.remove('hidden');
-            pauseIcon.classList.add('hidden');
-        });
+        
+        const playPromise = audioPlayer.play();
+        if (playPromise) {
+            playPromise.then(() => {
+                if (!isFallbackMode) {
+                    drawVisualization();
+                } else {
+                    simulateVisualization();
+                }
+            }).catch(e => {
+                console.error("Audio play error:", e);
+                // If error is DOMException (CORS), enable fallback and retry
+                if ((e.name === 'NotSupportedError' || e.message.includes('media'))) {
+                     enableFallbackMode();
+                     audioPlayer.play().then(() => simulateVisualization()).catch(err => {
+                         statusText.textContent = "PLAYBACK FAILED";
+                         onPause(id);
+                     });
+                } else {
+                    statusText.textContent = "AUDIO ERROR";
+                    onPause(id);
+                }
+            });
+        }
       }
-      startVisualization(id);
-      if (statusText) statusText.textContent = "PLAYING SEQUENCE: " + currentRpm.toUpperCase();
+      if (statusText) statusText.textContent = "PLAYING: " + currentRpm.toUpperCase();
     } else {
-      playIcon.classList.remove('hidden');
-      pauseIcon.classList.add('hidden');
+      onPause(id);
       if (audioPlayer) audioPlayer.pause();
-      stopVisualization(id);
-      if (statusText) statusText.textContent = "SEQUENCE PAUSED";
+      if (statusText) statusText.textContent = "PAUSED";
     }
   };
   
-  // Waveform animation
-  function startVisualization(id) {
-    const bars = document.querySelectorAll('#waveform-bars-' + id + ' .waveform-bar');
-    const dbMeter = document.getElementById('db-meter-' + id);
-    const dbValue = document.getElementById('db-value-' + id);
-    const hpValue = document.getElementById('hp-value-' + id);
-    
-    // Intensity multiplier based on RPM
-    let intensity = 1;
-    if (currentRpm === '3000') intensity = 1.2;
-    if (currentRpm === 'redline') intensity = 1.5;
-
-    animationInterval = setInterval(() => {
-      // Animate bars
-      bars.forEach(bar => {
-        const height = (Math.random() * 80 + 20) * intensity;
-        bar.style.height = Math.min(height, 100) + '%';
-      });
-      
-      // Update dB meter
-      const baseDb = currentRpm === 'idle' ? 85 : (currentRpm === '3000' ? 95 : 105);
-      const randomVar = Math.random() * 5;
-      const db = Math.floor(baseDb + randomVar);
-      
-      if (dbMeter) dbMeter.style.width = Math.min((db / 120 * 100), 100) + '%';
-      if (dbValue) dbValue.textContent = db + ' dB';
-      
-      // Update HP
-      // Keep static HP display usually, or animate slightly? Let's just animate slightly
-      // const hp = Math.floor(Math.random() * 10 + 20);
-      // if (hpValue) hpValue.textContent = '+' + hp + ' HP';
-      
-    }, 100);
+  function onPause(id) {
+      const playIcon = document.getElementById('play-icon-' + id);
+      const pauseIcon = document.getElementById('pause-icon-' + id);
+      isPlaying = false;
+      playIcon.classList.remove('hidden');
+      pauseIcon.classList.add('hidden');
+      cancelAnimationFrame(animationFrameId);
+      resetVisualizer(id);
   }
-  
-  function stopVisualization(id) {
-    clearInterval(animationInterval);
+
+  // Real-time Visualization Loop
+  function drawVisualization() {
+    if (isFallbackMode) return;
     
-    const bars = document.querySelectorAll('#waveform-bars-' + id + ' .waveform-bar');
-    bars.forEach((bar, i) => {
-      bar.style.height = (i % 8 * 10 + 20) + '%';
+    const bars = document.querySelectorAll('#waveform-bars-' + sectionId + ' .waveform-bar');
+    const dbMeter = document.getElementById('db-meter-' + sectionId);
+    const dbValue = document.getElementById('db-value-' + sectionId);
+    
+    if (!analyser) return;
+    
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    analyser.getByteFrequencyData(dataArray);
+    
+    bars.forEach((bar, index) => {
+      const dataIndex = index < bufferLength ? index : bufferLength - 1;
+      const value = dataArray[dataIndex];
+      const heightPercent = (value / 255) * 100;
+      bar.style.height = Math.max(heightPercent, 10) + '%';
     });
     
+    let sum = 0;
+    for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
+    const average = sum / bufferLength;
+    
+    let calibratedDb = 0;
+    if (average > 0) calibratedDb = Math.floor(60 + (average / 255) * 60);
+    
+    if (dbMeter) dbMeter.style.width = Math.min((calibratedDb / 120 * 100), 100) + '%';
+    if (dbValue) dbValue.textContent = calibratedDb + ' dB';
+    
+    animationFrameId = requestAnimationFrame(drawVisualization);
+  }
+  
+  // Fallback Simulation
+  function simulateVisualization() {
+      const bars = document.querySelectorAll('#waveform-bars-' + sectionId + ' .waveform-bar');
+      const dbMeter = document.getElementById('db-meter-' + sectionId);
+      const dbValue = document.getElementById('db-value-' + sectionId);
+      const specLabel = document.querySelector('#sonic-visualizer-' + sectionId + ' .hud-spec-label');
+      
+      // Update label to indicate simulation
+      const dbLabel = document.querySelector('.db-label-text');
+      if (dbLabel) dbLabel.textContent = "DECIBEL_OUTPUT (SIMULATED)";
+      
+      let intensity = 1;
+      let baseDb = 85;
+      if (currentRpm === '3000') { intensity = 1.3; baseDb = 95; }
+      if (currentRpm === 'redline') { intensity = 1.6; baseDb = 105; }
+      
+      function loop() {
+          if (!isPlaying) return;
+          bars.forEach(bar => {
+              const h = (Math.random() * 80 + 10) * intensity;
+              bar.style.height = Math.min(h, 100) + '%';
+          });
+          const db = Math.floor(baseDb + Math.random() * 5);
+          if (dbMeter) dbMeter.style.width = Math.min((db / 110 * 100), 100) + '%';
+          if (dbValue) dbValue.textContent = db + ' dB';
+          
+          setTimeout(() => {
+              if (isPlaying) animationFrameId = requestAnimationFrame(loop);
+          }, 80);
+      }
+      loop();
+  }
+  
+  function resetVisualizer(id) {
+    const bars = document.querySelectorAll('#waveform-bars-' + id + ' .waveform-bar');
     const dbMeter = document.getElementById('db-meter-' + id);
     const dbValue = document.getElementById('db-value-' + id);
-   // const hpValue = document.getElementById('hp-value-' + id);
+    const dbLabel = document.querySelector('.db-label-text');
+    
+    bars.forEach(bar => { bar.style.height = '10%'; });
     
     if (dbMeter) dbMeter.style.width = '0%';
     if (dbValue) dbValue.textContent = '0 dB';
-    // if (hpValue) hpValue.textContent = '+0 HP';
+    if (dbLabel) dbLabel.textContent = "DECIBEL_OUTPUT";
   }
   
   // RPM toggle logic
@@ -247,13 +364,11 @@
       const sectionId = '{{ section.id }}';
       const newRpm = this.getAttribute('data-rpm');
       
-      // Update UI
       document.querySelectorAll('.rpm-toggle').forEach(b => b.classList.remove('active', 'border-[#CC0000]', 'text-[#CC0000]'));
       this.classList.add('active', 'border-[#CC0000]', 'text-[#CC0000]');
       
       currentRpm = newRpm;
       
-      // Switch Audio Source
       const audioPlayer = document.getElementById('audio-player-' + sectionId);
       const statusText = document.getElementById('audio-status-text-' + sectionId);
       
@@ -262,27 +377,41 @@
           audioPlayer.src = audioSources[newRpm];
           
           if (wasPlaying) {
-              audioPlayer.play();
-              if (statusText) statusText.textContent = "PLAYING SEQUENCE: " + currentRpm.toUpperCase();
+              audioPlayer.play().then(() => {
+                  if (!isFallbackMode) drawVisualization();
+                  else simulateVisualization();
+              }).catch(e => {
+                  console.warn("Switch play interrupted", e);
+                  enableFallbackMode(); 
+                  audioPlayer.play().then(() => simulateVisualization());
+              });
+              if (statusText) statusText.textContent = "PLAYING: " + currentRpm.toUpperCase();
           } else {
-             if (statusText) statusText.textContent = "SEQUENCE READY: " + currentRpm.toUpperCase();
+             if (statusText) statusText.textContent = "READY: " + currentRpm.toUpperCase();
           }
       }
     });
   });
+  
+  // Detect load error on audio element (CORS often triggers error listener)
+  const player = document.getElementById('audio-player-' + sectionId);
+  if (player) {
+      player.addEventListener('error', (e) => {
+          console.warn("Audio error:", player.error);
+          enableFallbackMode();
+          if (isPlaying) { // Try to recover playback
+             const statusText = document.getElementById('audio-status-text-' + sectionId);
+             player.play().catch(err => {
+                 statusText.textContent = "ERROR LOADING AUDIO";
+                 onPause(sectionId);
+             }); 
+          }
+      });
+  }
 })();
 </script>
 
 <style>
-  .waveform-bar {
-    animation: waveform 0.5s ease-in-out infinite alternate;
-  }
-  
-  @keyframes waveform {
-    0% { transform: scaleY(0.5); }
-    100% { transform: scaleY(1); }
-  }
-  
   @keyframes scan {
     0% { left: 0; }
     100% { left: 100%; }
@@ -310,25 +439,29 @@
     },
     {
       "type": "header",
-      "content": "Audio Configuration"
+      "content": "Audio Configuration (Shopify Hosted)"
+    },
+    {
+      "type": "paragraph",
+      "content": "For best results (and real-time visualization), upload your .mp3 files to Shopify Admin > Content > Files. Then copy the link and paste it below. External links (like GitHub) may cause CORS errors and default to 'Simulation Mode'."
     },
     {
       "type": "url",
       "id": "audio_idle",
-      "label": "Audio: Idle (MP3)",
-      "info": "Audio track for Idle state"
+      "label": "Idle Audio URL",
+      "info": "Paste the Link from Shopify Files."
     },
     {
       "type": "url",
       "id": "audio_3000",
-      "label": "Audio: 3000 RPM (MP3)",
-      "info": "Audio track for 3000 RPM state"
+      "label": "3000 RPM Audio URL",
+      "info": "Paste the Link from Shopify Files."
     },
     {
       "type": "url",
       "id": "audio_redline",
-      "label": "Audio: Redline (MP3)",
-      "info": "Audio track for Redline state"
+      "label": "Redline Audio URL",
+      "info": "Paste the Link from Shopify Files."
     },
     {
       "type": "url",

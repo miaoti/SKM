@@ -90,6 +90,9 @@
       ],
       "settings": {
         "heading": "HEAR THE POWER.",
+        "audio_idle": "https://github.com/miaoti/SKM/raw/refs/heads/main/Pictures/Contact/Video/Idle.mp3",
+        "audio_3000": "https://github.com/miaoti/SKM/raw/refs/heads/main/Pictures/Contact/Video/3000.mp3",
+        "audio_redline": "",
         "audio_url": "https://github.com/miaoti/SKM/raw/refs/heads/main/Pictures/Contact/Video/Idle.mp3"
       }
     },
