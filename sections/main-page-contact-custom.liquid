@@ -24,7 +24,7 @@
   /* Backgrounds */
   .bg-carbon-fiber {
     background-color: #050505;
-    background-image: url('https://github.com/miaoti/SKM/blob/main/Pictures/Contact/background%20texture.png?raw=true');
+    background-image: url('https://github.com/miaoti/SKM/blob/main/Pictures/Contact/background_texture.png?raw=true');
     background-size: cover;
     background-position: center;
   }
@@ -122,8 +122,8 @@
   <!-- =========================================
        2. SPLIT LAYOUT: "Tactical Intel & Input"
   ========================================== -->
-  <div class="w-full py-24 relative" style="width: 100%; min-width: 100%;">
-    <div class="w-full max-w-[1400px] mx-auto px-8 lg:px-16">
+  <div class="w-full py-12 lg:py-24 relative" style="width: 100%; min-width: 100%;">
+    <div class="w-full max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-16">
     
       <!-- Background "DNA" Watermark (Updated Image) -->
       <div class="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none z-0 flex items-center justify-center overflow-hidden">
@@ -132,11 +132,11 @@
                class="w-full h-full object-cover transform scale-150 rotate-12 opacity-50 grayscale invert">
       </div>
 
-      <!-- Two Column Grid - Force display with inline styles -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4rem;" class="relative z-10">
+      <!-- Two Column Layout - Responsive: stacks on mobile, side-by-side on lg+ -->
+      <div class="flex flex-col lg:flex-row gap-8 lg:gap-16 relative z-10">
         
         <!-- LEFT COLUMN: Technical Intel -->
-        <div class="flex flex-col justify-center space-y-12" style="min-width: 0;">
+        <div class="flex flex-col justify-center space-y-8 lg:space-y-12 lg:w-[380px] lg:flex-shrink-0">
           
           <!-- Address -->
           <div class="group relative pl-6">
@@ -169,7 +169,7 @@
           <div class="group relative pl-6">
               <div class="absolute left-0 top-1 bottom-1 w-[1px] bg-gray-800 group-hover:bg-[#CC0000] transition-colors"></div>
               <div class="font-bold text-[10px] text-[#CC0000] tracking-widest mb-2">HOURS</div>
-              <div class="flex items-center gap-4 text-3xl md:text-4xl font-tech-header font-bold text-gray-200">
+              <div class="flex items-center gap-2 lg:gap-4 text-2xl md:text-3xl lg:text-4xl font-tech-header font-bold text-gray-200">
                   09:00 <span class="text-gray-600">—</span> 18:00
                   <span class="text-sm font-tech-mono text-gray-500 ml-2">EST</span>
               </div>
@@ -187,16 +187,16 @@
         </div>
 
         <!-- RIGHT COLUMN: The Command Form -->
-        <div class="glass-panel p-8 md:p-12 rounded-sm shadow-2xl relative overflow-hidden" style="min-width: 0;">
+        <div class="glass-panel p-6 sm:p-8 md:p-12 rounded-sm shadow-2xl relative overflow-hidden flex-1">
         <!-- Subtle red glow corner -->
         <div class="absolute -top-10 -right-10 w-32 h-32 bg-[#CC0000] opacity-10 blur-[50px] rounded-full"></div>
 
-        <h2 class="font-tech-header text-3xl font-bold uppercase mb-8 flex items-center gap-3">
+        <h2 class="font-tech-header text-xl sm:text-2xl lg:text-3xl font-bold uppercase mb-6 lg:mb-8 flex items-center gap-3">
           <span class="w-2 h-8 bg-[#CC0000]"></span>
           Transmit Inquiry
         </h2>
 
-        {% form 'contact', class: "space-y-8" %}
+        {% form 'contact', class: "space-y-6 lg:space-y-8" %}
           
           {% if form.posted_successfully? %}
             <div class="border border-green-500/30 bg-green-500/10 p-6 text-center">
@@ -267,7 +267,7 @@
   <!-- =========================================
        3. MAP: "Global Telemetry"
   ========================================== -->
-  <div class="w-full h-[500px] relative border-y border-gray-900 overflow-hidden bg-black">
+  <div class="w-full h-[300px] sm:h-[400px] lg:h-[500px] relative border-y border-gray-900 overflow-hidden bg-black">
     
     <!-- Using Google Maps Embed with CSS Filter for "Midnight" look -->
     <iframe 
@@ -295,7 +295,7 @@
     </div>
 
     <!-- Coordinates Overlay -->
-    <div class="absolute bottom-8 right-8 text-right z-20">
+    <div class="absolute bottom-4 right-4 lg:bottom-8 lg:right-8 text-right z-20">
       <div class="text-[10px] text-gray-500 tracking-widest uppercase mb-1">Target Coordinates</div>
       <div class="font-tech-mono text-[#CC0000] text-lg bg-black/80 px-2 py-1 border border-[#CC0000]/30 shadow-[0_0_10px_rgba(204,0,0,0.2)]">
         32.9097° N / 96.7455° W
@@ -307,7 +307,7 @@
   <!-- =========================================
        4. FOOTER: "Protocol & Documentation"
   ========================================== -->
-  <div class="bg-[#080808] py-24 border-t border-gray-900">
+  <div class="bg-[#080808] py-12 lg:py-24 border-t border-gray-900">
     <div class="max-w-[1600px] mx-auto px-4 md:px-8">
       
       <div class="flex items-center gap-4 mb-16">
