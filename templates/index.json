@@ -58,6 +58,11 @@
         "heading": "PRECISION ENGINEERED"
       }
     },
+    "racing_sep": {
+      "type": "racing-separator",
+      "settings": {
+      }
+    },
     "showroom": {
       "type": "showroom-masonry",
       "settings": {
@@ -102,8 +107,8 @@
         "hotspot_1": {
           "type": "hotspot",
           "settings": {
-            "top": 40,
-            "left": 60,
+            "top": 30,
+            "left": 61,
             "code": "WELD_01",
             "title": "Anti-Drone Tech",
             "text": "Cancels out specific frequencies to eliminate cabin drone.",
@@ -113,7 +118,7 @@
         "hotspot_2": {
           "type": "hotspot",
           "settings": {
-            "top": 65,
+            "top": 73,
             "left": 30,
             "code": "WELD_01",
             "title": "TIG Welded",
@@ -127,13 +132,15 @@
         "hotspot_2"
       ],
       "settings": {
-        "heading": "THE GARAGE"
+        "heading": "THE GARAGE",
+        "image": "shopify://shop_images/T_642bd2b0-607c-4dce-9b55-daa7b09f361b.jpg"
       }
     }
   },
   "order": [
     "hero_ymm",
     "engineering_prop",
+    "racing_sep",
     "showroom",
     "dyno_room",
     "garage_hotspots"

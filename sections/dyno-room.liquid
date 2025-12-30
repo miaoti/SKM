@@ -4,10 +4,10 @@
 ========================================== -->
 
 <div class="bg-[#0a0a0a] text-white py-0">
-  <div class="flex flex-col lg:flex-row min-h-[700px]">
+  <div class="flex flex-col xl:flex-row min-h-[600px] xl:min-h-[700px]">
     
     <!-- Left: Audio Visualizer -->
-    <div class="w-full lg:w-1/2 relative flex items-center justify-center p-8 lg:p-16 border-b lg:border-b-0 lg:border-r border-white/5">
+    <div class="w-full xl:w-1/2 relative flex items-center justify-center p-6 md:p-8 xl:p-12 border-b xl:border-b-0 xl:border-r border-white/5">
       
       <!-- Background Grid -->
       <div class="absolute inset-0 opacity-10" style="background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 25px 25px;"></div>
@@ -68,34 +68,34 @@
     </div>
     
     <!-- Right: Metrics Dashboard -->
-    <div class="w-full lg:w-1/2 p-8 lg:p-16 flex flex-col justify-center">
+    <div class="w-full xl:w-1/2 p-6 md:p-8 xl:p-12 flex flex-col justify-center items-stretch">
       
       <!-- Section Header -->
-      <div class="mb-12">
+      <div class="mb-6 md:mb-10">
         <div class="hud-spec-label mb-3">[ EMPIRICAL_VALIDATION ]</div>
-        <h2 class="text-4xl md:text-5xl font-bold tracking-tight mb-4" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">
+        <h2 class="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-4" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">
           {{ section.settings.heading | default: "THE SONIC LABORATORY" }}
         </h2>
-        <p class="text-gray-400 hud-mono text-sm max-w-md">
+        <p class="text-gray-400 hud-mono text-sm">
           Real-time acoustic analysis demonstrating measurable performance improvements.
         </p>
       </div>
       
-      <!-- Metrics Grid -->
-      <div class="grid grid-cols-2 gap-8 mb-12">
+      <!-- Metrics - Full Width Flex Layout -->
+      <div class="flex flex-col sm:flex-row gap-4 md:gap-6 mb-8 md:mb-10 w-full">
         {%- for block in section.blocks -%}
-          <div class="metric-card p-6 border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
-            <div class="hud-spec-label mb-2">[ {{ block.settings.label | upcase | replace: ' ', '_' }} ]</div>
-            <div class="text-4xl md:text-5xl font-mono font-bold text-[#CC0000] mb-2" data-metric="{{ block.settings.value }}">
+          <div class="metric-card flex-1 p-5 sm:p-6 md:p-8 border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
+            <div class="hud-spec-label mb-2 text-[10px] sm:text-xs">[ {{ block.settings.label | upcase | replace: ' ', '_' }} ]</div>
+            <div class="text-3xl sm:text-4xl md:text-5xl font-mono font-bold text-[#CC0000] mb-2" data-metric="{{ block.settings.value }}">
               {{ block.settings.value }}
             </div>
-            <div class="text-gray-500 text-sm">{{ block.settings.label }}</div>
+            <div class="text-gray-500 text-xs sm:text-sm">{{ block.settings.label }}</div>
           </div>
         {%- endfor -%}
       </div>
       
-      <!-- dB Meter -->
-      <div class="mb-8">
+      <!-- dB Meter - Full Width -->
+      <div class="w-full">
         <div class="flex items-center justify-between mb-2">
           <span class="hud-mono text-xs text-gray-500 db-label-text">DECIBEL_OUTPUT</span>
           <span id="db-value-{{ section.id }}" class="hud-mono text-sm text-[#CC0000]">0 dB</span>
@@ -110,8 +110,6 @@
           <span>120 dB</span>
         </div>
       </div>
-      
-      <!-- HP Graph Removed as requested -->
       
     </div>
   </div>

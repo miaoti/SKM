@@ -3,14 +3,14 @@
      Technical schematics with blueprint grid aesthetic
 ========================================== -->
 
-<div class="py-24 bg-white relative overflow-hidden">
+<div class="py-12 md:py-16 bg-white relative overflow-hidden">
   <!-- Blueprint Grid Background -->
   <div class="absolute inset-0 blueprint-grid opacity-50"></div>
   
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
     
     <!-- Section Header -->
-    <div class="text-center mb-20">
+    <div class="text-center mb-10">
       <div class="hud-spec-label mb-4">[ ENGINEERING_MANIFEST ]</div>
       <h2 class="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight mb-6" style="font-family: 'Helvetica Now Display', Inter, sans-serif;">
         {{ section.settings.heading | default: "PRECISION ENGINEERED" }}
@@ -20,128 +20,294 @@
 
     <!-- Specification Grid -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-0 border border-gray-200">
-      {%- for block in section.blocks -%}
-        <div class="spec-card group relative p-8 lg:p-12 {% unless forloop.last %}border-b md:border-b-0 md:border-r border-gray-200{% endunless %} hover:bg-gray-50 transition-colors duration-300">
-          
-          <!-- Spec Number -->
-          <div class="hud-spec-label mb-6">[ SPEC_0{{ forloop.index }} ]</div>
-          
+      
+      <!-- SPEC_01: Dynamic Material Card -->
+      <div class="spec-card group relative p-6 lg:p-8 border-b md:border-b-0 md:border-r border-gray-200 hover:bg-gray-50 transition-colors duration-300">
+        
+        <!-- Spec Number -->
+        <div class="hud-spec-label mb-6">[ SPEC_01 ]</div>
+        
+        <!-- 304 Stainless Steel Content -->
+        <div id="spec01-stainless-{{ section.id }}" class="spec01-material">
           <!-- Technical Schematic -->
-          <div class="w-24 h-24 mb-8 text-gray-300 group-hover:text-[#CC0000] transition-colors duration-300">
-            {%- if block.settings.icon_svg != blank -%}
-              {{ block.settings.icon_svg }}
-            {%- else -%}
-              {%- case forloop.index -%}
-                {%- when 1 -%}
-                  <!-- Flange Schematic -->
-                  <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="0.5" class="w-full h-full">
-                    <circle cx="50" cy="50" r="35" />
-                    <circle cx="50" cy="50" r="20" />
-                    <circle cx="50" cy="50" r="8" />
-                    <circle cx="50" cy="20" r="3" />
-                    <circle cx="50" cy="80" r="3" />
-                    <circle cx="20" cy="50" r="3" />
-                    <circle cx="80" cy="50" r="3" />
-                    <line x1="0" y1="50" x2="15" y2="50" />
-                    <line x1="85" y1="50" x2="100" y2="50" />
-                    <line x1="50" y1="0" x2="50" y2="15" />
-                    <line x1="50" y1="85" x2="50" y2="100" />
-                  </svg>
-                {%- when 2 -%}
-                  <!-- Mandrel Bend Schematic -->
-                  <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="0.5" class="w-full h-full">
-                    <path d="M10 80 L10 50 Q10 20 40 20 L90 20" />
-                    <path d="M20 80 L20 55 Q20 30 45 30 L90 30" />
-                    <line x1="10" y1="80" x2="20" y2="80" stroke-width="1" />
-                    <line x1="90" y1="20" x2="90" y2="30" stroke-width="1" />
-                    <!-- Dimension lines -->
-                    <line x1="0" y1="50" x2="10" y2="50" stroke-dasharray="2,2" />
-                    <line x1="40" y1="10" x2="40" y2="20" stroke-dasharray="2,2" />
-                    <text x="2" y="48" font-size="6" fill="currentColor">R45°</text>
-                  </svg>
-                {%- when 3 -%}
-                  <!-- Material Structure Schematic -->
-                  <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="0.5" class="w-full h-full">
-                    <rect x="10" y="30" width="80" height="40" />
-                    <line x1="10" y1="40" x2="90" y2="40" stroke-dasharray="4,2" />
-                    <line x1="10" y1="50" x2="90" y2="50" />
-                    <line x1="10" y1="60" x2="90" y2="60" stroke-dasharray="4,2" />
-                    <!-- Grain pattern -->
-                    <path d="M15 35 Q25 37 35 35 T55 35 T75 35 T90 35" stroke-width="0.3" />
-                    <path d="M15 45 Q25 47 35 45 T55 45 T75 45 T90 45" stroke-width="0.3" />
-                    <path d="M15 55 Q25 57 35 55 T55 55 T75 55 T90 55" stroke-width="0.3" />
-                    <path d="M15 65 Q25 67 35 65 T55 65 T75 65 T90 65" stroke-width="0.3" />
-                    <!-- Labels -->
-                    <text x="50" y="20" font-size="5" text-anchor="middle" fill="currentColor">304 AUSTENITIC</text>
-                    <text x="50" y="85" font-size="5" text-anchor="middle" fill="currentColor">2.5mm WALL</text>
-                  </svg>
-                {%- else -%}
-                  <!-- Default Schematic -->
-                  <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="0.5" class="w-full h-full">
-                    <circle cx="50" cy="50" r="40" />
-                    <circle cx="50" cy="50" r="20" />
-                    <line x1="50" y1="10" x2="50" y2="30" />
-                    <line x1="50" y1="70" x2="50" y2="90" />
-                    <line x1="10" y1="50" x2="30" y2="50" />
-                    <line x1="70" y1="50" x2="90" y2="50" />
-                  </svg>
-              {%- endcase -%}
-            {%- endif -%}
+          <div class="w-16 h-16 mb-6 text-gray-300 group-hover:text-[#CC0000] transition-colors duration-300">
+            <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="0.5" class="w-full h-full">
+              <circle cx="50" cy="50" r="35" />
+              <circle cx="50" cy="50" r="20" />
+              <circle cx="50" cy="50" r="8" />
+              <circle cx="50" cy="20" r="3" />
+              <circle cx="50" cy="80" r="3" />
+              <circle cx="20" cy="50" r="3" />
+              <circle cx="80" cy="50" r="3" />
+              <line x1="0" y1="50" x2="15" y2="50" />
+              <line x1="85" y1="50" x2="100" y2="50" />
+              <line x1="50" y1="0" x2="50" y2="15" />
+              <line x1="50" y1="85" x2="50" y2="100" />
+            </svg>
           </div>
           
           <!-- Title -->
           <h3 class="text-xl font-bold text-gray-900 mb-4 uppercase tracking-wide">
-            {{ block.settings.title }}
+            304 Stainless Steel
           </h3>
           
           <!-- Description -->
           <p class="text-gray-500 leading-relaxed text-sm mb-6">
-            {{ block.settings.text }}
+            High-grade austenitic stainless steel with superior corrosion resistance and thermal stability.
           </p>
           
-          <!-- Technical Specs (if provided) -->
-          {%- if block.settings.specs != blank -%}
-            <div class="hud-mono text-xs text-gray-400 border-t border-gray-200 pt-4 mt-auto">
-              {{ block.settings.specs }}
-            </div>
-          {%- endif -%}
-          
-          <!-- Hover Laser Line -->
-          <div class="absolute bottom-0 left-0 w-0 h-[2px] bg-[#CC0000] group-hover:w-full transition-all duration-500"></div>
+          <!-- Technical Specs -->
+          <div class="hud-mono text-xs text-gray-400 border-t border-gray-200 pt-4 mt-auto">
+            GRADE: 304L | FINISH: #4 BRUSHED
+          </div>
         </div>
+        
+        <!-- Ti-6Al-4V Titanium Content -->
+        <div id="spec01-titanium-{{ section.id }}" class="spec01-material hidden">
+          <!-- Technical Schematic - Hexagonal crystal structure -->
+          <div class="w-16 h-16 mb-6 text-gray-300 group-hover:text-[#CC0000] transition-colors duration-300">
+            <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="0.5" class="w-full h-full">
+              <!-- Hexagonal crystal structure for titanium -->
+              <polygon points="50,15 80,32 80,68 50,85 20,68 20,32" />
+              <polygon points="50,25 70,38 70,62 50,75 30,62 30,38" />
+              <line x1="50" y1="15" x2="50" y2="25" />
+              <line x1="80" y1="32" x2="70" y2="38" />
+              <line x1="80" y1="68" x2="70" y2="62" />
+              <line x1="50" y1="85" x2="50" y2="75" />
+              <line x1="20" y1="68" x2="30" y2="62" />
+              <line x1="20" y1="32" x2="30" y2="38" />
+              <!-- Alpha-beta phase indicators -->
+              <circle cx="50" cy="50" r="8" fill="currentColor" opacity="0.3" />
+              <text x="50" y="8" font-size="5" text-anchor="middle" fill="currentColor">α+β ALLOY</text>
+              <text x="50" y="95" font-size="5" text-anchor="middle" fill="currentColor">1.5mm WALL</text>
+            </svg>
+          </div>
+          
+          <!-- Title -->
+          <h3 class="text-xl font-bold text-gray-900 mb-4 uppercase tracking-wide">
+            Ti-6Al-4V Titanium
+          </h3>
+          
+          <!-- Description -->
+          <p class="text-gray-500 leading-relaxed text-sm mb-6">
+            Aerospace-grade titanium alloy with exceptional strength-to-weight ratio and heat resistance.
+          </p>
+          
+          <!-- Technical Specs -->
+          <div class="hud-mono text-xs text-gray-400 border-t border-gray-200 pt-4 mt-auto">
+            GRADE: 5 | FINISH: MILL ANNEALED
+          </div>
+        </div>
+        
+        <!-- Hover Laser Line -->
+        <div class="absolute bottom-0 left-0 w-0 h-[2px] bg-[#CC0000] group-hover:w-full transition-all duration-500"></div>
+      </div>
+
+      <!-- Remaining Spec Cards from blocks (skip first as we handle it separately) -->
+      {%- for block in section.blocks -%}
+        {%- if forloop.index > 1 -%}
+          <div class="spec-card group relative p-6 lg:p-8 {% unless forloop.last %}border-b md:border-b-0 md:border-r border-gray-200{% endunless %} hover:bg-gray-50 transition-colors duration-300">
+            
+            <!-- Spec Number -->
+            <div class="hud-spec-label mb-6">[ SPEC_0{{ forloop.index }} ]</div>
+            
+            <!-- Technical Schematic -->
+            <div class="w-16 h-16 mb-6 text-gray-300 group-hover:text-[#CC0000] transition-colors duration-300">
+              {%- if block.settings.icon_svg != blank -%}
+                {{ block.settings.icon_svg }}
+              {%- else -%}
+                {%- case forloop.index -%}
+                  {%- when 2 -%}
+                    <!-- Mandrel Bend Schematic -->
+                    <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="0.5" class="w-full h-full">
+                      <path d="M10 80 L10 50 Q10 20 40 20 L90 20" />
+                      <path d="M20 80 L20 55 Q20 30 45 30 L90 30" />
+                      <line x1="10" y1="80" x2="20" y2="80" stroke-width="1" />
+                      <line x1="90" y1="20" x2="90" y2="30" stroke-width="1" />
+                      <line x1="0" y1="50" x2="10" y2="50" stroke-dasharray="2,2" />
+                      <line x1="40" y1="10" x2="40" y2="20" stroke-dasharray="2,2" />
+                      <text x="2" y="48" font-size="6" fill="currentColor">R45°</text>
+                    </svg>
+                  {%- when 3 -%}
+                    <!-- Dyno/Performance Schematic -->
+                    <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="0.5" class="w-full h-full">
+                      <rect x="10" y="30" width="80" height="40" />
+                      <line x1="10" y1="40" x2="90" y2="40" stroke-dasharray="4,2" />
+                      <line x1="10" y1="50" x2="90" y2="50" />
+                      <line x1="10" y1="60" x2="90" y2="60" stroke-dasharray="4,2" />
+                      <path d="M15 35 Q25 37 35 35 T55 35 T75 35 T90 35" stroke-width="0.3" />
+                      <path d="M15 45 Q25 47 35 45 T55 45 T75 45 T90 45" stroke-width="0.3" />
+                      <path d="M15 55 Q25 57 35 55 T55 55 T75 55 T90 55" stroke-width="0.3" />
+                      <path d="M15 65 Q25 67 35 65 T55 65 T75 65 T90 65" stroke-width="0.3" />
+                      <text x="50" y="20" font-size="5" text-anchor="middle" fill="currentColor">DYNO TESTED</text>
+                      <text x="50" y="85" font-size="5" text-anchor="middle" fill="currentColor">+25 HP VERIFIED</text>
+                    </svg>
+                  {%- else -%}
+                    <!-- Default Schematic -->
+                    <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="0.5" class="w-full h-full">
+                      <circle cx="50" cy="50" r="40" />
+                      <circle cx="50" cy="50" r="20" />
+                      <line x1="50" y1="10" x2="50" y2="30" />
+                      <line x1="50" y1="70" x2="50" y2="90" />
+                      <line x1="10" y1="50" x2="30" y2="50" />
+                      <line x1="70" y1="50" x2="90" y2="50" />
+                    </svg>
+                {%- endcase -%}
+              {%- endif -%}
+            </div>
+            
+            <!-- Title -->
+            <h3 class="text-xl font-bold text-gray-900 mb-4 uppercase tracking-wide">
+              {{ block.settings.title }}
+            </h3>
+            
+            <!-- Description -->
+            <p class="text-gray-500 leading-relaxed text-sm mb-6">
+              {{ block.settings.text }}
+            </p>
+            
+            <!-- Technical Specs (if provided) -->
+            {%- if block.settings.specs != blank -%}
+              <div class="hud-mono text-xs text-gray-400 border-t border-gray-200 pt-4 mt-auto">
+                {{ block.settings.specs }}
+              </div>
+            {%- endif -%}
+            
+            <!-- Hover Laser Line -->
+            <div class="absolute bottom-0 left-0 w-0 h-[2px] bg-[#CC0000] group-hover:w-full transition-all duration-500"></div>
+          </div>
+        {%- endif -%}
       {%- endfor -%}
     </div>
 
-    <!-- Material Composition Bar -->
-    <div class="mt-16 p-8 bg-gray-50 border border-gray-200">
-      <div class="hud-spec-label mb-4">[ MATERIAL_COMPOSITION: 304_STAINLESS_STEEL ]</div>
-      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 hud-mono text-sm">
-        <div class="text-center p-3 border border-gray-200 bg-white">
-          <div class="text-[#CC0000] font-bold">Fe</div>
-          <div class="text-gray-500">66-74%</div>
+    <!-- Material Composition Bar with Toggle -->
+    <div class="mt-10 p-6 bg-gray-50 border border-gray-200">
+      <!-- Material Toggle Buttons -->
+      <div class="flex flex-wrap items-center gap-4 mb-6">
+        <span class="hud-spec-label">[ SELECT_MATERIAL ]</span>
+        <div class="flex gap-2">
+          <button 
+            id="btn-stainless-{{ section.id }}" 
+            onclick="switchMaterial('{{ section.id }}', 'stainless')"
+            class="material-btn px-4 py-2 text-xs hud-mono border-2 border-[#CC0000] bg-[#CC0000] text-white transition-all duration-200">
+            304 STAINLESS STEEL
+          </button>
+          <button 
+            id="btn-titanium-{{ section.id }}" 
+            onclick="switchMaterial('{{ section.id }}', 'titanium')"
+            class="material-btn px-4 py-2 text-xs hud-mono border-2 border-gray-300 bg-white text-gray-600 hover:border-[#CC0000] hover:text-[#CC0000] transition-all duration-200">
+            Ti-6Al-4V TITANIUM
+          </button>
         </div>
-        <div class="text-center p-3 border border-gray-200 bg-white">
-          <div class="text-[#CC0000] font-bold">Cr</div>
-          <div class="text-gray-500">17.5-20%</div>
+      </div>
+
+      <!-- 304 Stainless Steel Composition -->
+      <div id="composition-stainless-{{ section.id }}" class="material-composition">
+        <div class="hud-spec-label mb-4">[ MATERIAL_COMPOSITION: 304_STAINLESS_STEEL ]</div>
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 hud-mono text-sm">
+          <div class="text-center p-3 border border-gray-200 bg-white">
+            <div class="text-[#CC0000] font-bold">Fe</div>
+            <div class="text-gray-500">66-74%</div>
+          </div>
+          <div class="text-center p-3 border border-gray-200 bg-white">
+            <div class="text-[#CC0000] font-bold">Cr</div>
+            <div class="text-gray-500">17.5-20%</div>
+          </div>
+          <div class="text-center p-3 border border-gray-200 bg-white">
+            <div class="text-[#CC0000] font-bold">Ni</div>
+            <div class="text-gray-500">8-11%</div>
+          </div>
+          <div class="text-center p-3 border border-gray-200 bg-white">
+            <div class="text-[#CC0000] font-bold">Mn</div>
+            <div class="text-gray-500">≤2%</div>
+          </div>
+          <div class="text-center p-3 border border-gray-200 bg-white">
+            <div class="text-[#CC0000] font-bold">Si</div>
+            <div class="text-gray-500">≤1%</div>
+          </div>
+          <div class="text-center p-3 border border-gray-200 bg-white">
+            <div class="text-[#CC0000] font-bold">C</div>
+            <div class="text-gray-500">≤0.08%</div>
+          </div>
         </div>
-        <div class="text-center p-3 border border-gray-200 bg-white">
-          <div class="text-[#CC0000] font-bold">Ni</div>
-          <div class="text-gray-500">8-11%</div>
+        <div class="mt-4 text-xs text-gray-400 hud-mono">
+          DENSITY: 8.00 g/cm³ | MELTING POINT: 1400-1450°C | TENSILE STRENGTH: 515 MPa
         </div>
-        <div class="text-center p-3 border border-gray-200 bg-white">
-          <div class="text-[#CC0000] font-bold">Mn</div>
-          <div class="text-gray-500">≤2%</div>
+      </div>
+
+      <!-- Ti-6Al-4V Titanium Alloy Composition -->
+      <div id="composition-titanium-{{ section.id }}" class="material-composition hidden">
+        <div class="hud-spec-label mb-4">[ MATERIAL_COMPOSITION: Ti-6Al-4V_GRADE_5 ]</div>
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 hud-mono text-sm">
+          <div class="text-center p-3 border border-gray-200 bg-white">
+            <div class="text-[#CC0000] font-bold">Ti</div>
+            <div class="text-gray-500">87.6-91%</div>
+          </div>
+          <div class="text-center p-3 border border-gray-200 bg-white">
+            <div class="text-[#CC0000] font-bold">Al</div>
+            <div class="text-gray-500">5.5-6.75%</div>
+          </div>
+          <div class="text-center p-3 border border-gray-200 bg-white">
+            <div class="text-[#CC0000] font-bold">V</div>
+            <div class="text-gray-500">3.5-4.5%</div>
+          </div>
+          <div class="text-center p-3 border border-gray-200 bg-white">
+            <div class="text-[#CC0000] font-bold">Fe</div>
+            <div class="text-gray-500">≤0.3%</div>
+          </div>
+          <div class="text-center p-3 border border-gray-200 bg-white">
+            <div class="text-[#CC0000] font-bold">O</div>
+            <div class="text-gray-500">≤0.2%</div>
+          </div>
+          <div class="text-center p-3 border border-gray-200 bg-white">
+            <div class="text-[#CC0000] font-bold">C</div>
+            <div class="text-gray-500">≤0.08%</div>
+          </div>
         </div>
-        <div class="text-center p-3 border border-gray-200 bg-white">
-          <div class="text-[#CC0000] font-bold">Si</div>
-          <div class="text-gray-500">≤1%</div>
-        </div>
-        <div class="text-center p-3 border border-gray-200 bg-white">
-          <div class="text-[#CC0000] font-bold">C</div>
-          <div class="text-gray-500">≤0.08%</div>
+        <div class="mt-4 text-xs text-gray-400 hud-mono">
+          DENSITY: 4.43 g/cm³ | MELTING POINT: 1604-1660°C | TENSILE STRENGTH: 950 MPa
         </div>
       </div>
     </div>
+
+    <script>
+      function switchMaterial(sectionId, material) {
+        const stainlessBtn = document.getElementById('btn-stainless-' + sectionId);
+        const titaniumBtn = document.getElementById('btn-titanium-' + sectionId);
+        const stainlessComp = document.getElementById('composition-stainless-' + sectionId);
+        const titaniumComp = document.getElementById('composition-titanium-' + sectionId);
+        
+        if (material === 'stainless') {
+          stainlessBtn.classList.add('border-[#CC0000]', 'bg-[#CC0000]', 'text-white');
+          stainlessBtn.classList.remove('border-gray-300', 'bg-white', 'text-gray-600');
+          titaniumBtn.classList.remove('border-[#CC0000]', 'bg-[#CC0000]', 'text-white');
+          titaniumBtn.classList.add('border-gray-300', 'bg-white', 'text-gray-600');
+          stainlessComp.classList.remove('hidden');
+          titaniumComp.classList.add('hidden');
+        } else {
+          titaniumBtn.classList.add('border-[#CC0000]', 'bg-[#CC0000]', 'text-white');
+          titaniumBtn.classList.remove('border-gray-300', 'bg-white', 'text-gray-600');
+          stainlessBtn.classList.remove('border-[#CC0000]', 'bg-[#CC0000]', 'text-white');
+          stainlessBtn.classList.add('border-gray-300', 'bg-white', 'text-gray-600');
+          titaniumComp.classList.remove('hidden');
+          stainlessComp.classList.add('hidden');
+        }
+        
+        // Also toggle the SPEC_01 card content
+        const spec01Stainless = document.getElementById('spec01-stainless-' + sectionId);
+        const spec01Titanium = document.getElementById('spec01-titanium-' + sectionId);
+        
+        if (spec01Stainless && spec01Titanium) {
+          if (material === 'stainless') {
+            spec01Stainless.classList.remove('hidden');
+            spec01Titanium.classList.add('hidden');
+          } else {
+            spec01Titanium.classList.remove('hidden');
+            spec01Stainless.classList.add('hidden');
+          }
+        }
+      }
+    </script>
   </div>
 </div>
 

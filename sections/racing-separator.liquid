@@ -1,0 +1,158 @@
+<!-- =========================================
+     VELOCITY TICKER: High-Performance Separator
+     Sleek, infinite-scrolling telemetry strip
+========================================== -->
+
+<div class="relative w-full h-14 bg-black overflow-hidden flex items-center border-y border-zinc-900">
+  
+  <!-- Left/Right Fades for Depth -->
+  <div class="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-black to-transparent z-10"></div>
+  <div class="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-black to-transparent z-10"></div>
+
+  <!-- Marquee Container -->
+  <div class="marquee-container flex whitespace-nowrap overflow-hidden w-full">
+    
+    <!-- Track 1 -->
+    <div class="marquee-content flex items-center gap-12 px-6 animate-marquee">
+      {%- for i in (1..6) -%}
+        <div class="flex items-center gap-12">
+          <span class="hud-mono text-xs tracking-[0.2em] text-zinc-500">
+            ENGINE_TEMP: <span class="text-white">89°C</span>
+          </span>
+          <span class="hud-mono text-xs tracking-[0.2em] text-zinc-500">
+            <span class="w-2 h-2 inline-block rounded-full bg-[#CC0000] mr-2 animate-pulse"></span>
+            SYSTEM_STATUS: <span class="text-[#CC0000]">ARMED</span>
+          </span>
+          <span class="hud-mono text-xs tracking-[0.2em] text-zinc-500">
+            AIR_INTAKE: <span class="text-white">109%</span>
+          </span>
+          <span class="hud-mono text-xs tracking-[0.2em] text-zinc-500">
+            RPM: <span class="text-white">7,200</span>
+          </span>
+          <span class="hud-mono text-xs tracking-[0.2em] text-zinc-500 flex items-center gap-3">
+             <span class="text-[#CC0000]">///</span>
+             <span class="ticker-brand-content flex items-center">
+               {%- assign ticker_logo = section.settings.ticker_logo | default: settings.logo -%}
+               {%- if ticker_logo != blank -%}
+                 {{ ticker_logo | image_url: width: 200 | image_tag: class: 'h-8 w-auto object-contain opacity-90 grayscale hover:grayscale-0 transition-all duration-300', loading: 'lazy' }}
+               {%- else -%}
+                 <span class="text-white font-bold italic">{{ shop.name }}</span>
+               {%- endif -%}
+             </span>
+             <span class="text-[#CC0000]">///</span>
+          </span>
+        </div>
+      {%- endfor -%}
+    </div>
+
+    <!-- Track 2 (Duplicate for seamless loop) -->
+    <div class="marquee-content flex items-center gap-12 px-6 animate-marquee" aria-hidden="true">
+      {%- for i in (1..6) -%}
+        <div class="flex items-center gap-12">
+           <span class="hud-mono text-xs tracking-[0.2em] text-zinc-500">
+            ENGINE_TEMP: <span class="text-white">89°C</span>
+          </span>
+          <span class="hud-mono text-xs tracking-[0.2em] text-zinc-500">
+            <span class="w-2 h-2 inline-block rounded-full bg-[#CC0000] mr-2 animate-pulse"></span>
+            SYSTEM_STATUS: <span class="text-[#CC0000]">ARMED</span>
+          </span>
+          <span class="hud-mono text-xs tracking-[0.2em] text-zinc-500">
+            AIR_INTAKE: <span class="text-white">109%</span>
+          </span>
+          <span class="hud-mono text-xs tracking-[0.2em] text-zinc-500">
+            RPM: <span class="text-white">7,200</span>
+          </span>
+          <span class="hud-mono text-xs tracking-[0.2em] text-zinc-500 flex items-center gap-3">
+             <span class="text-[#CC0000]">///</span>
+             <span class="ticker-brand-content flex items-center">
+               {%- assign ticker_logo = section.settings.ticker_logo | default: settings.logo -%}
+               {%- if ticker_logo != blank -%}
+                 {{ ticker_logo | image_url: width: 200 | image_tag: class: 'h-8 w-auto object-contain opacity-90 grayscale hover:grayscale-0 transition-all duration-300', loading: 'lazy' }}
+               {%- else -%}
+                 <span class="text-white font-bold italic">{{ shop.name }}</span>
+               {%- endif -%}
+             </span>
+             <span class="text-[#CC0000]">///</span>
+          </span>
+        </div>
+      {%- endfor -%}
+    </div>
+
+  </div>
+</div>
+
+<script>
+  (function() {
+    // Attempt to fetch logo from API if standard Liquid logo is missing
+    const updateTickerLogo = async () => {
+      try {
+        // Only fetch if we are showing the text fallback (implied by checking if we have an img already?? 
+        // Or just fetch and overwrite to be safe/consistent with header?)
+        // Let's check if the user has manually set a logo first to avoid overriding manual settings.
+        // We can check if the rendered content has an 'img' tag.
+        
+        const brandContainers = document.querySelectorAll('.ticker-brand-content');
+        if (brandContainers.length === 0) return;
+
+        // If the first one already has an image (from Liquid), we assume it's good.
+        if (brandContainers[0].querySelector('img')) return;
+
+        const res = await fetch('https://skm-inventory-api.miaotingshuo.workers.dev/shop/profile');
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        if (data.logo && data.logo.trim() !== '') {
+          brandContainers.forEach(container => {
+            container.innerHTML = `<img src="${data.logo}" alt="{{ shop.name }}" class="h-8 w-auto object-contain opacity-90 grayscale hover:grayscale-0 transition-all duration-300">`;
+          });
+        }
+      } catch (e) {
+        console.error('Ticker logo update failed:', e);
+      }
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', updateTickerLogo);
+    } else {
+      updateTickerLogo();
+    }
+  })();
+</script>
+
+<style>
+  .animate-marquee {
+    animation: marquee 60s linear infinite;
+  }
+
+  @keyframes marquee {
+    0% {
+      transform: translateX(0%);
+    }
+    100% {
+      transform: translateX(-100%);
+    }
+  }
+
+  /* Pause on hover for interaction */
+  .marquee-container:hover .animate-marquee {
+    animation-play-state: paused;
+  }
+</style>
+
+{% schema %}
+{
+  "name": "Velocity Ticker",
+  "settings": [
+    {
+      "type": "image_picker",
+      "id": "ticker_logo",
+      "label": "Custom Ticker Logo"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Velocity Ticker"
+    }
+  ]
+}
+{% endschema %}

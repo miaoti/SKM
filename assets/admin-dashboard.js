@@ -1323,6 +1323,7 @@
       container.innerHTML = '<p class="text-sm text-gray-400 text-center py-2">No options defined. Add options like "Material" or "Size" to create variants.</p>';
       $('new-variants-section').classList.add('hidden');
       $('new-media-option-mapping').classList.add('hidden');
+      updateNewPricingFieldsState();
       return;
     }
 
@@ -1331,7 +1332,7 @@
         <div class="flex items-center gap-2 mb-2">
           <input type="text" class="new-option-name flex-1 h-8 px-2 text-sm border border-gray-200 rounded" 
                  placeholder="Option name (e.g., Material)" value="${opt.name}" data-idx="${idx}">
-          <button class="btn-remove-new-option text-xs text-red-500 hover:text-red-700 px-2" data-idx="${idx}">âœ•</button>
+          <button class="btn-remove-new-option text-xs text-red-500 hover:text-red-700 px-2" data-idx="${idx}">&#10005;</button>
         </div>
         <div class="flex items-center gap-2 mb-2">
           <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
@@ -1347,7 +1348,7 @@
       return `
               <span class="inline-flex items-center gap-1 px-2 py-1 bg-white border border-gray-200 text-xs rounded ${opt.isAddOn && priceModifier ? 'border-blue-200' : ''}">
                 ${v}${opt.isAddOn && priceModifier ? ` (+$${priceModifier})` : ''}
-                <button class="btn-remove-new-value text-gray-400 hover:text-red-500" data-opt-idx="${idx}" data-val-idx="${vi}">Ã—</button>
+                <button class="btn-remove-new-value text-gray-400 hover:text-red-500" data-opt-idx="${idx}" data-val-idx="${vi}">&#215;</button>
               </span>
             `;
     }).join('')}
@@ -1533,6 +1534,45 @@
         </tr>
       `;
     }).join('');
+
+    // Update pricing fields state based on variants
+    updateNewPricingFieldsState();
+  }
+
+  // Update new product pricing fields based on variants
+  function updateNewPricingFieldsState() {
+    const notice = $('new-pricing-variant-notice');
+    const container = $('new-pricing-fields-container');
+    if (!notice || !container) return;
+
+    // Check if there are inventory-affecting options (non-add-on options with values)
+    const hasInventoryOptions = newProductPending.options.some(o => o.name && o.values.length > 0 && !o.isAddOn);
+
+    if (hasInventoryOptions) {
+      // Show notice and disable pricing fields
+      notice.classList.remove('hidden');
+      container.classList.add('opacity-60');
+
+      ['new-price', 'new-compare-price', 'new-b2b-price', 'new-discount-price'].forEach(id => {
+        const el = $(id);
+        if (el) {
+          el.disabled = true;
+          el.classList.add('bg-gray-100', 'cursor-not-allowed');
+        }
+      });
+    } else {
+      // Hide notice and enable pricing fields
+      notice.classList.add('hidden');
+      container.classList.remove('opacity-60');
+
+      ['new-price', 'new-compare-price', 'new-b2b-price', 'new-discount-price'].forEach(id => {
+        const el = $(id);
+        if (el) {
+          el.disabled = false;
+          el.classList.remove('bg-gray-100', 'cursor-not-allowed');
+        }
+      });
+    }
   }
 
   function renderNewMediaMapping() {
@@ -1913,7 +1953,7 @@
             <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
               <div class="flex items-center justify-between mb-3">
                 <h4 class="text-sm font-semibold text-gray-900">Edit Vehicle</h4>
-                <button class="cancel-edit text-xs text-gray-500 hover:text-gray-700" data-id="${v.id}">âœ• Cancel</button>
+                <button class="cancel-edit text-xs text-gray-500 hover:text-gray-700" data-id="${v.id}">&#10005; Cancel</button>
               </div>
               <div class="grid grid-cols-4 gap-3 mb-3">
                 <div>
@@ -2420,9 +2460,17 @@
       $('cust-address').innerHTML = '<p class="text-gray-400">No address on file</p>';
     }
 
-    // Stats
-    $('cust-orders').textContent = c.ordersCount || 0;
-    $('cust-spent').textContent = `$${parseFloat(c.totalSpent || 0).toFixed(2)}`;
+    // Stats - Total Orders = all orders, Total Spent = only non-refunded
+    // Always use recentOrders length for order count (includes all orders)
+    const ordersCount = c.recentOrders?.length || c.ordersCount || 0;
+    // For total spent: use Shopify's amountSpent (excludes refunded), 
+    // or calculate from non-refunded orders in recentOrders
+    const totalSpent = parseFloat(c.totalSpent || 0) ||
+      (c.recentOrders?.filter(o => o.financial !== 'REFUNDED')
+        .reduce((sum, o) => sum + parseFloat(o.total || 0), 0) || 0);
+
+    $('cust-orders').textContent = ordersCount;
+    $('cust-spent').textContent = `$${totalSpent.toFixed(2)}`;
     $('cust-since').textContent = c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '-';
 
     // Recent orders
@@ -2877,6 +2925,7 @@
       container.innerHTML = '<p class="text-sm text-gray-400 text-center py-2">No options defined. Add options like "Material" or "Size" to create variants.</p>';
       $('variants-section').classList.add('hidden');
       $('media-option-mapping').classList.add('hidden');
+      updatePricingFieldsState(); // Re-enable pricing fields when no options
       return;
     }
 
@@ -3167,6 +3216,9 @@
     } else if (infoDiv) {
       infoDiv.remove();
     }
+
+    // Update pricing fields state based on variants
+    updatePricingFieldsState();
   }
 
   function generateCombinations(options) {
@@ -3331,6 +3383,40 @@
     renderOptionsEditor();
     generateVariantsPreview();
     renderMediaMapping(product);
+    updatePricingFieldsState();
+  }
+
+  // Update pricing fields based on whether product has variants
+  function updatePricingFieldsState() {
+    const hasVariants = variantState.options.some(o => o.name && o.values.length > 0 && !o.isAddOn);
+    const hasMultipleVariants = variantState.variants && variantState.variants.length > 1;
+    const shouldDisable = hasVariants || hasMultipleVariants;
+
+    const notice = $('pricing-variant-notice');
+    const container = $('pricing-fields-container');
+
+    // Show/hide notice
+    if (notice) notice.classList.toggle('hidden', !shouldDisable);
+
+    // Disable/enable fields
+    const priceFields = ['edit-price', 'edit-compare-price', 'edit-b2b-price', 'edit-discount-price'];
+    priceFields.forEach(id => {
+      const field = $(id);
+      if (field) {
+        field.disabled = shouldDisable;
+        field.classList.toggle('bg-gray-100', shouldDisable);
+        field.classList.toggle('cursor-not-allowed', shouldDisable);
+      }
+    });
+
+    // Hide remove discount button when disabled
+    if (shouldDisable) {
+      const removeBtn = $('btn-remove-discount');
+      if (removeBtn) removeBtn.classList.add('hidden');
+    }
+
+    // Add opacity to container
+    if (container) container.classList.toggle('opacity-60', shouldDisable);
   }
 
   // Media-Option Mapping

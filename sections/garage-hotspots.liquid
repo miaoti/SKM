@@ -37,22 +37,25 @@
 
       <!-- Technical Hotspots -->
       {%- for block in section.blocks -%}
-        <div class="hotspot-container absolute group" 
+        <div class="hotspot-container absolute" 
+             id="hotspot-{{ section.id }}-{{ forloop.index }}"
+             data-hotspot-index="{{ forloop.index }}"
              style="top: {{ block.settings.top }}%; left: {{ block.settings.left }}%;"
              {{ block.shopify_attributes }}>
           
           <!-- Pulsing Hotspot -->
-          <div class="relative flex items-center justify-center w-10 h-10 cursor-pointer">
+          <div class="relative flex items-center justify-center w-10 h-10 cursor-pointer hotspot-trigger"
+               onclick="toggleHotspot('{{ section.id }}', {{ forloop.index }})">
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#CC0000] opacity-40"></span>
             <span class="relative inline-flex rounded-full h-4 w-4 bg-[#CC0000] border-2 border-white shadow-lg"></span>
             
             <!-- Connector Line -->
-            <div class="absolute w-8 h-[1px] bg-[#CC0000] opacity-0 group-hover:opacity-100 transition-opacity" 
+            <div class="hotspot-connector absolute w-8 h-[1px] bg-[#CC0000] opacity-0 transition-opacity" 
                  style="left: 100%; top: 50%;"></div>
           </div>
           
           <!-- Technical Tooltip -->
-          <div class="absolute z-20 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300
+          <div class="hotspot-tooltip absolute z-20 opacity-0 invisible transition-all duration-300
                       {% if block.settings.left > 50 %}right-full mr-4{% else %}left-full ml-4{% endif %}
                       top-1/2 -translate-y-1/2">
             <div class="bg-black text-white p-5 text-sm w-72 shadow-2xl border border-[#CC0000]/30 relative">
@@ -89,17 +92,17 @@
         </div>
       {%- endfor -%}
       
-      <!-- Corner Annotations -->
-      <div class="absolute top-4 left-4 hud-mono text-[10px] text-gray-400">
+      <!-- Corner Annotations with backdrop for readability -->
+      <div class="absolute top-4 left-4 hud-mono text-[10px] text-white bg-black/60 px-2 py-1 rounded backdrop-blur-sm">
         REV: 2.0 | SCALE: 1:1
       </div>
-      <div class="absolute top-4 right-4 hud-mono text-[10px] text-gray-400">
+      <div class="absolute top-4 right-4 hud-mono text-[10px] text-white bg-black/60 px-2 py-1 rounded backdrop-blur-sm">
         DWG: SKM-EX-001
       </div>
-      <div class="absolute bottom-4 left-4 hud-mono text-[10px] text-gray-400">
+      <div class="absolute bottom-4 left-4 hud-mono text-[10px] text-white bg-black/60 px-2 py-1 rounded backdrop-blur-sm">
         MATERIAL: 304 STAINLESS STEEL
       </div>
-      <div class="absolute bottom-4 right-4 hud-mono text-[10px] text-gray-400">
+      <div class="absolute bottom-4 right-4 hud-mono text-[10px] text-white bg-black/60 px-2 py-1 rounded backdrop-blur-sm">
         TOLERANCE: ±0.5mm
       </div>
     </div>
@@ -107,7 +110,9 @@
     <!-- Component Legend -->
     <div class="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {%- for block in section.blocks limit: 4 -%}
-        <div class="p-4 border border-gray-200 bg-white hover:border-[#CC0000] transition-colors cursor-pointer group">
+        <div class="legend-item p-4 border border-gray-200 bg-white hover:border-[#CC0000] transition-colors cursor-pointer group"
+             onclick="activateHotspot('{{ section.id }}', {{ forloop.index }})"
+             data-legend-index="{{ forloop.index }}">
           <div class="flex items-start gap-3">
             <div class="w-3 h-3 bg-[#CC0000] mt-1 flex-shrink-0"></div>
             <div>
@@ -121,6 +126,110 @@
     
   </div>
 </div>
+
+<!-- Hotspot Click Interaction Scripts -->
+<script>
+  // Track active hotspot per section
+  const activeHotspots = {};
+  
+  // Toggle hotspot tooltip when clicking on the hotspot dot
+  function toggleHotspot(sectionId, index) {
+    const hotspot = document.getElementById('hotspot-' + sectionId + '-' + index);
+    if (!hotspot) return;
+    
+    const tooltip = hotspot.querySelector('.hotspot-tooltip');
+    const connector = hotspot.querySelector('.hotspot-connector');
+    
+    // Close any other open hotspots in this section
+    if (activeHotspots[sectionId] && activeHotspots[sectionId] !== index) {
+      closeHotspot(sectionId, activeHotspots[sectionId]);
+    }
+    
+    // Toggle this hotspot
+    if (tooltip.classList.contains('opacity-100')) {
+      // Close it
+      tooltip.classList.remove('opacity-100', 'visible');
+      tooltip.classList.add('opacity-0', 'invisible');
+      connector.classList.remove('opacity-100');
+      connector.classList.add('opacity-0');
+      activeHotspots[sectionId] = null;
+    } else {
+      // Open it
+      tooltip.classList.add('opacity-100', 'visible');
+      tooltip.classList.remove('opacity-0', 'invisible');
+      connector.classList.add('opacity-100');
+      connector.classList.remove('opacity-0');
+      activeHotspots[sectionId] = index;
+    }
+  }
+  
+  // Close a specific hotspot
+  function closeHotspot(sectionId, index) {
+    const hotspot = document.getElementById('hotspot-' + sectionId + '-' + index);
+    if (!hotspot) return;
+    
+    const tooltip = hotspot.querySelector('.hotspot-tooltip');
+    const connector = hotspot.querySelector('.hotspot-connector');
+    
+    tooltip.classList.remove('opacity-100', 'visible');
+    tooltip.classList.add('opacity-0', 'invisible');
+    connector.classList.remove('opacity-100');
+    connector.classList.add('opacity-0');
+  }
+  
+  // Activate hotspot from legend click (scroll and show)
+  function activateHotspot(sectionId, index) {
+    const hotspot = document.getElementById('hotspot-' + sectionId + '-' + index);
+    if (!hotspot) return;
+    
+    // Scroll the hotspot into view
+    hotspot.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    // After scrolling, toggle the hotspot
+    setTimeout(() => {
+      // Close any other open hotspots
+      if (activeHotspots[sectionId] && activeHotspots[sectionId] !== index) {
+        closeHotspot(sectionId, activeHotspots[sectionId]);
+      }
+      
+      // Open this hotspot
+      const tooltip = hotspot.querySelector('.hotspot-tooltip');
+      const connector = hotspot.querySelector('.hotspot-connector');
+      
+      tooltip.classList.add('opacity-100', 'visible');
+      tooltip.classList.remove('opacity-0', 'invisible');
+      connector.classList.add('opacity-100');
+      connector.classList.remove('opacity-0');
+      activeHotspots[sectionId] = index;
+      
+      // Highlight the legend item
+      document.querySelectorAll('.legend-item').forEach(item => {
+        item.classList.remove('border-[#CC0000]', 'bg-red-50');
+      });
+      const legendItem = document.querySelector('[data-legend-index="' + index + '"]');
+      if (legendItem) {
+        legendItem.classList.add('border-[#CC0000]', 'bg-red-50');
+      }
+    }, 400);
+  }
+  
+  // Close hotspots when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.hotspot-container') && !e.target.closest('.legend-item')) {
+      // Close all active hotspots
+      Object.keys(activeHotspots).forEach(sectionId => {
+        if (activeHotspots[sectionId]) {
+          closeHotspot(sectionId, activeHotspots[sectionId]);
+          activeHotspots[sectionId] = null;
+        }
+      });
+      // Remove legend highlights
+      document.querySelectorAll('.legend-item').forEach(item => {
+        item.classList.remove('border-[#CC0000]', 'bg-red-50');
+      });
+    }
+  });
+</script>
 
 {% schema %}
 {

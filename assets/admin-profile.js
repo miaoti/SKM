@@ -152,6 +152,17 @@
             // Update Logo Preview
             updateLogoPreview(data.logo);
 
+            // Update Favicon from shop logo
+            if (data.logo) {
+                let favicon = document.querySelector('link[rel="icon"]') || document.querySelector('link[rel="shortcut icon"]');
+                if (!favicon) {
+                    favicon = document.createElement('link');
+                    favicon.rel = 'icon';
+                    document.head.appendChild(favicon);
+                }
+                favicon.href = data.logo;
+            }
+
         } catch (error) {
             console.error('Error loading profile:', error);
             if (toast) toast('Failed to load shop profile', 'error');
@@ -175,8 +186,7 @@
         };
 
         const profileData = {
-            name: getInputVal('shop-name'),
-            email: getInputVal('shop-email'),
+            // Note: name and email are not included because Shopify doesn't allow changing them via API
             logo: getInputVal('shop-logo-url'),
             social_twitter: getInputVal('social-twitter'),
             social_instagram: getInputVal('social-instagram'),
@@ -196,10 +206,7 @@
 
             if (!res.ok) throw new Error('Failed to save profile');
 
-            // Update Title if changed
-            document.title = `Inventory Manager | ${profileData.name}`;
-            const headerName = document.querySelector('header span.font-semibold');
-            if (headerName) headerName.textContent = profileData.name;
+            // Note: Shop name is read-only, so we don't update the title or header here
 
             // Update Logo Preview
             updateLogoPreview(profileData.logo);

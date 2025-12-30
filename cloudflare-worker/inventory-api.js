@@ -6149,7 +6149,7 @@ async function getShopProfile(env) {
     social_youtube: ""
   };
 
-  // Override with Metafield if exists
+  // Override with Metafield if exists (except name - always use real Shopify name)
   if (shop.metafield?.value) {
     try {
       const savedProfile = JSON.parse(shop.metafield.value);
@@ -6158,6 +6158,10 @@ async function getShopProfile(env) {
       console.error("Failed to parse shop profile metafield", e);
     }
   }
+
+  // Always use the real Shopify shop name and email (cannot be changed via API)
+  profile.name = shop.name;
+  profile.email = shop.email;
 
   return profile;
 }

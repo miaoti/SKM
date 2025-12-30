@@ -1,4 +1,4 @@
-﻿{% layout none %}
+{% layout none %}
 {% comment %}
   SKM INVENTORY MANAGER - Full Product & Vehicle Management
 {% endcomment %}
@@ -21,6 +21,12 @@
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Favicon: Uses theme favicon, dynamically updated from shop profile logo -->
+  {%- if settings.favicon != blank -%}
+    <link rel="icon" type="image/png" href="{{ settings.favicon | image_url: width: 32, height: 32 }}">
+  {%- endif -%}
+  
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } } }</script>
   
@@ -613,7 +619,14 @@
                 <!-- Pricing -->
                 <div class="bg-white rounded-xl border border-gray-200 p-5">
                   <h2 class="text-sm font-semibold text-gray-900 mb-4">Pricing</h2>
-                  <div class="space-y-4">
+                  
+                  <!-- Variant Pricing Notice -->
+                  <div id="pricing-variant-notice" class="hidden mb-4 flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <svg class="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <p class="text-xs text-gray-600">This product has variants. Edit prices in the <span class="font-medium text-gray-700">Options & Variants</span> section below.</p>
+                  </div>
+                  
+                  <div id="pricing-fields-container" class="space-y-4">
                     <div>
                       <label class="text-xs font-medium text-gray-600 mb-1 block">Price</label>
                       <div class="relative">
@@ -643,10 +656,10 @@
                           <input type="number" step="0.01" id="edit-discount-price" class="w-full h-10 pl-7 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="Leave empty for no discount">
                         </div>
                         <button type="button" id="btn-remove-discount" class="h-10 px-3 text-xs text-red-600 hover:text-white border border-red-200 hover:bg-red-600 rounded-lg transition-colors whitespace-nowrap hidden" title="Remove discount and restore original price">
-                          âœ• Remove
+                          &#10005; Remove
                         </button>
                       </div>
-                      <p id="discount-active" class="hidden text-xs text-green-600 mt-1">âœ“ Discount active</p>
+                      <p id="discount-active" class="hidden text-xs text-green-600 mt-1">&#10003; Discount active</p>
                     </div>
                   </div>
                 </div>
@@ -657,7 +670,7 @@
                   
                   <!-- Not Tracked Warning -->
                   <div id="inventory-not-tracked" class="hidden mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p class="text-sm text-yellow-800 mb-2">âš ï¸ Inventory tracking is disabled for this product.</p>
+                    <p class="text-sm text-yellow-800 mb-2">⚠️ Inventory tracking is disabled for this product.</p>
                     <button id="btn-enable-tracking" class="text-xs text-white bg-yellow-600 hover:bg-yellow-700 px-3 py-1.5 rounded">Enable Tracking</button>
                   </div>
                   
@@ -909,7 +922,12 @@
                 <!-- Pricing -->
                 <div class="bg-white rounded-xl border border-gray-200 p-5">
                   <h2 class="text-sm font-semibold text-gray-900 mb-4">Pricing</h2>
-                  <div class="space-y-4">
+                  <!-- Notice when product has variants -->
+                  <div id="new-pricing-variant-notice" class="hidden mb-4 flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <svg class="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <p class="text-xs text-gray-600">This product has variants. Edit prices in the <span class="font-medium text-gray-700">Options & Variants</span> section above.</p>
+                  </div>
+                  <div id="new-pricing-fields-container" class="space-y-4">
                     <div>
                       <label class="text-xs font-medium text-gray-600 mb-1 block">Price *</label>
                       <div class="relative">
