@@ -83,34 +83,37 @@
 
 <script>
   (function() {
-    // Attempt to fetch logo from API if standard Liquid logo is missing
     const updateTickerLogo = async () => {
       try {
-        // Only fetch if we are showing the text fallback (implied by checking if we have an img already?? 
-        // Or just fetch and overwrite to be safe/consistent with header?)
-        // Let's check if the user has manually set a logo first to avoid overriding manual settings.
-        // We can check if the rendered content has an 'img' tag.
-        
         const brandContainers = document.querySelectorAll('.ticker-brand-content');
-        if (brandContainers.length === 0) return;
+        if (brandContainers.length === 0) {
+          console.log('Ticker: No brand containers found');
+          return;
+        }
 
-        // If the first one already has an image (from Liquid), we assume it's good.
-        if (brandContainers[0].querySelector('img')) return;
-
+        console.log('Ticker: Fetching logo from API...');
         const res = await fetch('https://skm-inventory-api.miaotingshuo.workers.dev/shop/profile');
-        if (!res.ok) return;
+        if (!res.ok) {
+          console.error('Ticker: API request failed', res.status);
+          return;
+        }
         const data = await res.json();
+        console.log('Ticker: API response', data);
         
         if (data.logo && data.logo.trim() !== '') {
+          console.log('Ticker: Injecting logo', data.logo);
           brandContainers.forEach(container => {
-            container.innerHTML = `<img src="${data.logo}" alt="{{ shop.name }}" class="h-8 w-auto object-contain opacity-90 grayscale hover:grayscale-0 transition-all duration-300">`;
+            container.innerHTML = `<img src="${data.logo}" alt="Store Logo" style="height: 28px; width: auto; min-width: 80px; display: inline-block; object-fit: contain;">`;
           });
+        } else {
+          console.log('Ticker: No logo in API response');
         }
       } catch (e) {
         console.error('Ticker logo update failed:', e);
       }
     };
 
+    // Run on DOMContentLoaded or immediately if already loaded
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', updateTickerLogo);
     } else {
