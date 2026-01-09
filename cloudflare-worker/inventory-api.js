@@ -8,7 +8,7 @@
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Admin-Key",
+  "Access-Control-Allow-Headers": "Content-Type, X-Admin-Key, X-Customer-Signature",
 };
 
 // Helper: Return JSON response with CORS
@@ -82,7 +82,9 @@ export default {
     // Authentication check (skip for health check, B2B storefront, and public dealer endpoints)
     const publicPaths = ["/health", "/b2b/checkout", "/b2b/cart-preview", "/checkout/create", "/shop/profile", "/categories", "/dealers", "/apply-dealer", "/my-dealer"];
     const isPublicDealerPath = path.startsWith("/dealers/") && request.method === "GET";
-    if (!publicPaths.includes(path) && !isPublicDealerPath) {
+    const isCustomerUpdate = path.startsWith("/customers/") && request.method === "PUT";
+
+    if (!publicPaths.includes(path) && !isPublicDealerPath && !isCustomerUpdate) {
       const clientKey = request.headers.get("X-Admin-Key");
       if (clientKey !== env.ADMIN_SECRET) {
         return errorResponse("Unauthorized", 401);
@@ -133,7 +135,8 @@ export default {
         case path.match(/^\/customers\/[^/]+$/) && request.method === "PUT":
           const updateCustomerId = path.split("/").pop();
           const updateCustomerBody = await request.json();
-          return jsonResponse(await updateCustomer(env, updateCustomerId, updateCustomerBody));
+          const signature = request.headers.get("X-Customer-Signature");
+          return jsonResponse(await updateCustomerProfile(env, updateCustomerId, updateCustomerBody, signature));
 
         case path.match(/^\/customers\/[^/]+\/tags$/) && request.method === "POST":
           const tagCustomerId = path.split("/")[2];
@@ -438,6 +441,8 @@ export default {
         case path.match(/^\/orders\/[^/]+\/send-receipt$/) && request.method === "POST":
           const receiptOrderId = path.split("/")[2];
           return jsonResponse(await sendOrderReceipt(env, receiptOrderId));
+
+
 
         // ==========================================
         // DEALER MANAGEMENT ROUTES
@@ -6907,39 +6912,127 @@ async function getShippingRates(env, orderId) {
 }
 
 /**
+ * Update customer profile (name, email, phone, password)
+ * Used by Customer Account page
+ */
+async function updateCustomerProfile(env, customerId, data, signature) {
+  // 1. Security Check: Verify Signature
+  // This ensures the request comes from the authenticated storefront session
+  const secret = "skm-customer-update-secret";
+  const expectedSignature = await hmacSha256(secret, customerId);
+
+  if (!signature || signature !== expectedSignature) {
+    // Log for debugging
+    console.warn(`[Auth Fail] ID: ${customerId}, Sig: ${signature}, Expected: ${expectedSignature}`);
+    throw new Error("Unauthorized: Invalid signature");
+  }
+
+  // Add global ID prefix if missing
+  const gid = customerId.startsWith("gid://") ? customerId : `gid://shopify/Customer/${customerId}`;
+
+  let input = {
+    id: gid
+  };
+
+  if (data.firstName) input.firstName = data.firstName;
+  if (data.lastName) input.lastName = data.lastName;
+  if (data.email) input.email = data.email;
+  // Format phone number to E.164 if possible, or just pass it through for Shopify to validate
+  if (data.phone) input.phone = data.phone;
+  if (data.password) input.password = data.password;
+
+  const mutation = `
+    mutation customerUpdate($input: CustomerInput!) {
+      customerUpdate(input: $input) {
+        customer {
+          id
+          firstName
+          lastName
+          email
+          phone
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  try {
+    const result = await shopifyGraphQL(env, mutation, { input });
+
+    if (result.customerUpdate?.userErrors?.length > 0) {
+      const errorMessages = result.customerUpdate.userErrors.map(e => e.message).join(', ');
+      throw new Error(errorMessages);
+    }
+
+    return { success: true, customer: result.customerUpdate.customer };
+  } catch (e) {
+    console.error('[updateCustomerProfile] Error:', e);
+    throw new Error(`Failed to update profile: ${e.message}`);
+  }
+}
+
+/**
+ * HMCA SHA256 Helper
+ */
+async function hmacSha256(secret, message) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(message)
+  );
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
  * Send order confirmation email
  */
 async function sendOrderReceipt(env, orderId) {
   const gid = orderId.startsWith("gid://") ? orderId : `gid://shopify/Order/${orderId}`;
 
-  // Use REST API for sending invoice/receipt as GraphQL doesn't have this mutation
-  const numericId = orderId.startsWith("gid://") ? orderId.split("/").pop() : orderId;
-
-  const response = await fetch(
-    `https://${env.SHOPIFY_DOMAIN}/admin/api/2024-01/orders/${numericId}/send_invoice.json`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": env.SHOPIFY_ACCESS_TOKEN,
-      },
-      body: JSON.stringify({
-        order_invoice: {
-          to: null, // Uses order email
-          from: null, // Uses shop email
-          subject: null, // Uses default subject
-          custom_message: null
+  // Use GraphQL orderInvoiceSend mutation to send order notification
+  const mutation = `
+    mutation OrderInvoiceSend($id: ID!) {
+      orderInvoiceSend(id: $id) {
+        order {
+          id
+          name
         }
-      })
+        userErrors {
+          field
+          message
+        }
+      }
     }
-  );
+  `;
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to send receipt: ${error}`);
+  try {
+    const result = await shopifyGraphQL(env, mutation, { id: gid });
+
+    console.log('[sendOrderReceipt] Response:', JSON.stringify(result));
+
+    if (result.orderInvoiceSend?.userErrors?.length > 0) {
+      const errorMessages = result.orderInvoiceSend.userErrors.map(e => e.message).join(', ');
+      throw new Error(errorMessages);
+    }
+
+    return { success: true, message: "Order receipt sent" };
+  } catch (err) {
+    console.error('[sendOrderReceipt] Error:', err);
+    throw new Error(`Failed to send receipt: ${err.message}`);
   }
-
-  return { success: true, message: "Order receipt sent" };
 }
 
 // ============================================
@@ -7243,6 +7336,37 @@ async function updateDealer(env, id, data) {
       fields.push({ key, value: data[key] });
     }
   });
+
+  // Handle B2B account switching
+  if (data.accountSwitch) {
+    const { oldCustomerId, newCustomerId } = data.accountSwitch;
+
+    console.log('[updateDealer] Account switch detected:', data.accountSwitch);
+
+    try {
+      // Remove b2b and dealer tags from old customer
+      // NOTE: This only removes b2b/dealer, any other tags (like 'admin') are preserved
+      if (oldCustomerId) {
+        console.log('[updateDealer] Removing b2b/dealer tags from old customer:', oldCustomerId);
+        await removeCustomerTags(env, oldCustomerId, ['b2b', 'dealer']);
+      }
+
+      // Add b2b and dealer tags to new customer
+      // NOTE: tagsAdd only adds tags, it does NOT remove existing tags
+      // If the new customer already has 'admin' or other tags, they will be preserved
+      if (newCustomerId) {
+        console.log('[updateDealer] Adding b2b/dealer tags to new customer:', newCustomerId);
+        await addCustomerTags(env, newCustomerId, ['b2b', 'dealer']);
+
+        // Update the customer_id field in dealer metaobject
+        const newCustomerGid = newCustomerId.startsWith('gid://') ? newCustomerId : `gid://shopify/Customer/${newCustomerId}`;
+        fields.push({ key: 'customer_id', value: newCustomerGid });
+      }
+    } catch (err) {
+      console.error('[updateDealer] Error during account switch:', err);
+      return { success: false, error: 'Failed to switch B2B account: ' + err.message };
+    }
+  }
 
   // Auto-geocode if address fields are being updated or lat/lng is missing
   if (data.address || data.city || data.state || data.zip) {

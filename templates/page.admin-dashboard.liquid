@@ -1709,9 +1709,24 @@
             
             <!-- Active Dealers -->
             <div class="bg-white rounded-xl border border-gray-200">
-              <div class="p-5 border-b border-gray-100 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-gray-900">Active Dealers</h2>
-                <span id="active-dealer-count" class="text-xs text-gray-500">0 dealers</span>
+              <div class="p-5 border-b border-gray-100">
+                <div class="flex items-center justify-between mb-3">
+                  <h2 class="text-sm font-semibold text-gray-900">All Dealers</h2>
+                  <span id="active-dealer-count" class="text-xs text-gray-500">0 dealers</span>
+                </div>
+                <!-- Search and Sort Controls -->
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <div class="flex-1">
+                    <input type="text" id="dealer-search" placeholder="Search by name, email, or location..." class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                  </div>
+                  <select id="dealer-sort" class="h-9 px-3 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-500">
+                    <option value="name-asc">Name (A-Z)</option>
+                    <option value="name-desc">Name (Z-A)</option>
+                    <option value="location-asc">Location (A-Z)</option>
+                    <option value="location-desc">Location (Z-A)</option>
+                    <option value="status">Status</option>
+                  </select>
+                </div>
               </div>
               <div id="active-dealers-list" class="divide-y divide-gray-100">
                 <div class="p-8 text-center text-gray-400">Loading...</div>
@@ -1785,9 +1800,23 @@
                   <label class="text-xs font-medium text-gray-600 mb-1 block">Phone</label>
                   <input type="tel" id="edit-dealer-phone" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg">
                 </div>
-                <div>
-                  <label class="text-xs font-medium text-gray-600 mb-1 block">Email</label>
-                  <input type="email" id="edit-dealer-email" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg">
+                <div class="relative">
+                  <label class="text-xs font-medium text-gray-600 mb-1 block">Connected Account Email</label>
+                  <input type="text" id="edit-dealer-email" name="dealer_customer_search_nofill" autocomplete="new-password" data-lpignore="true" data-form-type="other" placeholder="Search for customer account..." class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                  <input type="hidden" id="edit-dealer-customer-id">
+                  <input type="hidden" id="edit-dealer-original-email">
+                  <input type="hidden" id="edit-dealer-original-customer-id">
+                  <!-- Customer search suggestions dropdown -->
+                  <div id="dealer-email-suggestions" class="hidden absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    <!-- Suggestions populated by JavaScript -->
+                  </div>
+                  <!-- Validation message -->
+                  <p id="dealer-email-validation" class="hidden text-xs text-red-500 mt-1"></p>
+                  <!-- Selected customer info -->
+                  <div id="dealer-email-selected" class="hidden mt-2 p-2 bg-gray-50 rounded-lg text-sm">
+                    <span class="text-gray-600">Linked to: </span>
+                    <span id="dealer-email-selected-name" class="font-medium text-gray-900"></span>
+                  </div>
                 </div>
               </div>
               <div>
@@ -1837,6 +1866,33 @@
   
   <!-- Toast -->
   <div id="toast" class="fixed bottom-4 right-4 z-50"></div>
+  
+  <!-- Custom Confirm Modal -->
+  <div id="confirm-modal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 hidden">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden transform transition-all">
+      <div class="p-6">
+        <div class="flex items-start gap-4">
+          <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+            <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <h3 id="confirm-modal-title" class="text-lg font-semibold text-gray-900">Confirm Action</h3>
+            <p id="confirm-modal-message" class="mt-2 text-sm text-gray-600">Are you sure you want to proceed?</p>
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+        <button id="confirm-modal-cancel" class="h-10 px-5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">
+          Cancel
+        </button>
+        <button id="confirm-modal-ok" class="h-10 px-5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
   
   <!-- Auth Modal -->
   <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 hidden">

@@ -59,6 +59,67 @@
     }
   };
 
+  /**
+   * Show custom confirm modal (replaces browser's native confirm())
+   * @param {string} message - The message to display
+   * @param {string} title - Optional title (defaults to "Confirm Action")
+   * @returns {Promise<boolean>} - Resolves true if OK, false if Cancel
+   */
+  function showConfirmModal(message, title = 'Confirm Action') {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('confirm-modal');
+      const titleEl = document.getElementById('confirm-modal-title');
+      const messageEl = document.getElementById('confirm-modal-message');
+      const okBtn = document.getElementById('confirm-modal-ok');
+      const cancelBtn = document.getElementById('confirm-modal-cancel');
+
+      if (!modal || !titleEl || !messageEl || !okBtn || !cancelBtn) {
+        // Fallback to native confirm if modal elements not found
+        resolve(confirm(message));
+        return;
+      }
+
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      modal.classList.remove('hidden');
+
+      // Focus the cancel button for safety
+      cancelBtn.focus();
+
+      const cleanup = () => {
+        modal.classList.add('hidden');
+        okBtn.removeEventListener('click', handleOk);
+        cancelBtn.removeEventListener('click', handleCancel);
+        document.removeEventListener('keydown', handleKeydown);
+      };
+
+      const handleOk = () => {
+        cleanup();
+        resolve(true);
+      };
+
+      const handleCancel = () => {
+        cleanup();
+        resolve(false);
+      };
+
+      const handleKeydown = (e) => {
+        if (e.key === 'Escape') {
+          handleCancel();
+        } else if (e.key === 'Enter') {
+          handleOk();
+        }
+      };
+
+      okBtn.addEventListener('click', handleOk);
+      cancelBtn.addEventListener('click', handleCancel);
+      document.addEventListener('keydown', handleKeydown);
+    });
+  }
+
+  // Expose showConfirmModal globally for other scripts
+  window.showConfirmModal = showConfirmModal;
+
   // UI Helpers
   function toast(msg, type = 'info') {
     const t = document.createElement('div');
@@ -275,7 +336,8 @@
     try {
       // Clear pending media when switching products (with warning if any)
       if (S.pendingMedia.length > 0) {
-        if (!confirm(`You have ${S.pendingMedia.length} unsaved media. Switch anyway?`)) return;
+        const confirmed = await showConfirmModal(`You have ${S.pendingMedia.length} unsaved media. Switch anyway?`, 'Unsaved Media');
+        if (!confirmed) return;
         S.pendingMedia.forEach(item => URL.revokeObjectURL(item.preview));
         S.pendingMedia = [];
       }
@@ -506,7 +568,8 @@
     g.querySelectorAll('.delete-media').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (!confirm('Delete this image?')) return;
+        const confirmed = await showConfirmModal('Delete this image?', 'Delete Image');
+        if (!confirmed) return;
         try {
           const pid = S.selected.id.split('/').pop();
           // Extract just the numeric ID from the full GID
@@ -750,7 +813,9 @@
   // DELETE PRODUCT
   // ==========================================
   $('btn-delete-product').addEventListener('click', async () => {
-    if (!S.selected || !confirm('Delete this product? This cannot be undone.')) return;
+    if (!S.selected) return;
+    const confirmed = await showConfirmModal('Delete this product? This cannot be undone.', 'Delete Product');
+    if (!confirmed) return;
     try {
       const pid = S.selected.id.split('/').pop();
       await api.del(`/products/${pid}`);
@@ -2047,7 +2112,8 @@
     // Bind delete buttons
     tbody.querySelectorAll('.del-vehicle').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('Delete this vehicle?')) return;
+        const confirmed = await showConfirmModal('Delete this vehicle?', 'Delete Vehicle');
+        if (!confirmed) return;
         try {
           await api.del(`/vehicles/${btn.dataset.id.split('/').pop()}`);
           toast('Vehicle deleted', 'success');
@@ -2529,7 +2595,8 @@
     container.querySelectorAll('.remove-tag').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (!confirm(`Remove tag "${btn.dataset.tag}"?`)) return;
+        const confirmed = await showConfirmModal(`Remove tag "${btn.dataset.tag}"?`, 'Remove Tag');
+        if (!confirmed) return;
         try {
           const custId = S.selectedCustomer.id.split('/').pop();
           await api.del(`/customers/${custId}/tags`, { tags: [btn.dataset.tag] });
@@ -2750,7 +2817,8 @@
 
   // Delete custom package
   async function deletePackage(packageId) {
-    if (!confirm('Delete this package?')) return;
+    const confirmed = await showConfirmModal('Delete this package?', 'Delete Package');
+    if (!confirmed) return;
     try {
       await api.del(`/shipping/packages/${packageId}`);
       toast('Package deleted', 'success');
