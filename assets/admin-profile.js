@@ -6,20 +6,67 @@
 (function (window) {
     'use strict';
 
+    // Track if profile tab has been initialized
+    let profileInitialized = false;
+
+    // Export init function for lazy loading
+    window.AdminProfile = {
+        init: function () {
+            if (profileInitialized) return;
+
+            if (window.AdminDashboard && document.getElementById('tab-profile')) {
+                const { API_BASE, api, toast } = window.AdminDashboard;
+                initProfileTab(API_BASE, api, toast);
+                profileInitialized = true;
+            }
+        }
+    };
+
+    /**
+     * Load just the favicon from shop profile (called on page load)
+     * This runs independently of the profile tab to ensure favicon is always set
+     */
+    async function loadFavicon() {
+        try {
+            if (!window.AdminDashboard) return;
+            const { API_BASE, api } = window.AdminDashboard;
+            if (!API_BASE || !api) return;
+
+            const baseUrl = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE;
+            const res = await fetch(`${baseUrl}/shop/profile`, {
+                method: 'GET',
+                headers: api.headers()
+            });
+
+            if (!res.ok) return;
+            const data = await res.json();
+
+            // Update Favicon from shop logo
+            if (data.logo) {
+                let favicon = document.querySelector('link[rel="icon"]') || document.querySelector('link[rel="shortcut icon"]');
+                if (!favicon) {
+                    favicon = document.createElement('link');
+                    favicon.rel = 'icon';
+                    document.head.appendChild(favicon);
+                }
+                favicon.href = data.logo;
+            }
+        } catch (e) {
+            console.log('Favicon load skipped:', e.message);
+        }
+    }
+
+    // Handle deep linking for profile tab and load favicon
     document.addEventListener('DOMContentLoaded', () => {
-        // Handle deep linking for profile tab if global switcher exists
         const hash = window.location.hash.replace('#', '');
         if (hash === 'profile' && window.switchToTab) {
             window.switchToTab('profile');
         }
 
-        // Initialize if context is available
-        // window.AdminDashboard is set by page.admin-dashboard.liquid
-        if (window.AdminDashboard && document.getElementById('tab-profile')) {
-            const { API_BASE, api, toast } = window.AdminDashboard;
-            initProfileTab(API_BASE, api, toast);
-        }
+        // Load favicon after a short delay to ensure AdminDashboard is initialized
+        setTimeout(() => loadFavicon(), 1000);
     });
+
 
     function initProfileTab(API_BASE, api, toast) {
         if (!API_BASE || !api) {

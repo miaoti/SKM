@@ -170,9 +170,12 @@ I have set up the following Metaobjects and Metafields in my Shopify Admin. Plea
   - Remove discount button (×) to clear variant discount price
   - Vehicle/fitment management
   - Customer management with B2B tagging
-  - **NEW:** Automatic product-level metafield updates when variants are saved
-  - **NEW:** Decimal-precise price input handling
-  - **NEW:** Dealers Management (Active Dealer CRUD, Pending Application Review)
+  - Automatic product-level metafield updates when variants are saved
+  - Decimal-precise price input handling
+  - Dealers Management (Active Dealer CRUD, Pending Application Review)
+  - Lazy Loading - Data is fetched only when tabs are activated to improve performance
+  - Loading animations during API data fetching
+  - Deferred initialization of category management and shop profile scripts
 
 ---
 
@@ -240,3 +243,10 @@ I have set up the following Metaobjects and Metafields in my Shopify Admin. Plea
 - **Mobile-optimized forms** and navigation
 - **Touch-friendly buttons** and interactions
 - **Adaptive sidebar** for admin dashboard
+
+### Performance Optimization: Lazy Loading (Jan 2026)
+- **Tabbed Lazy Loading:** Admin dashboard no longer loads all data (Products, Vehicles, Customers, Orders) upfront.
+- **On-Demand Fetching:** Data is fetched only when a user clicks the respective tab for the first time.
+- **State Management:** Tracking `S.dataLoaded` flags to prevent redundant API calls.
+- **Deferred Script Init:** `admin-categories.js` and `admin-profile.js` are initialized only when their tabs are visited.
+- **Favicon Fix:** Logo/Favicon is loaded via a separate lightweight call on page load (decoupled from the profile tab) to ensure it appears immediately while other data is deferred.

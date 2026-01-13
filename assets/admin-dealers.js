@@ -11,6 +11,11 @@ let currentDealerId = null;
 let currentAppEmail = null;
 let currentAppBusiness = null;
 
+// Dealers cache for search/sort without refetching
+let allDealers = [];
+let dealerSearchTimeout = null;
+let dealerEmailSearchTimeout = null;
+
 // Initialize on tab click
 document.addEventListener('DOMContentLoaded', () => {
   // Tab switching handler
@@ -35,6 +40,87 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-reject-app')?.addEventListener('click', () => processApp('reject'));
   document.getElementById('btn-save-dealer')?.addEventListener('click', saveDealer);
   document.getElementById('btn-delete-dealer')?.addEventListener('click', deleteDealer);
+
+  // Dealer search handler (debounced)
+  document.getElementById('dealer-search')?.addEventListener('input', (e) => {
+    clearTimeout(dealerSearchTimeout);
+    dealerSearchTimeout = setTimeout(() => {
+      renderDealersList();
+    }, 300);
+  });
+
+  // Dealer sort handler
+  document.getElementById('dealer-sort')?.addEventListener('change', () => {
+    renderDealersList();
+  });
+
+  // Email autocomplete for Edit Dealer modal
+  const dealerEmailInput = document.getElementById('edit-dealer-email');
+  const emailSuggestions = document.getElementById('dealer-email-suggestions');
+
+  if (dealerEmailInput) {
+    // Search customers when typing in email field
+    dealerEmailInput.addEventListener('input', (e) => {
+      clearTimeout(dealerEmailSearchTimeout);
+      const query = e.target.value.trim();
+
+      // Hide validation message while typing
+      const validationEl = document.getElementById('dealer-email-validation');
+      if (validationEl) validationEl.classList.add('hidden');
+
+      // Clear selected customer if typing new value
+      document.getElementById('edit-dealer-customer-id').value = '';
+      document.getElementById('dealer-email-selected')?.classList.add('hidden');
+
+      if (query.length < 2) {
+        emailSuggestions?.classList.add('hidden');
+        return;
+      }
+
+      dealerEmailSearchTimeout = setTimeout(async () => {
+        try {
+          const result = await window.AdminDashboard.api.get(`/customers?q=${encodeURIComponent(query)}`);
+          const customers = result.data || result;
+
+          if (customers && customers.length > 0) {
+            emailSuggestions.innerHTML = customers.slice(0, 8).map(cust => `
+              <div class="customer-suggestion p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0" 
+                   data-id="${cust.id}" data-email="${cust.email || ''}" data-name="${cust.displayName || cust.email}">
+                <div class="font-medium text-sm text-gray-900">${cust.displayName || 'Customer'}</div>
+                <div class="text-xs text-gray-500">${cust.email}</div>
+                ${cust.tags?.includes('b2b') ? '<span class="text-[10px] px-1 py-0.5 bg-blue-100 text-blue-700 rounded mt-1 inline-block">B2B</span>' : ''}
+              </div>
+            `).join('');
+            emailSuggestions.classList.remove('hidden');
+
+            // Add click handlers to suggestions
+            emailSuggestions.querySelectorAll('.customer-suggestion').forEach(el => {
+              el.addEventListener('click', () => {
+                const email = el.dataset.email;
+                const id = el.dataset.id;
+                const name = el.dataset.name;
+                selectDealerCustomer(email, id, name);
+              });
+            });
+          } else {
+            emailSuggestions.innerHTML = '<div class="p-3 text-sm text-gray-400">No customers found</div>';
+            emailSuggestions.classList.remove('hidden');
+          }
+        } catch (err) {
+          console.error('Customer search error:', err);
+          emailSuggestions.innerHTML = '<div class="p-3 text-sm text-red-400">Search failed</div>';
+          emailSuggestions.classList.remove('hidden');
+        }
+      }, 300);
+    });
+
+    // Close suggestions on blur (with delay for click to register)
+    dealerEmailInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        emailSuggestions?.classList.add('hidden');
+      }, 200);
+    });
+  }
 
   // Handle deep linking from email - check URL params
   const urlParams = new URLSearchParams(window.location.search);
@@ -77,6 +163,152 @@ async function initDealersTab() {
   } catch (err) {
     console.error('[Dealers] Tab initialization failed:', err);
   }
+}
+
+/**
+ * View dealer's connected customer account
+ * Switches to Customers tab, searches for the dealer's email, and auto-selects the customer
+ */
+window.viewDealerAccount = async function (email) {
+  if (!email) return;
+
+  // Switch to customers tab using the exposed switchToTab function
+  if (window.AdminDashboard?.switchToTab) {
+    window.AdminDashboard.switchToTab('customers');
+
+    // Populate the search field
+    const searchInput = document.getElementById('customer-search');
+    if (searchInput) {
+      searchInput.value = email;
+    }
+
+    try {
+      // Use the API to search for the customer by email
+      const result = await window.AdminDashboard.api.get(`/customers?q=${encodeURIComponent(email)}`);
+      const customers = result.data || result;
+
+      if (customers && customers.length > 0) {
+        // Find exact email match first, otherwise use first result
+        const exactMatch = customers.find(c => c.email?.toLowerCase() === email.toLowerCase());
+        const customer = exactMatch || customers[0];
+
+        // Store customers in state and render the list
+        if (window.AdminDashboard.S) {
+          window.AdminDashboard.S.customers = customers;
+        }
+
+        // Get the customer ID for selection
+        const customerId = customer.id.includes('gid://')
+          ? customer.id.split('/').pop()
+          : customer.id;
+
+        // Fetch full customer details and display
+        const fullCustomer = await window.AdminDashboard.api.get(`/customers/${customerId}`);
+
+        if (window.AdminDashboard.S) {
+          window.AdminDashboard.S.selectedCustomer = fullCustomer;
+        }
+
+        // Trigger a re-render of the customer list to show the updated selection
+        const listContainer = document.getElementById('customer-list');
+        if (listContainer) {
+          // Re-render with selection highlight
+          listContainer.innerHTML = customers.map(cust => `
+            <div class="customer-item p-3 cursor-pointer hover:bg-gray-50 ${cust.id === customer.id ? 'bg-red-50' : ''}" data-id="${cust.id}">
+              <div class="flex items-center justify-between">
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-900 truncate">${cust.displayName || cust.email}</p>
+                  <p class="text-xs text-gray-500 truncate">${cust.email}</p>
+                </div>
+                <div class="flex gap-1 ml-2">
+                  ${cust.tags?.includes('admin') ? '<span class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-100 text-purple-700">Admin</span>' : ''}
+                  ${cust.tags?.includes('b2b') ? '<span class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-100 text-blue-700">B2B</span>' : ''}
+                </div>
+              </div>
+            </div>
+          `).join('');
+
+          // Update count
+          const countEl = document.getElementById('customer-count');
+          if (countEl) countEl.textContent = `${customers.length} customers`;
+        }
+
+        // Show the customer editor panel
+        const emptyState = document.getElementById('customer-empty');
+        const editor = document.getElementById('customer-editor');
+        if (emptyState) emptyState.classList.add('hidden');
+        if (editor) editor.classList.remove('hidden');
+
+        // Populate the customer editor fields
+        document.getElementById('cust-name').textContent = fullCustomer.displayName || `${fullCustomer.firstName || ''} ${fullCustomer.lastName || ''}`.trim() || 'Customer';
+        document.getElementById('cust-email').textContent = fullCustomer.email || '-';
+        document.getElementById('cust-state').textContent = fullCustomer.state || 'ENABLED';
+        document.getElementById('cust-firstname').value = fullCustomer.firstName || '';
+        document.getElementById('cust-lastname').value = fullCustomer.lastName || '';
+        document.getElementById('cust-email-edit').value = fullCustomer.email || '';
+        document.getElementById('cust-phone').value = fullCustomer.phone || '';
+        document.getElementById('cust-note').value = fullCustomer.note || '';
+        document.getElementById('cust-orders').textContent = fullCustomer.ordersCount || '0';
+        document.getElementById('cust-spent').textContent = fullCustomer.totalSpent ? `$${parseFloat(fullCustomer.totalSpent).toFixed(2)}` : '$0.00';
+        document.getElementById('cust-since').textContent = fullCustomer.createdAt ? new Date(fullCustomer.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '-';
+
+        // Display address
+        const addressEl = document.getElementById('cust-address');
+        if (addressEl && fullCustomer.address) {
+          const addr = fullCustomer.address;
+          addressEl.innerHTML = [addr.address1, addr.address2, `${addr.city || ''}, ${addr.province || ''} ${addr.zip || ''}`, addr.country].filter(Boolean).join('<br>');
+        } else if (addressEl) {
+          addressEl.innerHTML = '<p class="text-gray-400">No address on file</p>';
+        }
+
+        // Render tags
+        const tagsContainer = document.getElementById('cust-tags');
+        if (tagsContainer && fullCustomer.tags) {
+          tagsContainer.innerHTML = fullCustomer.tags.map(tag => `
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
+              ${tag}
+              <button class="remove-tag text-gray-400 hover:text-red-500" data-tag="${tag}">&times;</button>
+            </span>
+          `).join('');
+        }
+
+        showToast('Customer account loaded', 'success');
+      } else {
+        showToast('No customer found with that email', 'error');
+      }
+    } catch (err) {
+      console.error('[viewDealerAccount] Error loading customer:', err);
+      showToast('Failed to load customer: ' + err.message, 'error');
+    }
+  }
+}
+
+/**
+ * Select a customer for dealer email field
+ * Called when user clicks a customer from the autocomplete dropdown
+ */
+function selectDealerCustomer(email, customerId, name) {
+  // Set the email input value
+  const emailInput = document.getElementById('edit-dealer-email');
+  if (emailInput) emailInput.value = email;
+
+  // Store the customer ID
+  const customerIdInput = document.getElementById('edit-dealer-customer-id');
+  if (customerIdInput) customerIdInput.value = customerId;
+
+  // Show the selected customer info
+  const selectedEl = document.getElementById('dealer-email-selected');
+  const selectedNameEl = document.getElementById('dealer-email-selected-name');
+  if (selectedEl && selectedNameEl) {
+    selectedNameEl.textContent = `${name} (${email})`;
+    selectedEl.classList.remove('hidden');
+  }
+
+  // Hide the suggestions dropdown
+  document.getElementById('dealer-email-suggestions')?.classList.add('hidden');
+
+  // Hide validation error if any
+  document.getElementById('dealer-email-validation')?.classList.add('hidden');
 }
 
 /**
@@ -156,63 +388,129 @@ async function loadPendingApplications() {
 }
 
 /**
- * Load active dealers
+ * Load active dealers (fetches from API and caches)
  */
 async function loadActiveDealers() {
   const container = document.getElementById('active-dealers-list');
   const countEl = document.getElementById('active-dealer-count');
 
-  // Update section header to reflect we show all dealers
-  const headerEl = container.parentElement.querySelector('h2');
-  if (headerEl) headerEl.textContent = 'All Dealers';
-
   try {
     const data = await window.AdminDashboard.api.get('/dealers?status=all');
 
     // Handle both array response and {success, data} response formats
-    const dealers = Array.isArray(data) ? data : (data.data || []);
+    allDealers = Array.isArray(data) ? data : (data.data || []);
 
-    if (!dealers || dealers.length === 0) {
-      container.innerHTML = '<div class="p-8 text-center text-gray-400">No active dealers</div>';
-      countEl.textContent = '0 dealers';
-      return;
-    }
-
-    countEl.textContent = `${dealers.length} dealers`;
-
-    container.innerHTML = dealers.map(dealer => `
-      <div class="p-4 flex items-center justify-between hover:bg-gray-50">
-        <div class="flex items-center gap-4">
-          <div class="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-            ${dealer.logo
-        ? `<img src="${dealer.logo}" alt="${dealer.name}" class="w-full h-full object-cover">`
-        : dealer.website
-          ? `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(dealer.website.replace(/^https?:\/\//, '').split('/')[0])}&sz=64" alt="${dealer.name}" class="w-8 h-8" onerror="this.parentElement.innerHTML='<svg class=\\'w-6 h-6 text-gray-400\\' fill=\\'none\\' viewBox=\\'0 0 24 24\\' stroke=\\'currentColor\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' stroke-width=\\'1.5\\' d=\\'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4\\'/></svg>'">`
-          : `<svg class="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                </svg>`
-      }
-          </div>
-          <div>
-            <h3 class="font-medium text-gray-900">${dealer.name}</h3>
-            <p class="text-sm text-gray-500">${[dealer.city, dealer.state].filter(Boolean).join(', ') || 'No location'}</p>
-          </div>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="px-2 py-1 text-xs font-medium rounded-full ${dealer.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}">${dealer.status || 'active'}</span>
-          <button onclick="editDealer('${dealer.id}')" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-    `).join('');
+    // Render the dealers list
+    renderDealersList();
 
   } catch (err) {
     console.error('Failed to load dealers:', err);
     container.innerHTML = '<div class="p-8 text-center text-red-500">Failed to load dealers</div>';
   }
+}
+
+/**
+ * Render dealers list with search and sort applied
+ */
+function renderDealersList() {
+  const container = document.getElementById('active-dealers-list');
+  const countEl = document.getElementById('active-dealer-count');
+  const searchInput = document.getElementById('dealer-search');
+  const sortSelect = document.getElementById('dealer-sort');
+
+  const searchQuery = (searchInput?.value || '').toLowerCase().trim();
+  const sortBy = sortSelect?.value || 'name-asc';
+
+  // Filter dealers by search query (fuzzy match on name, email, city, state)
+  let filteredDealers = allDealers;
+  if (searchQuery) {
+    filteredDealers = allDealers.filter(dealer => {
+      const name = (dealer.name || '').toLowerCase();
+      const email = (dealer.email || '').toLowerCase();
+      const city = (dealer.city || '').toLowerCase();
+      const state = (dealer.state || '').toLowerCase();
+      const location = `${city} ${state}`;
+
+      return name.includes(searchQuery) ||
+        email.includes(searchQuery) ||
+        city.includes(searchQuery) ||
+        state.includes(searchQuery) ||
+        location.includes(searchQuery);
+    });
+  }
+
+  // Sort dealers
+  filteredDealers = [...filteredDealers].sort((a, b) => {
+    switch (sortBy) {
+      case 'name-asc':
+        return (a.name || '').localeCompare(b.name || '');
+      case 'name-desc':
+        return (b.name || '').localeCompare(a.name || '');
+      case 'location-asc':
+        const locA = [a.city, a.state].filter(Boolean).join(', ');
+        const locB = [b.city, b.state].filter(Boolean).join(', ');
+        return locA.localeCompare(locB);
+      case 'location-desc':
+        const locA2 = [a.city, a.state].filter(Boolean).join(', ');
+        const locB2 = [b.city, b.state].filter(Boolean).join(', ');
+        return locB2.localeCompare(locA2);
+      case 'status':
+        return (a.status || '').localeCompare(b.status || '');
+      default:
+        return 0;
+    }
+  });
+
+  // Update count (showing filtered count if searching)
+  if (searchQuery) {
+    countEl.textContent = `${filteredDealers.length} of ${allDealers.length} dealers`;
+  } else {
+    countEl.textContent = `${filteredDealers.length} dealers`;
+  }
+
+  if (!filteredDealers.length) {
+    container.innerHTML = searchQuery
+      ? '<div class="p-8 text-center text-gray-400">No dealers match your search</div>'
+      : '<div class="p-8 text-center text-gray-400">No dealers found</div>';
+    return;
+  }
+
+  container.innerHTML = filteredDealers.map(dealer => `
+    <div class="p-4 flex items-center justify-between hover:bg-gray-50">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+          ${dealer.logo
+      ? `<img src="${dealer.logo}" alt="${dealer.name}" class="w-full h-full object-cover">`
+      : dealer.website
+        ? `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(dealer.website.replace(/^https?:\/\//, '').split('/')[0])}&sz=64" alt="${dealer.name}" class="w-8 h-8" onerror="this.parentElement.innerHTML='<svg class=\\'w-6 h-6 text-gray-400\\' fill=\\'none\\' viewBox=\\'0 0 24 24\\' stroke=\\'currentColor\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' stroke-width=\\'1.5\\' d=\\'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4\\'/></svg>'">`
+        : `<svg class="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>`
+    }
+        </div>
+        <div>
+          <h3 class="font-medium text-gray-900">${dealer.name}</h3>
+          <p class="text-sm text-gray-500">${[dealer.city, dealer.state].filter(Boolean).join(', ') || 'No location'}</p>
+          ${dealer.email ? `
+            <button onclick="viewDealerAccount('${dealer.email}')" class="text-xs text-red-600 hover:text-red-700 hover:underline flex items-center gap-1 mt-1">
+              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+              </svg>
+              ${dealer.email}
+            </button>
+          ` : ''}
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-1 text-xs font-medium rounded-full ${dealer.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}">${dealer.status || 'active'}</span>
+        <button onclick="editDealer('${dealer.id}')" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  `).join('');
 }
 
 /**
@@ -418,6 +716,25 @@ window.editDealer = async function (dealerId) {
     document.getElementById('edit-dealer-state').value = dealer.state || '';
     document.getElementById('edit-dealer-zip').value = dealer.zip || '';
     document.getElementById('edit-dealer-website').value = dealer.website || '';
+
+    // Store original email and customer ID for tracking changes
+    document.getElementById('edit-dealer-original-email').value = dealer.email || '';
+    document.getElementById('edit-dealer-original-customer-id').value = dealer.customer_id || '';
+    document.getElementById('edit-dealer-customer-id').value = dealer.customer_id || '';
+
+    // Show currently linked customer info if email exists
+    const selectedEl = document.getElementById('dealer-email-selected');
+    const selectedNameEl = document.getElementById('dealer-email-selected-name');
+    if (selectedEl && selectedNameEl && dealer.email) {
+      selectedNameEl.textContent = dealer.email;
+      selectedEl.classList.remove('hidden');
+    } else if (selectedEl) {
+      selectedEl.classList.add('hidden');
+    }
+
+    // Clear any validation messages
+    document.getElementById('dealer-email-validation')?.classList.add('hidden');
+
     // Populate hours (handle object or string)
     let hoursText = '';
     if (typeof dealer.hours === 'string') hoursText = dealer.hours;
@@ -443,6 +760,37 @@ async function saveDealer() {
 
   const btn = document.getElementById('btn-save-dealer');
   const originalText = btn.textContent;
+
+  // Get email values
+  const newEmail = document.getElementById('edit-dealer-email')?.value || '';
+  const originalEmail = document.getElementById('edit-dealer-original-email')?.value || '';
+  const newCustomerId = document.getElementById('edit-dealer-customer-id')?.value || '';
+  const originalCustomerId = document.getElementById('edit-dealer-original-customer-id')?.value || '';
+
+  // Check if email is changing
+  const emailChanged = newEmail.toLowerCase() !== originalEmail.toLowerCase();
+
+  if (emailChanged) {
+    // If email changed but no customer selected from autocomplete, show validation error
+    if (!newCustomerId) {
+      const validationEl = document.getElementById('dealer-email-validation');
+      if (validationEl) {
+        validationEl.textContent = 'Please select a valid customer account from the suggestions';
+        validationEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    // Confirm the account switch
+    const confirmed = await window.showConfirmModal(
+      `This will change the linked B2B account from "${originalEmail}" to "${newEmail}". The old account will lose B2B access. Continue?`,
+      'Change Linked Account'
+    );
+    if (!confirmed) {
+      return;
+    }
+  }
+
   btn.textContent = 'Saving...';
   btn.disabled = true;
 
@@ -450,7 +798,7 @@ async function saveDealer() {
     const data = {
       name: document.getElementById('edit-dealer-name').value,
       phone: document.getElementById('edit-dealer-phone').value,
-      email: document.getElementById('edit-dealer-email').value,
+      email: newEmail,
       address: document.getElementById('edit-dealer-address').value,
       city: document.getElementById('edit-dealer-city').value,
       state: document.getElementById('edit-dealer-state').value,
@@ -459,6 +807,16 @@ async function saveDealer() {
       hours: { display: document.getElementById('edit-dealer-hours').value },
       status: document.getElementById('edit-dealer-status').value
     };
+
+    // If email changed, include account switching data for the API to handle B2B tags
+    if (emailChanged) {
+      data.accountSwitch = {
+        oldEmail: originalEmail,
+        oldCustomerId: originalCustomerId,
+        newEmail: newEmail,
+        newCustomerId: newCustomerId
+      };
+    }
 
     const result = await window.AdminDashboard.api.put(`/dealers/${encodeURIComponent(currentDealerId)}`, data);
 
@@ -485,7 +843,11 @@ async function saveDealer() {
 async function deleteDealer() {
   if (!currentDealerId) return;
 
-  if (!confirm('Are you sure you want to delete this dealer? This action cannot be undone.')) {
+  const confirmed = await window.showConfirmModal(
+    'Are you sure you want to delete this dealer? This action cannot be undone.',
+    'Delete Dealer'
+  );
+  if (!confirmed) {
     return;
   }
 
@@ -553,5 +915,5 @@ function showToast(message, type = 'info') {
     </div>
   `;
 
-  setTimeout(() => { toast.innerHTML = ''; }, 4000);
+  setTimeout(() => { toast.innerHTML = ''; }, 5000);
 }

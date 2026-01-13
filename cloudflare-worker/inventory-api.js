@@ -153,6 +153,21 @@ export default {
           return jsonResponse(await listCategories(env, vehicleIdParam));
 
         // ==========================================
+        // TYPES ROUTES (Product Type Management)
+        // ==========================================
+        case path === "/types" && request.method === "GET":
+          return jsonResponse(await listProductTypes(env));
+
+        case path.match(/^\/types\/[^/]+$/) && request.method === "PUT":
+          const oldTypeName = decodeURIComponent(path.split("/").pop());
+          const renameBody = await request.json();
+          return jsonResponse(await renameProductType(env, oldTypeName, renameBody.newName));
+
+        case path.match(/^\/types\/[^/]+$/) && request.method === "DELETE":
+          const typeToDelete = decodeURIComponent(path.split("/").pop());
+          return jsonResponse(await deleteProductType(env, typeToDelete));
+
+        // ==========================================
         // PRODUCT ROUTES
         // ==========================================
         case path === "/products" && request.method === "GET":
@@ -1071,6 +1086,156 @@ async function listCategoriesForVehicle(env, vehicleId) {
     .sort((a, b) => b.count - a.count);
 
   return { success: true, data: categories, count: categories.length, vehicleFiltered: true };
+}
+
+// ============================================
+// PRODUCT TYPE MANAGEMENT OPERATIONS (Admin)
+// ============================================
+
+/**
+ * List all product types with enhanced details (product IDs for each type)
+ */
+async function listProductTypes(env) {
+  const query = `
+    query ListProductTypesWithIds($first: Int!, $after: String) {
+      products(first: $first, after: $after) {
+        edges {
+          node {
+            id
+            productType
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `;
+
+  const typeData = {}; // { typeName: { count, productIds: [] } }
+  let hasNextPage = true;
+  let cursor = null;
+
+  while (hasNextPage) {
+    const result = await shopifyGraphQL(env, query, { first: 250, after: cursor });
+
+    for (const edge of result.products.edges) {
+      const type = edge.node.productType;
+      if (type && type.trim() !== '') {
+        const normalizedType = type.trim();
+        if (!typeData[normalizedType]) {
+          typeData[normalizedType] = { count: 0, productIds: [] };
+        }
+        typeData[normalizedType].count++;
+        typeData[normalizedType].productIds.push(edge.node.id);
+      }
+    }
+
+    hasNextPage = result.products.pageInfo.hasNextPage;
+    cursor = result.products.pageInfo.endCursor;
+  }
+
+  const types = Object.entries(typeData)
+    .map(([name, data]) => ({
+      name,
+      count: data.count,
+      productIds: data.productIds,
+      handle: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+      canDelete: data.count === 0
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  return { success: true, data: types, count: types.length };
+}
+
+/**
+ * Rename a product type (updates all products with that type)
+ */
+async function renameProductType(env, oldName, newName) {
+  if (!oldName || !newName) {
+    throw new Error("Both oldName and newName are required");
+  }
+
+  if (oldName.trim() === newName.trim()) {
+    return { success: true, message: "No change needed", updated: 0 };
+  }
+
+  // First, get all products with the old type
+  const typesResult = await listProductTypes(env);
+  const typeData = typesResult.data.find(t => t.name === oldName);
+
+  if (!typeData) {
+    throw new Error(`Product type "${oldName}" not found`);
+  }
+
+  if (typeData.productIds.length === 0) {
+    return { success: true, message: "No products to update", updated: 0 };
+  }
+
+  // Update each product's productType
+  const updateQuery = `
+    mutation UpdateProductType($id: ID!, $productType: String!) {
+      productUpdate(input: { id: $id, productType: $productType }) {
+        product { id productType }
+        userErrors { field message }
+      }
+    }
+  `;
+
+  let updated = 0;
+  const errors = [];
+
+  // Process in batches to avoid rate limits
+  for (const productId of typeData.productIds) {
+    try {
+      const result = await shopifyGraphQL(env, updateQuery, {
+        id: productId,
+        productType: newName.trim()
+      });
+
+      if (result.productUpdate.userErrors?.length > 0) {
+        errors.push({ productId, error: result.productUpdate.userErrors.map(e => e.message).join(", ") });
+      } else {
+        updated++;
+      }
+    } catch (e) {
+      errors.push({ productId, error: e.message });
+    }
+  }
+
+  return {
+    success: true,
+    message: `Renamed "${oldName}" to "${newName}"`,
+    updated,
+    total: typeData.productIds.length,
+    errors: errors.length > 0 ? errors : undefined
+  };
+}
+
+/**
+ * Delete a product type (only if no products use it)
+ */
+async function deleteProductType(env, typeName) {
+  if (!typeName) {
+    throw new Error("typeName is required");
+  }
+
+  // Check if any products use this type
+  const typesResult = await listProductTypes(env);
+  const typeData = typesResult.data.find(t => t.name === typeName);
+
+  if (!typeData) {
+    // Type doesn't exist in any product, so it's effectively "deleted"
+    return { success: true, message: `Type "${typeName}" does not exist or is already deleted` };
+  }
+
+  if (typeData.count > 0) {
+    throw new Error(`Cannot delete type "${typeName}" because it is used by ${typeData.count} product(s). Remove or reassign those products first.`);
+  }
+
+  // If count is 0, the type doesn't really exist in Shopify (it's derived from products)
+  return { success: true, message: `Type "${typeName}" deleted successfully` };
 }
 
 // ============================================

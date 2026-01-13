@@ -32,6 +32,11 @@
       <span class="collection-hud-indicator"></span>
       <span class="collection-hud-label">VEHICLE CONFIGURATION</span>
       <span class="collection-hud-vehicle" id="current-vehicle-display">NO VEHICLE SELECTED</span>
+      <button id="btn-clear-vehicle-collection" class="collection-hud-clear hidden" title="Clear Vehicle Selection">
+        <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
     </div>
     <button onclick="document.getElementById('ymm-reset-modal').showModal()" class="collection-hud-button">
       <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -43,21 +48,38 @@
 </div>
 
 <script>
-  // Display current vehicle from localStorage
+  // Display current vehicle from localStorage and handle clear button
   document.addEventListener('DOMContentLoaded', function() {
-    const vehicleData = localStorage.getItem('skm_garage_vehicle');
+    const VEHICLE_KEY = 'skm_garage_vehicle';
+    const vehicleData = localStorage.getItem(VEHICLE_KEY);
+    const display = document.getElementById('current-vehicle-display');
+    const clearBtn = document.getElementById('btn-clear-vehicle-collection');
+    
     if (vehicleData) {
       try {
         const v = JSON.parse(vehicleData);
-        const display = document.getElementById('current-vehicle-display');
         if (display && v.year && v.make && v.model) {
           display.textContent = `${v.year} ${v.make} ${v.model}${v.submodel ? ' ' + v.submodel : ''}`;
           display.classList.add('collection-hud-vehicle--active');
+          
+          // Show the clear button
+          if (clearBtn) {
+            clearBtn.classList.remove('hidden');
+          }
         }
       } catch(e) {}
     }
+    
+    // Clear vehicle button handler
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function() {
+        localStorage.removeItem(VEHICLE_KEY);
+        window.location.href = '/collections/all';
+      });
+    }
   });
 </script>
+
 
 <!-- YMM Configuration Modal -->
 <dialog id="ymm-reset-modal" class="ymm-modal-dialog">
@@ -331,6 +353,32 @@
     border-color: rgba(204, 0, 0, 0.3);
     background: rgba(204, 0, 0, 0.1);
   }
+
+  .collection-hud-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: rgba(204, 0, 0, 0.2);
+    border: 1px solid rgba(204, 0, 0, 0.4);
+    border-radius: 4px;
+    color: #CC0000;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .collection-hud-clear:hover {
+    background: rgba(204, 0, 0, 0.4);
+    border-color: #CC0000;
+    color: white;
+  }
+
+  .collection-hud-clear.hidden {
+    display: none;
+  }
+
 
   .collection-hud-button {
     display: inline-flex;

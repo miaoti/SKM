@@ -162,6 +162,11 @@ Modals
 - Media upload and management
 - Mobile-responsive design
 - Real-time search and filtering
+- **Lazy Loading Implementation:**
+  - Upfront API calls removed from startup.
+  - Data fetched only on tab activation (checked via `S.dataLoaded`).
+  - Loading indicators shown for Products, Orders, Customers.
+  - Categories and Profile scripts initialized lazily on tab visit.
 
 ---
 
@@ -451,7 +456,7 @@ Become a Dealer Section
 | **Category Nav Bar** | `sections/header-precision.liquid` (lines 234-362) | Product type navigation with YMM integration |
 | **Footer** | `sections/blueprint-footer.liquid` | Site footer with social links, logo |
 | **Footer Social Icons** | `sections/blueprint-footer.liquid` (lines 84-103) | Twitter, Instagram, Facebook, YouTube |
-| **Favicon** | `sections/header-precision.liquid` (JS) | Dynamic favicon from shop profile |
+| **Favicon** | `assets/admin-profile.js` | Loaded lazily via `loadFavicon()` on page load (independent of Profile tab) |
 | **Announcements** | `sections/header-announcements.liquid` | Top banner announcements |
 
 ### Homepage (`/`)
@@ -560,8 +565,8 @@ Become a Dealer Section
 
 | File | Purpose | Used In |
 |------|---------|---------|
-| `assets/admin-profile.js` | Profile tab functionality | Admin Dashboard |
-| `assets/admin-categories.js` | Category/product type management | Admin Dashboard |
+| `assets/admin-profile.js` | Profile tab functionality (Lazy-initialized) | Admin Dashboard |
+| `assets/admin-categories.js` | Category/product type management (Lazy-initialized) | Admin Dashboard |
 | `assets/header-precision.js` | Header scroll/sticky behavior | All pages |
 | `assets/ymm.js` | YMM vehicle search & filtering | Homepage, Collection |
 | `assets/cart.js` | Cart functionality | Cart drawer |

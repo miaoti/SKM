@@ -21,7 +21,15 @@
     productYmmFilter: { year: '', make: '', model: '' }, // Product sidebar YMM filter
     orderFilters: { status: '', fulfillment: '', financial: '', query: '' },
     create: { year: '', make: '', model: '', submodel: '' },
-    pendingMedia: []
+    pendingMedia: [],
+    // Lazy loading flags - track if data has been loaded for each tab
+    dataLoaded: {
+      products: false,
+      vehicles: false,
+      customers: false,
+      orders: false,
+      packages: false
+    }
   };
 
   // API
@@ -58,6 +66,67 @@
       return d;
     }
   };
+
+  /**
+   * Show custom confirm modal (replaces browser's native confirm())
+   * @param {string} message - The message to display
+   * @param {string} title - Optional title (defaults to "Confirm Action")
+   * @returns {Promise<boolean>} - Resolves true if OK, false if Cancel
+   */
+  function showConfirmModal(message, title = 'Confirm Action') {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('confirm-modal');
+      const titleEl = document.getElementById('confirm-modal-title');
+      const messageEl = document.getElementById('confirm-modal-message');
+      const okBtn = document.getElementById('confirm-modal-ok');
+      const cancelBtn = document.getElementById('confirm-modal-cancel');
+
+      if (!modal || !titleEl || !messageEl || !okBtn || !cancelBtn) {
+        // Fallback to native confirm if modal elements not found
+        resolve(confirm(message));
+        return;
+      }
+
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      modal.classList.remove('hidden');
+
+      // Focus the cancel button for safety
+      cancelBtn.focus();
+
+      const cleanup = () => {
+        modal.classList.add('hidden');
+        okBtn.removeEventListener('click', handleOk);
+        cancelBtn.removeEventListener('click', handleCancel);
+        document.removeEventListener('keydown', handleKeydown);
+      };
+
+      const handleOk = () => {
+        cleanup();
+        resolve(true);
+      };
+
+      const handleCancel = () => {
+        cleanup();
+        resolve(false);
+      };
+
+      const handleKeydown = (e) => {
+        if (e.key === 'Escape') {
+          handleCancel();
+        } else if (e.key === 'Enter') {
+          handleOk();
+        }
+      };
+
+      okBtn.addEventListener('click', handleOk);
+      cancelBtn.addEventListener('click', handleCancel);
+      document.addEventListener('keydown', handleKeydown);
+    });
+  }
+
+  // Expose showConfirmModal globally for other scripts
+  window.showConfirmModal = showConfirmModal;
 
   // UI Helpers
   function toast(msg, type = 'info') {
@@ -131,13 +200,35 @@
     }
 
     // Load customers when tab is first visited
-    if (tabName === 'customers' && S.customers.length === 0) {
+    if (tabName === 'customers' && !S.dataLoaded.customers) {
       loadCustomers();
     }
 
     // Load orders when tab is first visited
-    if (tabName === 'orders' && S.orders.length === 0) {
+    if (tabName === 'orders' && !S.dataLoaded.orders) {
       loadOrders();
+    }
+
+    // Load products + vehicles when Products tab is first visited
+    if (tabName === 'product' && !S.dataLoaded.products) {
+      loadProductTabData();
+      // Also initialize categories combo-boxes after products load
+      if (window.AdminCategories) {
+        setTimeout(() => {
+          window.AdminCategories.initAllProductTypeComboBoxes();
+          window.AdminCategories.setupTypesManagement();
+        }, 500);
+      }
+    }
+
+    // Load vehicles when Vehicles tab is first visited (if not already loaded)
+    if (tabName === 'vehicles' && !S.dataLoaded.vehicles) {
+      loadVehicles();
+    }
+
+    // Initialize profile tab when first visited
+    if (tabName === 'profile' && window.AdminProfile) {
+      window.AdminProfile.init();
     }
   }
 
@@ -156,10 +247,29 @@
     try {
       const products = await api.get(`/products${q ? `?q=${encodeURIComponent(q)}` : ''}`);
       S.allProducts = products;
+      S.dataLoaded.products = true;
       applyProductYmmFilter();
     } catch (e) {
       if (e.message === 'Unauthorized') showAuth();
       else toast(e.message, 'error');
+    }
+  }
+
+  // Load products tab data (products + vehicles needed for YMM filter)
+  async function loadProductTabData() {
+    // Show loading state
+    const productList = $('product-list');
+    if (productList) productList.innerHTML = '<div class="p-4 text-center"><span class="loading loading-spinner loading-md"></span><p class="text-sm text-gray-500 mt-2">Loading products...</p></div>';
+
+    try {
+      // Load vehicles first (needed for YMM filter in sidebar)
+      if (!S.dataLoaded.vehicles) {
+        await loadVehicles();
+      }
+      // Then load products
+      await loadProducts();
+    } catch (e) {
+      toast('Error loading product data: ' + e.message, 'error');
     }
   }
 
@@ -275,7 +385,8 @@
     try {
       // Clear pending media when switching products (with warning if any)
       if (S.pendingMedia.length > 0) {
-        if (!confirm(`You have ${S.pendingMedia.length} unsaved media. Switch anyway?`)) return;
+        const confirmed = await showConfirmModal(`You have ${S.pendingMedia.length} unsaved media. Switch anyway?`, 'Unsaved Media');
+        if (!confirmed) return;
         S.pendingMedia.forEach(item => URL.revokeObjectURL(item.preview));
         S.pendingMedia = [];
       }
@@ -283,9 +394,19 @@
       // Switch to Products tab if not already there
       switchToTab('product');
 
+      // Also switch to Products subtab (in case user is on Types subtab)
+      if (window.ProductSubtabs) {
+        window.ProductSubtabs.switchToProducts();
+      }
+
       const numId = id.includes('gid://') ? id.split('/').pop() : id;
       const p = await api.get(`/products/${numId}`);
       S.selected = p;
+
+      // Update subtab text with product name
+      if (window.ProductSubtabs) {
+        window.ProductSubtabs.updateText(p.title);
+      }
 
       // Update product in list to keep sidebar in sync
       const idx = S.products.findIndex(prod => prod.id === p.id || prod.id.endsWith(`/${numId}`));
@@ -506,7 +627,8 @@
     g.querySelectorAll('.delete-media').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (!confirm('Delete this image?')) return;
+        const confirmed = await showConfirmModal('Delete this image?', 'Delete Image');
+        if (!confirmed) return;
         try {
           const pid = S.selected.id.split('/').pop();
           // Extract just the numeric ID from the full GID
@@ -750,7 +872,9 @@
   // DELETE PRODUCT
   // ==========================================
   $('btn-delete-product').addEventListener('click', async () => {
-    if (!S.selected || !confirm('Delete this product? This cannot be undone.')) return;
+    if (!S.selected) return;
+    const confirmed = await showConfirmModal('Delete this product? This cannot be undone.', 'Delete Product');
+    if (!confirmed) return;
     try {
       const pid = S.selected.id.split('/').pop();
       await api.del(`/products/${pid}`);
@@ -1885,6 +2009,7 @@
   async function loadVehicles() {
     try {
       S.vehicles = await api.get('/vehicles');
+      S.dataLoaded.vehicles = true;
       renderVehicleTable();
       populateVehicleSelects();
       populateVehicleFilters();
@@ -2047,7 +2172,8 @@
     // Bind delete buttons
     tbody.querySelectorAll('.del-vehicle').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('Delete this vehicle?')) return;
+        const confirmed = await showConfirmModal('Delete this vehicle?', 'Delete Vehicle');
+        if (!confirmed) return;
         try {
           await api.del(`/vehicles/${btn.dataset.id.split('/').pop()}`);
           toast('Vehicle deleted', 'success');
@@ -2529,7 +2655,8 @@
     container.querySelectorAll('.remove-tag').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (!confirm(`Remove tag "${btn.dataset.tag}"?`)) return;
+        const confirmed = await showConfirmModal(`Remove tag "${btn.dataset.tag}"?`, 'Remove Tag');
+        if (!confirmed) return;
         try {
           const custId = S.selectedCustomer.id.split('/').pop();
           await api.del(`/customers/${custId}/tags`, { tags: [btn.dataset.tag] });
@@ -2750,7 +2877,8 @@
 
   // Delete custom package
   async function deletePackage(packageId) {
-    if (!confirm('Delete this package?')) return;
+    const confirmed = await showConfirmModal('Delete this package?', 'Delete Package');
+    if (!confirmed) return;
     try {
       await api.del(`/shipping/packages/${packageId}`);
       toast('Package deleted', 'success');
@@ -3737,28 +3865,30 @@
       if (d.status !== 'ok') throw new Error('API offline');
 
       if (API_KEY) {
-        await loadVehicles();
-        await loadProducts();
-        await loadPackages();
-
-        // Check URL for order parameter (e.g., ?order=1002 or ?tab=orders&order=1002)
+        // Check URL for tab/order parameters for deep linking
         const urlParams = new URLSearchParams(window.location.search);
         const orderParam = urlParams.get('order');
         const tabParam = urlParams.get('tab');
 
         if (orderParam || tabParam === 'orders') {
-          // Switch to orders tab
+          // Switch to orders tab (will lazy-load orders)
           switchToTab('orders');
 
           // If specific order requested, select it after orders load
           if (orderParam && orderMgmt) {
-            // Wait for orders to load then select the specific order
             setTimeout(() => {
               if (orderMgmt.selectOrderByNumber) {
                 orderMgmt.selectOrderByNumber(orderParam);
               }
             }, 1500);
           }
+        } else if (tabParam === 'vehicles') {
+          switchToTab('vehicles');
+        } else if (tabParam === 'customers') {
+          switchToTab('customers');
+        } else {
+          // Default: products tab - lazy load via switchToTab
+          switchToTab('product');
         }
       } else {
         showAuth();

@@ -109,12 +109,14 @@
     </main>
 
     {% sections 'footer-group' %}
+    
+    <div style="font-size: 0; line-height: 0;">
+      {% render 'search-modal' %}
 
-    {% render 'search-modal' %}
-
-    {% if settings.quick_add or settings.mobile_quick_add %}
-      {% render 'quick-add-modal' %}
-    {% endif %}
+      {% if settings.quick_add or settings.mobile_quick_add %}
+        {% render 'quick-add-modal' %}
+      {% endif %}
+    </div>
 
     {% comment %} 
       Customer Cart Persistence System
@@ -388,8 +390,21 @@
         0% { transform: translateY(0); }
         100% { transform: translateY(60px); }
       }
+      }
       #back-to-top .animate-scan {
         animation: scan 1.5s linear infinite;
+      }
+      /* Fix for extra whitespace below footer caused by hidden modals */
+      dialog-component, quick-add-dialog {
+        display: contents;
+      }
+      html {
+        height: 100%;
+      }
+      body {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
       }
     </style>
 

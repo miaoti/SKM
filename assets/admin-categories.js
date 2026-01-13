@@ -9,7 +9,18 @@ const CATEGORIES_API = 'https://skm-inventory-api.miaotingshuo.workers.dev/categ
 let cachedCategories = [];
 
 /**
- * Fetch categories from API
+ * Get pending types from localStorage (shared with TypeManager)
+ */
+function getPendingTypes() {
+    try {
+        return JSON.parse(localStorage.getItem('skm_pending_types') || '[]');
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Fetch categories from API and merge with pending types
  */
 async function fetchCategories() {
     if (cachedCategories.length > 0) {
@@ -20,11 +31,22 @@ async function fetchCategories() {
         const res = await fetch(CATEGORIES_API);
         if (!res.ok) throw new Error('Failed to fetch categories');
         const data = await res.json();
-        cachedCategories = data.data || [];
+        let categories = data.data || [];
+
+        // Merge in pending types from localStorage
+        const pendingTypes = getPendingTypes();
+        pendingTypes.forEach(name => {
+            if (!categories.some(cat => cat.name.toLowerCase() === name.toLowerCase())) {
+                categories.push({ name, count: 0, pending: true });
+            }
+        });
+
+        cachedCategories = categories;
         return cachedCategories;
     } catch (e) {
         console.error('Error fetching categories:', e);
-        return [];
+        // Still return pending types even if API fails
+        return getPendingTypes().map(name => ({ name, count: 0, pending: true }));
     }
 }
 
@@ -60,7 +82,7 @@ async function initProductTypeComboBox(container, inputId, initialValue = '') {
         ${categories.length > 0 ?
             categories.map(cat => `
             <div class="category-option px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 flex items-center justify-between" data-value="${cat.name}">
-              <span>${cat.name}</span>
+              <span>${cat.name}${cat.pending ? ' <span class="text-xs text-amber-600 bg-amber-50 px-1 py-0.5 rounded ml-1">Pending</span>' : ''}</span>
               <span class="text-xs text-gray-400">${cat.count} products</span>
             </div>
           `).join('') :
@@ -209,13 +231,7 @@ window.AdminCategories = {
     setupTypesManagement
 };
 
-// Auto-initialize on DOM ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        initAllProductTypeComboBoxes();
-        setupTypesManagement();
-    });
-} else {
-    initAllProductTypeComboBoxes();
-    setupTypesManagement();
-}
+// NOTE: Auto-initialization removed for lazy loading.
+// These functions are now called by admin-dashboard.js when the Products tab is activated:
+//   - initAllProductTypeComboBoxes()
+//   - setupTypesManagement()
