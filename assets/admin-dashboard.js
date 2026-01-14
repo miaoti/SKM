@@ -22,6 +22,12 @@
     orderFilters: { status: '', fulfillment: '', financial: '', query: '' },
     create: { year: '', make: '', model: '', submodel: '' },
     pendingMedia: [],
+    // Pagination state for products
+    productPagination: {
+      hasNextPage: false,
+      endCursor: null,
+      currentQuery: ''
+    },
     // Lazy loading flags - track if data has been loaded for each tab
     dataLoaded: {
       products: false,
@@ -243,15 +249,65 @@
   // ==========================================
   // PRODUCT LIST
   // ==========================================
-  async function loadProducts(q = '') {
+  async function loadProducts(q = '', append = false) {
     try {
-      const products = await api.get(`/products${q ? `?q=${encodeURIComponent(q)}` : ''}`);
-      S.allProducts = products;
+      // Build URL with query params
+      let url = '/products?limit=25';
+      if (q) url += `&q=${encodeURIComponent(q)}`;
+
+      // If appending, use the stored cursor
+      if (append && S.productPagination.endCursor) {
+        url += `&cursor=${encodeURIComponent(S.productPagination.endCursor)}`;
+      }
+
+      // Store current query for pagination
+      S.productPagination.currentQuery = q;
+
+      const result = await api.get(url);
+
+      // Handle pagination response
+      if (result.data) {
+        if (append) {
+          // Append new products to existing list
+          S.allProducts = [...S.allProducts, ...result.data];
+        } else {
+          // Replace products list
+          S.allProducts = result.data;
+        }
+
+        // Update pagination state
+        S.productPagination.hasNextPage = result.pagination?.hasNextPage || false;
+        S.productPagination.endCursor = result.pagination?.endCursor || null;
+      } else {
+        // Fallback for old API response format
+        S.allProducts = Array.isArray(result) ? result : [];
+        S.productPagination.hasNextPage = false;
+        S.productPagination.endCursor = null;
+      }
+
       S.dataLoaded.products = true;
       applyProductYmmFilter();
     } catch (e) {
       if (e.message === 'Unauthorized') showAuth();
       else toast(e.message, 'error');
+    }
+  }
+
+  // Load more products (pagination)
+  async function loadMoreProducts() {
+    if (!S.productPagination.hasNextPage) return;
+
+    const btn = $('btn-load-more-products');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+    }
+
+    await loadProducts(S.productPagination.currentQuery, true);
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Load More Products';
     }
   }
 
@@ -379,6 +435,22 @@
       });
     }
     if ($('product-count-mobile')) $('product-count-mobile').textContent = `${S.products.length} products`;
+
+    // Render Load More button if there are more products
+    const loadMoreContainer = $('load-more-container');
+    if (loadMoreContainer) {
+      if (S.productPagination.hasNextPage) {
+        loadMoreContainer.innerHTML = `
+          <button id="btn-load-more-products" class="w-full py-2 px-4 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+            Load More Products
+          </button>
+        `;
+        const btn = $('btn-load-more-products');
+        if (btn) btn.addEventListener('click', loadMoreProducts);
+      } else {
+        loadMoreContainer.innerHTML = '';
+      }
+    }
   }
 
   async function selectProduct(id) {
@@ -803,6 +875,11 @@
       }
 
       // Save product details
+      // Determine if product has variants (options with values)
+      const hasVariants = variantState.options.some(o => o.name && o.values.length > 0 && !o.isAddOn);
+      const hasMultipleVariants = S.selected.variants && S.selected.variants.length > 1;
+      const shouldIncludeSku = !hasVariants && !hasMultipleVariants;
+
       await api.put(`/products/${pid}`, {
         title: $('edit-title').value,
         description: $('edit-description').value,
@@ -814,7 +891,8 @@
         compareAtPrice: $('edit-compare-price').value,
         b2bPrice: $('edit-b2b-price').value || null,
         discountPrice: $('edit-discount-price').value || null,
-        variantId: S.selected.variants?.[0]?.id
+        variantId: S.selected.variants?.[0]?.id,
+        sku: shouldIncludeSku ? $('edit-sku').value : undefined
       });
 
       // Also update inventory if changed
@@ -3545,6 +3623,20 @@
 
     // Add opacity to container
     if (container) container.classList.toggle('opacity-60', shouldDisable);
+
+    // SKU Field State - also disable when product has variants
+    const skuField = $('edit-sku');
+    const skuNotice = $('sku-variant-notice');
+
+    if (skuField) {
+      skuField.disabled = shouldDisable;
+      skuField.classList.toggle('bg-gray-100', shouldDisable);
+      skuField.classList.toggle('cursor-not-allowed', shouldDisable);
+    }
+
+    if (skuNotice) {
+      skuNotice.classList.toggle('hidden', !shouldDisable);
+    }
   }
 
   // Media-Option Mapping

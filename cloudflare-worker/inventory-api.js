@@ -175,7 +175,9 @@ export default {
         // ==========================================
         case path === "/products" && request.method === "GET":
           const searchQuery = url.searchParams.get("q") || "";
-          return jsonResponse(await listProducts(env, searchQuery));
+          const cursor = url.searchParams.get("cursor") || null;
+          const limit = url.searchParams.get("limit") || 25;
+          return jsonResponse(await listProducts(env, searchQuery, cursor, limit));
 
         case path === "/products/create" && request.method === "POST":
           const createProductBody = await request.json();
@@ -1247,10 +1249,22 @@ async function deleteProductType(env, typeName) {
 // PRODUCT OPERATIONS
 // ============================================
 
-async function listProducts(env, searchQuery = "") {
+async function listProducts(env, searchQuery = "", cursor = null, limit = 25) {
+  // Build search query - if user provides a search term, search both title and SKU
+  let shopifyQuery = null;
+  if (searchQuery && searchQuery.trim()) {
+    const term = searchQuery.trim();
+    // Shopify search query: search by title OR by variant SKU
+    shopifyQuery = `title:*${term}* OR sku:*${term}*`;
+  }
+
   const query = `
-    query ListProducts($first: Int!, $query: String) {
-      products(first: $first, query: $query) {
+    query ListProducts($first: Int!, $query: String, $after: String) {
+      products(first: $first, query: $query, after: $after) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
         edges {
           node {
             id
@@ -1300,7 +1314,11 @@ async function listProducts(env, searchQuery = "") {
     }
   `;
 
-  const result = await shopifyGraphQL(env, query, { first: 50, query: searchQuery || null });
+  const result = await shopifyGraphQL(env, query, {
+    first: parseInt(limit) || 25,
+    query: shopifyQuery,
+    after: cursor || null
+  });
 
   const products = result.products.edges.map(({ node }) => ({
     id: node.id,
@@ -1328,7 +1346,15 @@ async function listProducts(env, searchQuery = "") {
     fitments: node.metafield ? JSON.parse(node.metafield.value || "[]") : []
   }));
 
-  return { success: true, data: products, count: products.length };
+  return {
+    success: true,
+    data: products,
+    count: products.length,
+    pagination: {
+      hasNextPage: result.products.pageInfo.hasNextPage,
+      endCursor: result.products.pageInfo.endCursor
+    }
+  };
 }
 
 async function getProduct(env, productId) {
@@ -2222,6 +2248,12 @@ async function updateProduct(env, productId, data) {
       // No discount price - use normal pricing
       await updateVariantPrice(env, gid, data.variantId, originalPrice, compareAtPrice);
     }
+
+    // Update SKU if provided
+    if (data.sku !== undefined) {
+      await updateVariantSku(env, gid, data.variantId, data.sku);
+      console.log(`[UpdateProduct] Updated SKU to: ${data.sku}`);
+    }
   }
 
   // Delete discount_price metafield if flagged for deletion
@@ -2287,6 +2319,32 @@ async function updateVariantPrice(env, productId, variantId, price, compareAtPri
   const result = await shopifyGraphQL(env, query, {
     productId: productGid,
     variants: [variant]
+  });
+
+  if (result.productVariantsBulkUpdate?.userErrors?.length > 0) {
+    throw new Error(result.productVariantsBulkUpdate.userErrors.map(e => e.message).join(", "));
+  }
+
+  return result.productVariantsBulkUpdate?.productVariants?.[0];
+}
+
+// Update variant SKU only
+async function updateVariantSku(env, productId, variantId, sku) {
+  const productGid = productId.startsWith("gid://") ? productId : `gid://shopify/Product/${productId}`;
+  const variantGid = variantId.startsWith("gid://") ? variantId : `gid://shopify/ProductVariant/${variantId}`;
+
+  const query = `
+    mutation UpdateVariantSku($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+        productVariants { id sku }
+        userErrors { field message }
+      }
+    }
+  `;
+
+  const result = await shopifyGraphQL(env, query, {
+    productId: productGid,
+    variants: [{ id: variantGid, sku: sku || "" }]
   });
 
   if (result.productVariantsBulkUpdate?.userErrors?.length > 0) {

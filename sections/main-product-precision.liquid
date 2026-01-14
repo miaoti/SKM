@@ -1,5 +1,6 @@
 {% comment %}
-  Main Product Precision - "Spec Sheet" Design
+  Main Product Precision - "Technical Command Center" Design
+  Porsche-inspired clean, authoritative, precise aesthetic
 {% endcomment %}
 
 <script>
@@ -17,476 +18,552 @@
 <script type="application/json" data-product-json>
   {{ product | json }}
 </script>
-<div class="product-precision-page bg-white min-h-screen text-black font-sans">
-  <div class="page-width max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="flex flex-col lg:flex-row gap-12 relative">
+
+{% comment %} Technical Command Center Styles {% endcomment %}
+<style>
+  .tcc-page {
+    --tcc-obsidian: #111111;
+    --tcc-white: #FFFFFF;
+    --tcc-red: #CC0000;
+    --tcc-border: #E5E5E5;
+    --tcc-grey-light: #F8F8F8;
+    --tcc-grey-text: #666666;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  
+  /* Thumbnail Gallery */
+  .tcc-gallery {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 16px;
+    height: fit-content;
+  }
+  
+  .tcc-thumbnails {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 600px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  
+  .tcc-thumbnail {
+    width: 80px;
+    height: 80px;
+    border: 0.5px solid var(--tcc-border);
+    cursor: pointer;
+    opacity: 0.6;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  
+  .tcc-thumbnail:hover,
+  .tcc-thumbnail.active {
+    opacity: 1;
+    border-color: var(--tcc-obsidian);
+  }
+  
+  .tcc-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .tcc-main-image {
+    position: relative;
+    border: 1px solid var(--tcc-border);
+    background: var(--tcc-white);
+    overflow: hidden;
+  }
+  
+  .tcc-main-image img,
+  .tcc-main-image .product-media {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    transition: opacity 0.4s ease;
+  }
+  
+  .tcc-main-image .media-hidden {
+    opacity: 0;
+    position: absolute;
+    pointer-events: none;
+  }
+  
+  /* Glassmorphism Control Panel */
+  .tcc-control-panel {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 0.5px solid var(--tcc-border);
+    padding: 32px;
+  }
+  
+  /* Typography */
+  .tcc-title {
+    font-family: 'Helvetica Neue', 'Arial', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+    color: var(--tcc-obsidian);
+    margin: 0 0 8px 0;
+    line-height: 1.1;
+  }
+  
+  .tcc-spec-id {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 12px;
+    color: var(--tcc-grey-text);
+    margin-bottom: 24px;
+  }
+  
+  /* Pricing Module */
+  .tcc-pricing {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  
+  .tcc-price-main {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--tcc-obsidian);
+  }
+  
+  .tcc-price-crossed {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 16px;
+    color: var(--tcc-grey-text);
+    text-decoration: line-through;
+  }
+  
+  .tcc-badge-wholesale {
+    display: inline-block;
+    border: 1px solid var(--tcc-red);
+    color: var(--tcc-red);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    letter-spacing: 0.1em;
+  }
+  
+  .tcc-badge-delta {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 12px;
+    color: #16a34a;
+    font-weight: 600;
+  }
+  
+  /* Availability */
+  .tcc-availability {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--tcc-grey-text);
+    margin-bottom: 24px;
+    padding: 12px 0;
+    border-top: 0.5px solid var(--tcc-border);
+    border-bottom: 0.5px solid var(--tcc-border);
+  }
+  
+  .tcc-availability .in-stock {
+    color: #16a34a;
+    font-weight: 600;
+  }
+  
+  .tcc-availability .out-of-stock {
+    color: var(--tcc-red);
+    font-weight: 600;
+  }
+  
+  /* Technical Brief Section (Full Width) */
+  .tcc-tech-brief-section {
+    margin-top: 48px;
+    padding-top: 32px;
+    border-top: 0.5px solid var(--tcc-border);
+  }
+  
+  .tcc-tech-brief-header {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--tcc-red);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 20px;
+  }
+  
+  .tcc-tech-brief-content {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #333;
+  }
+  
+  .tcc-tech-brief-content p {
+    margin-bottom: 16px;
+  }
+  
+  .tcc-tech-brief-content ul,
+  .tcc-tech-brief-content ol {
+    margin-left: 20px;
+    margin-bottom: 16px;
+  }
+  
+  /* Mobile Responsive */
+  @media (max-width: 1024px) {
+    .tcc-gallery {
+      grid-template-columns: 1fr;
+    }
+    
+    .tcc-thumbnails {
+      flex-direction: row;
+      max-height: none;
+      overflow-x: auto;
+      order: 2;
+    }
+    
+    .tcc-main-image {
+      order: 1;
+    }
+    
+    .tcc-control-panel {
+      position: relative !important;
+      top: auto !important;
+    }
+  }
+</style>
+
+<div class="tcc-page min-h-screen bg-white text-black">
+  <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="grid grid-cols-1 lg:grid-cols-[60%_40%] gap-8 lg:gap-12">
       
-      <!-- LEFT COLUMN: VISUAL SHOWCASE (65%) -->
-      <div class="w-full lg:w-[65%] flex flex-col gap-4" data-product-media-container>
-        {%- if product.media.size > 0 -%}
-          {%- for media in product.media -%}
-            <div class="media-item w-full bg-gray-100 rounded-sm overflow-hidden relative group" data-product-media data-alt="{{ media.alt | escape }}">
-              {% render 'product-media', 
-                media: media, 
-                loop: section.settings.enable_video_looping, 
-                variant_image: false,
-                loading: 'lazy',
-                widths: '550, 750, 1100, 1500, 2000, 3000'
-              %}
+      <!-- LEFT: MEDIA GALLERY (60%) -->
+      <div class="tcc-gallery" data-product-media-container>
+        <!-- Thumbnail Rail -->
+        <div class="tcc-thumbnails">
+          {%- if product.media.size > 0 -%}
+            {%- for media in product.media -%}
+              <button 
+                class="tcc-thumbnail {% if forloop.first %}active{% endif %}" 
+                data-thumbnail-btn
+                data-media-index="{{ forloop.index0 }}"
+                data-media-id="{{ media.id }}"
+                data-media-alt="{{ media.alt | escape | downcase }}"
+                aria-label="View image {{ forloop.index }}"
+              >
+                <img 
+                  src="{{ media.preview_image | image_url: width: 160 }}" 
+                  alt="{{ media.alt | escape }}"
+                  loading="lazy"
+                >
+              </button>
+            {%- endfor -%}
+          {%- endif -%}
+        </div>
+        
+        <!-- Main Viewport -->
+        <div class="tcc-main-image">
+          {%- if product.media.size > 0 -%}
+            {%- for media in product.media -%}
+              <div 
+                class="tcc-media-slide {% unless forloop.first %}media-hidden{% endunless %}" 
+                data-media-slide 
+                data-media-index="{{ forloop.index0 }}"
+                data-media-id="{{ media.id }}"
+                data-media-alt="{{ media.alt | escape | downcase }}"
+              >
+                {% render 'product-media', 
+                  media: media, 
+                  loop: section.settings.enable_video_looping, 
+                  variant_image: false,
+                  loading: forloop.first | ternary: 'eager', 'lazy',
+                  widths: '550, 750, 1100, 1500, 2000'
+                %}
+              </div>
+            {%- endfor -%}
+          {%- else -%}
+            <div class="flex items-center justify-center h-full text-gray-400">
+              {{ 'product-1' | placeholder_svg_tag: 'w-1/3 h-1/3' }}
             </div>
-          {%- endfor -%}
-        {%- else -%}
-          <div class="media-item w-full bg-gray-100 aspect-square flex items-center justify-center text-gray-400">
-            {{ 'product-1' | placeholder_svg_tag: 'w-1/3 h-1/3' }}
-          </div>
-        {%- endif -%}
+          {%- endif -%}
+        </div>
       </div>
 
-      <!-- RIGHT COLUMN: CONTROL PANEL (35%) -->
-      <div class="w-full lg:w-[35%] lg:sticky lg:top-8 h-fit flex flex-col gap-6">
+      <!-- RIGHT: CONTROL PANEL (40%) -->
+      <div class="tcc-control-panel lg:sticky lg:top-8 h-fit">
         
-        <!-- Header -->
-        <div class="border-b border-gray-200 pb-4 relative">
-          <!-- Tech Line -->
-          <div class="absolute bottom-[-1px] left-0 w-full h-[1px] bg-black/10 flex justify-between">
-            <span class="w-1 h-[4px] bg-black -mt-[1.5px] rotate-45"></span>
-            <span class="w-1 h-[4px] bg-black -mt-[1.5px] rotate-45"></span>
-          </div>
-
-          <h1 class="text-3xl md:text-4xl font-bold uppercase tracking-tight text-black mb-2" style="font-family: 'Oswald', sans-serif;">
-            {{ product.title }}
-          </h1>
-          <div class="flex items-center justify-between mt-4">
-            <div class="flex flex-col gap-1">
-              <div class="text-xs font-mono text-gray-500" id="product-sku-display">
-                {%- if product.selected_or_first_available_variant.sku != blank -%}
-                  SKU: <span class="text-black font-bold">{{ product.selected_or_first_available_variant.sku }}</span>
-                {%- endif -%}
-              </div>
-              
-              <div class="text-xs font-mono text-gray-500" id="product-availability-display">
-                Availability: 
-                {%- if product.selected_or_first_available_variant.available -%}
-                  <span class="text-green-600 font-bold uppercase">In Stock (<span id="product-inventory-count">{{ product.selected_or_first_available_variant.inventory_quantity | default: '1+' }}</span>)</span>
-                {%- else -%}
-                  <span class="text-red-600 font-bold uppercase">Out of Stock</span>
-                {%- endif -%}
-              </div>
-            </div>
-
-            <!-- Dynamic Price Display with B2B Support -->
-            {%- liquid
-              assign selected_variant = product.selected_or_first_available_variant
-              assign original_price = selected_variant.price
-              assign compare_at_price = selected_variant.compare_at_price
-              
-              # Get B2B price - check variant-level first, then fall back to product-level
-              assign variant_b2b_price_raw = selected_variant.metafields.custom.b2b_price.value
-              assign product_b2b_price_raw = product.metafields.custom.b2b_price.value
-              
-              # Get discount price - check variant-level first, then fall back to product-level
-              assign variant_discount_price_raw = selected_variant.metafields.custom.discount_price.value
-              assign product_discount_price_raw = product.metafields.custom.discount_price.value
-              
-              # Use variant prices if available, otherwise product prices
-              assign b2b_price_raw = variant_b2b_price_raw
-              if b2b_price_raw == blank or b2b_price_raw == empty
-                assign b2b_price_raw = product_b2b_price_raw
-              endif
-              
-              assign discount_price_raw = variant_discount_price_raw
-              if discount_price_raw == blank or discount_price_raw == empty
-                assign discount_price_raw = product_discount_price_raw
-              endif
-              
-              assign b2b_price = nil
-              assign discount_price = nil
-              
-              if b2b_price_raw != blank and b2b_price_raw != empty
-                assign b2b_price = b2b_price_raw | times: 100
-              endif
-              
-              if discount_price_raw != blank and discount_price_raw != empty
-                assign discount_price = discount_price_raw | times: 100
-              endif
-              
-              # Check if user is B2B
-              assign is_b2b_user = false
-              if customer
-                for tag in customer.tags
-                  assign tag_downcase = tag | downcase | strip
-                  if tag_downcase == 'b2b' or tag_downcase == 'wholesale' or tag_downcase == 'business'
-                    assign is_b2b_user = true
-                    break
-                  endif
-                endfor
-              endif
-              
-              # Determine display price
-              assign display_price = original_price
-              assign crossed_out_price = nil
-              assign price_badge = nil
-              assign badge_color = 'bg-[#CC0000]'
-              assign show_crossed_price = false
-              
-              if is_b2b_user
-                # B2B user - compare B2B price vs discount price, show lower
-                if discount_price != nil and b2b_price != nil
-                  if b2b_price <= discount_price
-                    assign display_price = b2b_price
-                    assign crossed_out_price = original_price
-                    assign price_badge = 'WHOLESALE'
-                    assign badge_color = 'bg-[#CC0000]'
-                  else
-                    assign display_price = discount_price
-                    assign crossed_out_price = original_price
-                    assign price_diff = original_price | minus: discount_price
-                    assign percent_off = price_diff | times: 100 | divided_by: original_price | round
-                    assign price_badge = percent_off | append: '% OFF'
-                    assign badge_color = 'bg-green-600'
-                  endif
-                  assign show_crossed_price = true
-                elsif b2b_price != nil
-                  assign display_price = b2b_price
-                  assign crossed_out_price = original_price
-                  assign price_badge = 'WHOLESALE'
-                  assign badge_color = 'bg-[#CC0000]'
-                  assign show_crossed_price = true
-                elsif discount_price != nil
-                  assign display_price = discount_price
-                  assign crossed_out_price = original_price
-                  assign price_diff = original_price | minus: discount_price
-                  assign percent_off = price_diff | times: 100 | divided_by: original_price | round
-                  assign price_badge = percent_off | append: '% OFF'
-                  assign badge_color = 'bg-green-600'
-                  assign show_crossed_price = true
-                endif
-              else
-                # Standard user - show discount price with % OFF badge
-                if discount_price != nil
-                  assign display_price = discount_price
-                  assign crossed_out_price = original_price
-                  assign price_diff = original_price | minus: discount_price
-                  assign percent_off = price_diff | times: 100 | divided_by: original_price | round
-                  if percent_off > 0
-                    assign price_badge = percent_off | append: '% OFF'
-                  else
-                    assign price_badge = 'ON SALE'
-                  endif
-                  assign badge_color = 'bg-green-600'
-                  assign show_crossed_price = true
-                elsif compare_at_price > original_price
-                  assign crossed_out_price = compare_at_price
-                  assign show_crossed_price = true
-                endif
-              endif
-            -%}
-            <div class="text-xl" id="product-price-display">
-              {%- if show_crossed_price -%}
-                <span class="product-compare-price text-sm text-gray-400 line-through mr-2" data-compare-price>
-                  {{ crossed_out_price | money }}
-                </span>
-              {%- endif -%}
-              <span class="product-price font-bold {% if show_crossed_price %}text-[#CC0000]{% else %}text-black{% endif %}" data-product-price>
-                {{ display_price | money }}
-              </span>
-              {%- if price_badge -%}
-                <span class="price-badge ml-2 inline-block {{ badge_color }} text-white text-[10px] px-2 py-0.5 uppercase tracking-wider font-bold" style="clip-path: polygon(0 0, 100% 0, 95% 50%, 100% 100%, 0 100%, 5% 50%);">
-                  {{ price_badge }}
-                </span>
-              {%- endif -%}
-            </div>
-          </div>
+        <!-- Header: Title + SPEC_ID -->
+        <h1 class="tcc-title">{{ product.title }}</h1>
+        <div class="tcc-spec-id" id="product-sku-display">
+          {%- if product.selected_or_first_available_variant.sku != blank -%}
+            [ SPEC_ID: <span class="text-black font-semibold">{{ product.selected_or_first_available_variant.sku }}</span> ]
+          {%- else -%}
+            [ SPEC_ID: {{ product.id }} ]
+          {%- endif -%}
         </div>
 
-        <!-- Fitment Status Module REMOVED -->
+        <!-- Pricing Module (Logic Preserved) -->
+        {%- liquid
+          assign selected_variant = product.selected_or_first_available_variant
+          assign original_price = selected_variant.price
+          assign compare_at_price = selected_variant.compare_at_price
+          
+          assign variant_b2b_price_raw = selected_variant.metafields.custom.b2b_price.value
+          assign product_b2b_price_raw = product.metafields.custom.b2b_price.value
+          assign variant_discount_price_raw = selected_variant.metafields.custom.discount_price.value
+          assign product_discount_price_raw = product.metafields.custom.discount_price.value
+          
+          assign b2b_price_raw = variant_b2b_price_raw
+          if b2b_price_raw == blank or b2b_price_raw == empty
+            assign b2b_price_raw = product_b2b_price_raw
+          endif
+          
+          assign discount_price_raw = variant_discount_price_raw
+          if discount_price_raw == blank or discount_price_raw == empty
+            assign discount_price_raw = product_discount_price_raw
+          endif
+          
+          assign b2b_price = nil
+          assign discount_price = nil
+          
+          if b2b_price_raw != blank and b2b_price_raw != empty
+            assign b2b_price = b2b_price_raw | times: 100
+          endif
+          
+          if discount_price_raw != blank and discount_price_raw != empty
+            assign discount_price = discount_price_raw | times: 100
+          endif
+          
+          assign is_b2b_user = false
+          if customer
+            for tag in customer.tags
+              assign tag_downcase = tag | downcase | strip
+              if tag_downcase == 'b2b' or tag_downcase == 'wholesale' or tag_downcase == 'business'
+                assign is_b2b_user = true
+                break
+              endif
+            endfor
+          endif
+          
+          assign display_price = original_price
+          assign crossed_out_price = nil
+          assign price_badge = nil
+          assign is_wholesale = false
+          assign percent_off = 0
+          assign show_crossed_price = false
+          
+          if is_b2b_user
+            if discount_price != nil and b2b_price != nil
+              if b2b_price <= discount_price
+                assign display_price = b2b_price
+                assign crossed_out_price = original_price
+                assign price_badge = 'WHOLESALE'
+                assign is_wholesale = true
+              else
+                assign display_price = discount_price
+                assign crossed_out_price = original_price
+                assign price_diff = original_price | minus: discount_price
+                assign percent_off = price_diff | times: 100 | divided_by: original_price | round
+              endif
+              assign show_crossed_price = true
+            elsif b2b_price != nil
+              assign display_price = b2b_price
+              assign crossed_out_price = original_price
+              assign price_badge = 'WHOLESALE'
+              assign is_wholesale = true
+              assign show_crossed_price = true
+            elsif discount_price != nil
+              assign display_price = discount_price
+              assign crossed_out_price = original_price
+              assign price_diff = original_price | minus: discount_price
+              assign percent_off = price_diff | times: 100 | divided_by: original_price | round
+              assign show_crossed_price = true
+            endif
+          else
+            if discount_price != nil
+              assign display_price = discount_price
+              assign crossed_out_price = original_price
+              assign price_diff = original_price | minus: discount_price
+              assign percent_off = price_diff | times: 100 | divided_by: original_price | round
+              assign show_crossed_price = true
+            elsif compare_at_price > original_price
+              assign crossed_out_price = compare_at_price
+              assign price_diff = compare_at_price | minus: original_price
+              assign percent_off = price_diff | times: 100 | divided_by: compare_at_price | round
+              assign show_crossed_price = true
+            endif
+          endif
+        -%}
+        
+        <div class="tcc-pricing" id="product-price-display">
+          {%- if show_crossed_price and crossed_out_price -%}
+            <span class="tcc-price-crossed" data-compare-price>{{ crossed_out_price | money }}</span>
+          {%- endif -%}
+          <span class="tcc-price-main" data-product-price>{{ display_price | money }}</span>
+          {%- if is_wholesale -%}
+            <span class="tcc-badge-wholesale">WHOLESALE</span>
+          {%- elsif percent_off > 0 -%}
+            <span class="tcc-badge-delta">Δ -{{ percent_off }}%</span>
+          {%- endif -%}
+        </div>
+
+        <!-- Availability -->
+        <div class="tcc-availability" id="product-availability-display">
+          STATUS: 
+          {%- if product.selected_or_first_available_variant.available -%}
+            <span class="in-stock">IN_STOCK</span> // QTY: <span id="product-inventory-count">{{ product.selected_or_first_available_variant.inventory_quantity | default: '1+' }}</span>
+          {%- else -%}
+            <span class="out-of-stock">OUT_OF_STOCK</span>
+          {%- endif -%}
+        </div>
         
         <!-- Buy Buttons -->
         {%- render 'buy-buttons-precision', product: product, product_form_id: 'product-form-' | append: section.id -%}
 
-        <!-- Description -->
-        <div class="prose prose-sm max-w-none text-gray-600 font-mono text-xs leading-relaxed">
-          {{ product.description }}
-        </div>
-
-        <!-- Tech Specs Accordion -->
-        <div class="border-t border-gray-200 mt-8">
-          {%- for block in section.blocks -%}
-            {%- if block.type == 'collapsible_tab' -%}
-              <details class="group border-b border-gray-200">
-                <summary class="flex items-center justify-between py-4 cursor-pointer list-none select-none hover:bg-gray-50 px-2 transition-colors">
-                  <div class="flex items-center gap-3">
-                    <span class="w-2 h-2 bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                    <span class="font-bold uppercase tracking-wider text-xs text-black">{{ block.settings.heading }}</span>
-                  </div>
-                  <span class="relative w-4 h-4 flex items-center justify-center">
-                    <span class="absolute w-full h-[2px] bg-black"></span>
-                    <span class="absolute w-[2px] h-full bg-black transition-transform duration-300 group-open:rotate-90"></span>
-                  </span>
-                </summary>
-                <div class="pb-4 px-2 text-sm text-gray-600 font-mono">
-                  {{ block.settings.content }}
-                  {{ block.settings.page.content }}
-                </div>
-              </details>
-            {%- endif -%}
-          {%- endfor -%}
-        </div>
-
       </div>
     </div>
-  </div>
-</div>
-
-{% comment %} Variant Media Filter - filters gallery based on selected options {% endcomment %}
-<script src="{{ 'variant-media-filter.js' | asset_url }}" defer></script>
-
-{% comment %} Hidden Quick-Add Modal Content - simplified layout for modal display {% endcomment %}
-<div class="quick-add-content-wrapper" data-product-grid-content data-quick-add-content style="position: absolute; left: -9999px; top: -9999px;">
-  <div class="quick-add-product-grid" style="display: grid; grid-template-columns: 200px 1fr; gap: 24px; padding: 24px;">
-    <!-- Product Image -->
-    <div class="quick-add-media">
-      {%- if product.featured_media -%}
-        <img 
-          src="{{ product.featured_media | image_url: width: 400 }}" 
-          alt="{{ product.featured_media.alt | escape }}"
-          style="width: 100%; border-radius: 8px;"
-        >
-      {%- endif -%}
-    </div>
     
-    <!-- Product Details -->
-    <div class="product-details" style="display: flex; flex-direction: column; gap: 16px;">
-      <h2 style="font-size: 1.5rem; font-weight: bold; margin: 0;">{{ product.title }}</h2>
-      
-      <!-- Price with B2B/Discount Support -->
-      {%- liquid
-        assign qa_selected_variant = product.selected_or_first_available_variant
-        assign qa_original_price = qa_selected_variant.price
-        assign qa_compare_at_price = qa_selected_variant.compare_at_price
-        
-        assign qa_variant_b2b_price_raw = qa_selected_variant.metafields.custom.b2b_price.value
-        assign qa_product_b2b_price_raw = product.metafields.custom.b2b_price.value
-        assign qa_variant_discount_price_raw = qa_selected_variant.metafields.custom.discount_price.value
-        assign qa_product_discount_price_raw = product.metafields.custom.discount_price.value
-        
-        assign qa_b2b_price_raw = qa_variant_b2b_price_raw
-        if qa_b2b_price_raw == blank or qa_b2b_price_raw == empty
-          assign qa_b2b_price_raw = qa_product_b2b_price_raw
-        endif
-        
-        assign qa_discount_price_raw = qa_variant_discount_price_raw
-        if qa_discount_price_raw == blank or qa_discount_price_raw == empty
-          assign qa_discount_price_raw = qa_product_discount_price_raw
-        endif
-        
-        assign qa_b2b_price = nil
-        assign qa_discount_price = nil
-        
-        if qa_b2b_price_raw != blank and qa_b2b_price_raw != empty
-          assign qa_b2b_price = qa_b2b_price_raw | times: 100
-        endif
-        
-        if qa_discount_price_raw != blank and qa_discount_price_raw != empty
-          assign qa_discount_price = qa_discount_price_raw | times: 100
-        endif
-        
-        assign qa_is_b2b_user = false
-        if customer
-          for tag in customer.tags
-            assign tag_downcase = tag | downcase | strip
-            if tag_downcase == 'b2b' or tag_downcase == 'wholesale' or tag_downcase == 'business'
-              assign qa_is_b2b_user = true
-              break
-            endif
-          endfor
-        endif
-        
-        assign qa_display_price = qa_original_price
-        assign qa_crossed_out_price = nil
-        assign qa_price_badge = nil
-        assign qa_badge_color = 'background: #CC0000;'
-        assign qa_show_crossed_price = false
-        
-        if qa_is_b2b_user
-          if qa_discount_price != nil and qa_b2b_price != nil
-            if qa_b2b_price <= qa_discount_price
-              assign qa_display_price = qa_b2b_price
-              assign qa_crossed_out_price = qa_original_price
-              assign qa_price_badge = 'WHOLESALE'
-            else
-              assign qa_display_price = qa_discount_price
-              assign qa_crossed_out_price = qa_original_price
-              assign qa_price_diff = qa_original_price | minus: qa_discount_price
-              assign qa_percent_off = qa_price_diff | times: 100 | divided_by: qa_original_price | round
-              assign qa_price_badge = qa_percent_off | append: '% OFF'
-              assign qa_badge_color = 'background: #16a34a;'
-            endif
-            assign qa_show_crossed_price = true
-          elsif qa_b2b_price != nil
-            assign qa_display_price = qa_b2b_price
-            assign qa_crossed_out_price = qa_original_price
-            assign qa_price_badge = 'WHOLESALE'
-            assign qa_show_crossed_price = true
-          elsif qa_discount_price != nil
-            assign qa_display_price = qa_discount_price
-            assign qa_crossed_out_price = qa_original_price
-            assign qa_price_diff = qa_original_price | minus: qa_discount_price
-            assign qa_percent_off = qa_price_diff | times: 100 | divided_by: qa_original_price | round
-            assign qa_price_badge = qa_percent_off | append: '% OFF'
-            assign qa_badge_color = 'background: #16a34a;'
-            assign qa_show_crossed_price = true
-          endif
-        else
-          if qa_discount_price != nil
-            assign qa_display_price = qa_discount_price
-            assign qa_crossed_out_price = qa_original_price
-            assign qa_price_diff = qa_original_price | minus: qa_discount_price
-            assign qa_percent_off = qa_price_diff | times: 100 | divided_by: qa_original_price | round
-            if qa_percent_off > 0
-              assign qa_price_badge = qa_percent_off | append: '% OFF'
-            else
-              assign qa_price_badge = 'ON SALE'
-            endif
-            assign qa_badge_color = 'background: #16a34a;'
-            assign qa_show_crossed_price = true
-          elsif qa_compare_at_price > qa_original_price
-            assign qa_crossed_out_price = qa_compare_at_price
-            assign qa_show_crossed_price = true
-          endif
-        endif
-      -%}
-      <product-price>
-        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-          {%- if qa_show_crossed_price and qa_crossed_out_price -%}
-            <span style="text-decoration: line-through; color: #999; font-size: 0.9rem;">{{ qa_crossed_out_price | money }}</span>
-          {%- endif -%}
-          <span style="font-size: 1.25rem; font-weight: bold; color: #dc2626;">{{ qa_display_price | money }}</span>
-          {%- if qa_price_badge -%}
-            <span style="{{ qa_badge_color }} color: white; font-size: 10px; padding: 2px 8px; font-weight: bold; text-transform: uppercase;">{{ qa_price_badge }}</span>
-          {%- endif -%}
+    <!-- Technical Brief Section (Full Width) -->
+    {%- if product.description != blank -%}
+      <div class="tcc-tech-brief-section">
+        <div class="tcc-tech-brief-header">[ TECHNICAL_BRIEF ]</div>
+        <div class="tcc-tech-brief-content">
+          {{ product.description }}
         </div>
-      </product-price>
-      
-      <!-- Variant Options and Add to Cart Form -->
-      {%- form 'product', product, id: 'quick-add-product-form', class: 'quick-add-form', novalidate: 'novalidate', data-type: 'add-to-cart-form' -%}
-        <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}" class="product-variant-id">
-        
-        {%- unless product.has_only_default_variant -%}
-          <div class="variant-options" style="margin-bottom: 16px;">
-            {%- for option in product.options_with_values -%}
-              {%- assign option_index = forloop.index0 -%}
-              <fieldset style="border: none; padding: 0; margin: 0 0 12px 0;">
-                <legend style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 8px;">{{ option.name }}</legend>
-                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                  {%- for value in option.values -%}
-                    {%- assign option_available = false -%}
-                    {%- for variant in product.variants -%}
-                      {%- assign variant_option_value = variant.options[option_index] -%}
-                      {%- if variant.available and variant_option_value == value -%}
-                        {%- assign option_available = true -%}
-                        {%- break -%}
-                      {%- endif -%}
-                    {%- endfor -%}
-                    <label style="cursor: pointer; {% unless option_available %}opacity: 0.5;{% endunless %}">
-                      <input type="radio" name="option{{ option.position }}" value="{{ value | escape }}" 
-                             {% if option.selected_value == value %}checked{% endif %} 
-                             {% unless option_available %}disabled{% endunless %}
-                             style="position: absolute; opacity: 0; width: 0; height: 0;"
-                             class="qa-variant-input">
-                      <span class="qa-variant-btn" style="display: block; padding: 8px 16px; font-size: 14px; border: 2px solid #e5e5e5; border-radius: 4px; background: white; transition: all 0.2s;">{{ value }}</span>
-                    </label>
-                  {%- endfor -%}
-                </div>
-              </fieldset>
-            {%- endfor -%}
-          </div>
-        {%- endunless -%}
-        
-        {%- comment -%} Add-on options {%- endcomment -%}
-        {% assign addon_meta = product.metafields.custom.add_on_options %}
-        {% if addon_meta and addon_meta.value != blank %}
-          <div class="addon-options" style="margin-bottom: 16px;">
-            {% for addon in addon_meta.value %}
-              <fieldset style="border: none; padding: 0; margin: 0 0 12px 0;">
-                <legend style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #2563eb; margin-bottom: 8px;">
-                  {{ addon.name }} <span style="color: #999; font-weight: normal;">(optional)</span>
-                </legend>
-                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                  <label style="cursor: pointer;">
-                    <input type="radio" name="addon_{{ addon.name | handleize }}" value="" data-price-modifier="0" checked
-                           style="position: absolute; opacity: 0; width: 0; height: 0;" class="qa-addon-input">
-                    <span class="qa-addon-btn" style="display: block; padding: 8px 16px; font-size: 14px; border: 2px solid #e5e5e5; border-radius: 4px; background: white; transition: all 0.2s;">None</span>
-                  </label>
-                  {% for val in addon.values %}
-                    {% assign price_mod = addon.priceModifiers[val] | default: 0 %}
-                    <label style="cursor: pointer;">
-                      <input type="radio" name="addon_{{ addon.name | handleize }}" value="{{ val }}" data-price-modifier="{{ price_mod }}"
-                             style="position: absolute; opacity: 0; width: 0; height: 0;" class="qa-addon-input">
-                      <span class="qa-addon-btn" style="display: block; padding: 8px 16px; font-size: 14px; border: 2px solid #93c5fd; border-radius: 4px; background: white; transition: all 0.2s;">
-                        {{ val }}{% if price_mod > 0 %}<span style="font-size: 11px; opacity: 0.7; margin-left: 4px;">(+${{ price_mod }})</span>{% endif %}
-                      </span>
-                    </label>
-                  {% endfor %}
-                </div>
-              </fieldset>
-            {% endfor %}
-          </div>
-        {% endif %}
-        
-        <div style="display: flex; gap: 12px; align-items: center;">
-          <div style="display: flex; border: 1px solid #e5e5e5; border-radius: 4px; overflow: hidden;">
-            <button type="button" onclick="this.nextElementSibling.stepDown(); this.nextElementSibling.dispatchEvent(new Event('change'));" style="width: 36px; height: 44px; border: none; background: #f5f5f5; cursor: pointer; font-size: 18px;">-</button>
-            <input type="number" name="quantity" value="1" min="1" style="width: 50px; height: 44px; border: none; text-align: center; font-size: 14px;">
-            <button type="button" onclick="this.previousElementSibling.stepUp(); this.previousElementSibling.dispatchEvent(new Event('change'));" style="width: 36px; height: 44px; border: none; background: #f5f5f5; cursor: pointer; font-size: 18px;">+</button>
-          </div>
-          <button type="submit" name="add" style="flex: 1; height: 44px; background: #000; color: #fff; border: none; border-radius: 4px; font-weight: 600; font-size: 14px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em;"
-                  {% unless product.selected_or_first_available_variant.available %}disabled style="opacity: 0.5; cursor: not-allowed;"{% endunless %}>
-            {%- if product.selected_or_first_available_variant.available -%}Add to Cart{%- else -%}Sold Out{%- endif -%}
-          </button>
-        </div>
-      {%- endform -%}
-      
-      <style>
-        .qa-variant-input:checked + .qa-variant-btn { border-color: #000; background: #000; color: #fff; }
-        .qa-addon-input:checked + .qa-addon-btn { border-color: #2563eb; background: #2563eb; color: #fff; }
-      </style>
-    </div>
+      </div>
+    {%- endif -%}
+    
   </div>
 </div>
+
+<!-- Gallery Interaction + Variant Filter Script -->
+<script>
+(function() {
+  document.addEventListener('DOMContentLoaded', function() {
+    const thumbnails = document.querySelectorAll('[data-thumbnail-btn]');
+    const slides = document.querySelectorAll('[data-media-slide]');
+    
+    // Click handler for thumbnails
+    function activateThumbnail(thumb) {
+      const index = thumb.dataset.mediaIndex;
+      
+      // Update thumbnail active state
+      thumbnails.forEach(t => t.classList.remove('active'));
+      thumb.classList.add('active');
+      
+      // Cross-fade slides
+      slides.forEach(function(slide) {
+        if (slide.dataset.mediaIndex === index) {
+          slide.classList.remove('media-hidden');
+        } else {
+          slide.classList.add('media-hidden');
+        }
+      });
+    }
+    
+    thumbnails.forEach(function(thumb) {
+      thumb.addEventListener('click', function() {
+        activateThumbnail(this);
+      });
+    });
+    
+    // Variant media filtering
+    function filterMediaByVariant() {
+      // Get selected option values (check Material option specifically for this product)
+      const selectedValues = [];
+      
+      document.querySelectorAll('fieldset.variant-option-group').forEach(function(fieldset) {
+        const checkedInput = fieldset.querySelector('input[type="radio"]:checked');
+        if (checkedInput && checkedInput.value) {
+          selectedValues.push(checkedInput.value.toLowerCase().trim());
+        }
+      });
+      
+      // Also check for addon options but don't filter by them
+      // Only filter by variant options (like Material)
+      
+      if (selectedValues.length === 0) {
+        // No variant selected, show all
+        thumbnails.forEach(t => t.style.display = '');
+        slides.forEach(s => s.style.display = '');
+        return;
+      }
+      
+      let hasMatchingMedia = false;
+      let firstMatchingThumb = null;
+      
+      thumbnails.forEach(function(thumb, idx) {
+        const alt = (thumb.dataset.mediaAlt || '').toLowerCase().trim();
+        const slide = slides[idx];
+        
+        // Check if media alt contains any selected option value
+        let matches = false;
+        
+        if (alt === '') {
+          // Untagged media - show it
+          matches = true;
+        } else {
+          // Check if alt text matches any selected variant
+          matches = selectedValues.some(val => alt.includes(val));
+        }
+        
+        if (matches) {
+          thumb.style.display = '';
+          if (slide) slide.style.display = '';
+          hasMatchingMedia = true;
+          if (!firstMatchingThumb) firstMatchingThumb = thumb;
+        } else {
+          thumb.style.display = 'none';
+          if (slide) slide.style.display = 'none';
+        }
+      });
+      
+      // If no matching media found, show all
+      if (!hasMatchingMedia) {
+        thumbnails.forEach(t => t.style.display = '');
+        slides.forEach(s => s.style.display = '');
+        firstMatchingThumb = thumbnails[0];
+      }
+      
+      // Activate first matching thumbnail
+      if (firstMatchingThumb && !firstMatchingThumb.classList.contains('active')) {
+        activateThumbnail(firstMatchingThumb);
+      }
+    }
+    
+    // Listen for variant changes
+    document.querySelectorAll('input[type="radio"][name*="option"]').forEach(input => {
+      input.addEventListener('change', filterMediaByVariant);
+    });
+    
+    // Also listen on the form for any changes
+    const form = document.querySelector('form[action*="/cart/add"]');
+    if (form) {
+      form.addEventListener('change', function(e) {
+        if (e.target.matches('input[type="radio"][name*="option"]')) {
+          filterMediaByVariant();
+        }
+      });
+    }
+    
+    // Initial filter
+    filterMediaByVariant();
+  });
+})();
+</script>
 
 {% schema %}
 {
   "name": "Product Precision",
   "tag": "section",
   "class": "section",
-  "blocks": [
-    {
-      "type": "@app"
-    },
-    {
-      "type": "collapsible_tab",
-      "name": "Collapsible row",
-      "settings": [
-        {
-          "type": "text",
-          "id": "heading",
-          "default": "Collapsible row",
-          "label": "Heading"
-        },
-        {
-          "type": "richtext",
-          "id": "content",
-          "label": "Row content"
-        },
-        {
-          "type": "page",
-          "id": "page",
-          "label": "Row content from page"
-        }
-      ]
-    }
-  ],
+  "blocks": [],
   "settings": [
     {
       "type": "checkbox",

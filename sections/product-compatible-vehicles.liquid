@@ -1,27 +1,32 @@
 {%- if product.metafields.custom.fits_vehicles.value != blank -%}
-  <div class="page-width section-{{ section.id }}-padding color-{{ section.settings.color_scheme }}">
-    <div class="product-compatible-vehicles">
-      {%- if section.settings.heading != blank -%}
-        <h2 class="h2 {{ section.settings.heading_alignment }}">{{ section.settings.heading | escape }}</h2>
-      {%- endif -%}
-
+  <div class="page-width section-{{ section.id }}-padding">
+    <div class="tcc-fitment">
+      <!-- Header -->
+      <div class="tcc-fitment-header">Vehicle Fitment</div>
+      
       <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
+        <table class="tcc-fitment-table">
           <thead>
-            <tr class="border-b border-gray-200">
-              <th class="py-3 px-4 font-bold uppercase text-sm tracking-wider">Year</th>
-              <th class="py-3 px-4 font-bold uppercase text-sm tracking-wider">Make</th>
-              <th class="py-3 px-4 font-bold uppercase text-sm tracking-wider">Model</th>
-              <th class="py-3 px-4 font-bold uppercase text-sm tracking-wider">Submodel</th>
+            <tr>
+              <th></th>
+              <th>Year</th>
+              <th>Make</th>
+              <th>Model</th>
+              <th>Submodel</th>
             </tr>
           </thead>
           <tbody>
             {%- for vehicle in product.metafields.custom.fits_vehicles.value -%}
-              <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                <td class="py-3 px-4">{{ vehicle.year }}</td>
-                <td class="py-3 px-4">{{ vehicle.make }}</td>
-                <td class="py-3 px-4">{{ vehicle.model }}</td>
-                <td class="py-3 px-4">{{ vehicle.submodel | default: '-' }}</td>
+              <tr>
+                <td class="tcc-check-cell">
+                  <svg class="tcc-check-icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                  </svg>
+                </td>
+                <td>{{ vehicle.year }}</td>
+                <td>{{ vehicle.make }}</td>
+                <td>{{ vehicle.model }}</td>
+                <td>{{ vehicle.submodel | default: '—' }}</td>
               </tr>
             {%- endfor -%}
           </tbody>
@@ -30,6 +35,89 @@
     </div>
   </div>
 
+  <style>
+    .tcc-fitment {
+      margin-top: 48px;
+    }
+    
+    .tcc-fitment-header {
+      font-family: 'Helvetica Neue', 'Arial', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: #111;
+      text-transform: uppercase;
+      letter-spacing: -0.01em;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 0.5px solid #E5E5E5;
+    }
+    
+    .tcc-fitment-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+    }
+    
+    .tcc-fitment-table thead tr {
+      border-bottom: 0.5px solid #111;
+    }
+    
+    .tcc-fitment-table th {
+      padding: 12px 16px;
+      text-align: left;
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .tcc-fitment-table tbody tr {
+      border-bottom: 0.5px solid #E5E5E5;
+    }
+    
+    .tcc-fitment-table tbody tr:nth-child(odd) {
+      background: #FAFAFA;
+    }
+    
+    .tcc-fitment-table tbody tr:nth-child(even) {
+      background: #FFFFFF;
+    }
+    
+    .tcc-fitment-table td {
+      padding: 14px 16px;
+      color: #111;
+    }
+    
+    .tcc-check-cell {
+      width: 40px;
+      text-align: center;
+    }
+    
+    .tcc-check-icon {
+      width: 18px;
+      height: 18px;
+      color: #CC0000;
+    }
+    
+    @media (max-width: 768px) {
+      .tcc-fitment-table {
+        font-size: 12px;
+      }
+      
+      .tcc-fitment-table th,
+      .tcc-fitment-table td {
+        padding: 10px 8px;
+      }
+      
+      .tcc-fitment-header {
+        font-size: 20px;
+      }
+    }
+  </style>
+  
   {% style %}
     .section-{{ section.id }}-padding {
       padding-top: {{ section.settings.padding_top | times: 0.75 | round: 0 }}px;
@@ -54,7 +142,7 @@
     {
       "type": "text",
       "id": "heading",
-      "default": "Compatible Vehicles",
+      "default": "Vehicle Fitment",
       "label": "Heading"
     },
     {

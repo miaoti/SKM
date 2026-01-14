@@ -302,7 +302,7 @@
           <h2 class="text-sm font-semibold text-gray-900">Products</h2>
           <button id="btn-new-product" class="text-xs text-white bg-red-600 hover:bg-red-700 px-2.5 py-1 rounded">+ New</button>
         </div>
-        <input type="text" id="product-search" name="product-search-nofill" autocomplete="off" placeholder="Search by title..." class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 mb-2">
+        <input type="text" id="product-search" name="product-search-nofill" autocomplete="off" placeholder="Search by title or SKU..." class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 mb-2">
         
         <!-- YMM Filter -->
         <details id="ymm-filter-details" class="border border-gray-200 rounded-lg">
@@ -334,6 +334,7 @@
           <div class="w-5 h-5 border-2 border-gray-200 border-t-red-600 rounded-full spinner"></div>
         </div>
       </div>
+      <div id="load-more-container" class="p-2"></div>
       <div class="p-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500">
         <span id="product-count">Loading...</span>
       </div>
@@ -346,7 +347,7 @@
           <h2 class="text-sm font-semibold text-gray-900">Products</h2>
           <button id="btn-new-product-mobile" class="text-xs text-white bg-red-600 hover:bg-red-700 px-2.5 py-1 rounded">+ New</button>
         </div>
-        <input type="text" id="product-search-mobile" name="product-search-mobile-nofill" autocomplete="off" placeholder="Search by title..." class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 mb-2">
+        <input type="text" id="product-search-mobile" name="product-search-mobile-nofill" autocomplete="off" placeholder="Search by title or SKU..." class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 mb-2">
         
         <!-- YMM Filter Mobile -->
         <details id="ymm-filter-details-mobile" class="border border-gray-200 rounded-lg">
@@ -686,7 +687,12 @@
                   <div id="inventory-tracked-section" class="space-y-4">
                     <div>
                       <label class="text-xs font-medium text-gray-600 mb-1 block">SKU</label>
-                      <input type="text" id="edit-sku" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg bg-gray-50" readonly>
+                      <!-- SKU Variant Notice -->
+                      <div id="sku-variant-notice" class="hidden mb-2 flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-lg">
+                        <svg class="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <p class="text-xs text-gray-600">This product has variants. Edit SKU in the <span class="font-medium text-gray-700">Options & Variants</span> section.</p>
+                      </div>
+                      <input type="text" id="edit-sku" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500">
                     </div>
                     <div>
                       <label class="text-xs font-medium text-gray-600 mb-1 block">Quantity</label>
