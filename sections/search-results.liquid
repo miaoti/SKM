@@ -16,6 +16,15 @@
 >
   {% render 'skip-to-content-link', href: '#ResultsList', text: 'accessibility.skip_to_results_list' %}
 
+  <div id="vehicle-filter-notice" class="vehicle-filter-notice hidden">
+    <span class="vehicle-filter-notice__icon">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+      </svg>
+    </span>
+    <span id="vehicle-filter-message" class="vehicle-filter-notice__text"></span>
+  </div>
+
   <div
     class="collection-wrapper grid gap-style"
   >
@@ -61,6 +70,55 @@
     {% endpaginate %}
   </div>
 </results-list>
+
+<style>
+
+  .vehicle-filter-notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 20px;
+    background-color: #f8f8f8; /* Very light gray, assuming light mode */
+    border-left: 4px solid #D90000; /* SkM Red Accent */
+    color: #111;
+    margin-bottom: 32px;
+    margin-top: 16px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* Dark mode support if variables exist, otherwise rely on hardcoded for specific look */
+  @media (prefers-color-scheme: dark) {
+     .vehicle-filter-notice {
+        background-color: #1a1a1a;
+        color: #fff;
+     }
+  }
+
+  .vehicle-filter-notice.hidden {
+    display: none;
+  }
+
+  .vehicle-filter-notice__icon {
+    display: flex;
+    color: #D90000; /* SkM Red */
+    flex-shrink: 0;
+  }
+  
+  .vehicle-filter-notice__icon svg {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .vehicle-filter-notice__text {
+     text-align: center;
+     line-height: 1.4;
+     font-weight: 600;
+  }
+</style>
 
 {% schema %}
 {

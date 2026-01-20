@@ -37,6 +37,15 @@
         {%- endif -%}
       </div>
 
+      <div id="vehicle-filter-notice" class="vehicle-filter-notice hidden">
+        <span class="vehicle-filter-notice__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+        </span>
+        <span id="vehicle-filter-message" class="vehicle-filter-notice__text"></span>
+      </div>
+
       {% if predictive_search.performed %}
         {%- if search_results_count > 0 -%}
           {% assign shared_results_index = 0 %}
@@ -620,7 +629,6 @@
       transform: translateY(8px);
     }
   }
-
   .predictive-search-results__card--query {
     transition: transform var(--animation-speed-medium) var(--animation-timing-bounce);
     transform-origin: center;
@@ -628,6 +636,50 @@
     &:active {
       transform: scale(0.97);
     }
+  }
+
+
+  .vehicle-filter-notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px;
+    background-color: #f8f8f8;
+    border-left: 3px solid #D90000;
+    color: #111;
+    margin-bottom: 16px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  @media (prefers-color-scheme: dark) {
+     .vehicle-filter-notice {
+        background-color: #1a1a1a;
+        color: #fff;
+     }
+  }
+
+  .vehicle-filter-notice.hidden {
+    display: none;
+  }
+
+  .vehicle-filter-notice__icon {
+    display: flex;
+    color: #D90000;
+    flex-shrink: 0;
+  }
+  
+  .vehicle-filter-notice__icon svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .vehicle-filter-notice__text {
+     line-height: 1.4;
+     font-weight: 600;
   }
 {% endstylesheet %}
 

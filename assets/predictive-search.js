@@ -103,8 +103,8 @@ class PredictiveSearchComponent extends Component {
     const containers = Array.from(
       this.querySelectorAll(
         '.predictive-search-results__wrapper-queries, ' +
-          '.predictive-search-results__wrapper-products, ' +
-          '.predictive-search-results__list'
+        '.predictive-search-results__wrapper-products, ' +
+        '.predictive-search-results__list'
       )
     );
 
@@ -318,11 +318,100 @@ class PredictiveSearchComponent extends Component {
         morph(predictiveSearchResults, resultsMarkup);
 
         this.#resetScrollPositions();
+
+        // Filter by vehicle if selected
+        this.#filterResultsByVehicle().catch(console.error);
       })
       .catch((error) => {
         if (abortController.signal.aborted) return;
         throw error;
       });
+  }
+
+  /**
+   * Filter and reorder results based on selected vehicle
+   */
+  async #filterResultsByVehicle() {
+    // 1. Check if vehicle is selected
+    const VEHICLE_KEY = 'skm_garage_vehicle';
+    let vehicle = null;
+    try {
+      vehicle = JSON.parse(localStorage.getItem(VEHICLE_KEY) || 'null');
+    } catch { }
+
+    const notice = this.querySelector('#vehicle-filter-notice');
+    const noticeMessage = this.querySelector('#vehicle-filter-message');
+
+    // Reset notice
+    if (notice) notice.classList.add('hidden');
+
+    if (!vehicle || !vehicle.id) return;
+
+    // 2. Get all displayed products
+    const productItems = Array.from(this.querySelectorAll('[data-product-id]'));
+    if (productItems.length === 0) return;
+
+    const productIds = productItems.map(item => item.dataset.productId).filter(Boolean);
+
+    // 3. Call API to check fitment
+    try {
+      const response = await fetch(`https://skm-inventory-api.miaotingshuo.workers.dev/products/check-vehicle-fit?vehicleId=${vehicle.id}&productIds=${productIds.join(',')}`);
+      const data = await response.json();
+
+      const { fits, notFits } = data;
+
+      // 4. Handle results
+      if (fits.length === 0) {
+        // CASE: No matches for vehicle
+        if (notice && noticeMessage) {
+          const vehicleName = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+          noticeMessage.textContent = `No matching results for your ${vehicleName}, showing all related products.`;
+          notice.classList.remove('hidden');
+        }
+      } else {
+        // CASE: Some matches - Reorder DOM
+        // We want 'fits' to be first
+
+        // Group items
+        const fitItems = [];
+        const notFitItems = [];
+
+        productItems.forEach(item => {
+          const pid = item.dataset.productId;
+          if (fits.includes(pid)) {
+            fitItems.push(item);
+            // Add a visual indicator for fit if desired, or just rely on ordering
+            item.style.order = '-1';
+            // Optional: Add a "Fits" badge? Not requested but helpful.
+            // For now just reordering.
+          } else {
+            notFitItems.push(item);
+            item.style.order = '0';
+          }
+        });
+
+        // Since we are using flex/grid order, we need to ensure the parent has display flex/grid.
+        // The list is .predictive-search-results__list which usually has display grid or flex.
+        // Let's check css or just re-append elements to be safe.
+
+        const parent = productItems[0].parentElement;
+        if (parent) {
+          // It's safer to re-append elements to guarantee order regardless of CSS display type
+          fitItems.forEach(item => parent.appendChild(item));
+          notFitItems.forEach(item => parent.appendChild(item));
+
+          // Or Prepend fits
+          // Re-appending fits first, then notFits is equivalent to sorting.
+          // Wait, if I append they go to bottom.
+          // I should grab all items, sort them, then appendFrame.
+
+          fitItems.forEach(item => parent.insertBefore(item, parent.firstChild));
+        }
+      }
+
+    } catch (e) {
+      console.error('Failed to check vehicle fitment:', e);
+    }
   }
 
   /**
@@ -336,7 +425,7 @@ class PredictiveSearchComponent extends Component {
     if (viewedProducts.length === 0) return null;
 
     const url = new URL(Theme.routes.search_url, location.origin);
-    url.searchParams.set('q', viewedProducts.map(/** @param {string} id */ (id) => `id:${id}`).join(' OR '));
+    url.searchParams.set('q', viewedProducts.map(/** @param {string} id */(id) => `id:${id}`).join(' OR '));
     url.searchParams.set('resources[type]', 'product');
 
     return sectionRenderer.getSectionHTML(this.dataset.sectionId, false, url);

@@ -289,28 +289,34 @@
   /* ========================================
      COLLECTION HUD COMMAND BAR
      ======================================== */
+  /* ========================================
+     COLLECTION HUD COMMAND BAR
+     ======================================== */
   .collection-hud-bar {
     width: 100%;
-    background: linear-gradient(180deg, #0a0a0a 0%, #111111 100%);
-    border-bottom: 1px solid rgba(204, 0, 0, 0.3);
+    background: #0a0a0a;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     padding: 0;
+    position: relative;
+    z-index: 10;
   }
 
   .collection-hud-inner {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 16px 24px;
+    padding: 12px 16px;
     display: flex;
-    flex-direction: column;
+    flex-direction: row; /* Always row to keep it sleek */
+    align-items: center;
+    justify-content: space-between;
     gap: 12px;
-    align-items: stretch;
   }
 
-  @media (min-width: 768px) {
+  /* Mobile Optimization */
+  @media (max-width: 767px) {
     .collection-hud-inner {
-      flex-direction: row;
-      align-items: center;
-      justify-content: space-between;
+      padding: 10px 16px;
+      gap: 10px;
     }
   }
 
@@ -318,90 +324,129 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    flex-wrap: wrap;
+    flex: 1;
+    min-width: 0; /* Allow text truncation */
   }
 
   .collection-hud-indicator {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     background: #CC0000;
     border-radius: 50%;
     animation: pulse 2s infinite;
     flex-shrink: 0;
+    box-shadow: 0 0 5px rgba(204, 0, 0, 0.5);
   }
 
   .collection-hud-label {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.4);
     text-transform: uppercase;
-    letter-spacing: 0.15em;
+    letter-spacing: 0.1em;
+    display: none; /* Hide label on mobile for cleaner look */
+  }
+
+  @media (min-width: 768px) {
+    .collection-hud-label {
+      display: block;
+    }
   }
 
   .collection-hud-vehicle {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.4);
+    font-size: 12px;
+    color: #fff;
     font-weight: 500;
-    padding: 6px 12px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 6px 0; /* Remove horizontal padding on mobile to save space */
+    background: transparent;
+    border: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (min-width: 768px) {
+    .collection-hud-vehicle {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.4);
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
   }
 
   .collection-hud-vehicle--active {
     color: #CC0000;
     border-color: rgba(204, 0, 0, 0.3);
-    background: rgba(204, 0, 0, 0.1);
   }
-
+  
+  /* Clear Button - Redesigned */
   .collection-hud-clear {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    background: rgba(204, 0, 0, 0.2);
-    border: 1px solid rgba(204, 0, 0, 0.4);
-    border-radius: 4px;
-    color: #CC0000;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.3);
     cursor: pointer;
     transition: all 0.2s ease;
     flex-shrink: 0;
+    padding: 0;
+    margin-left: 4px;
   }
 
   .collection-hud-clear:hover {
-    background: rgba(204, 0, 0, 0.4);
-    border-color: #CC0000;
-    color: white;
+    color: #CC0000;
+    transform: scale(1.1);
   }
 
   .collection-hud-clear.hidden {
     display: none;
   }
 
-
+  /* Configure Button - Redesigned */
   .collection-hud-button {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.8);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.05em;
     cursor: pointer;
     transition: all 0.3s ease;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  
+  @media (min-width: 768px) {
+    .collection-hud-button {
+      padding: 8px 16px;
+      gap: 8px;
+       font-size: 11px;
+       letter-spacing: 0.1em;
+    }
+  }
+
+  .collection-hud-button svg {
+    width: 12px;
+    height: 12px;
+    color: #CC0000;
   }
 
   .collection-hud-button:hover {
     color: white;
     border-color: #CC0000;
     background: rgba(204, 0, 0, 0.1);
-    box-shadow: 0 0 20px rgba(204, 0, 0, 0.3);
+    box-shadow: 0 0 10px rgba(204, 0, 0, 0.2);
   }
 
   /* ========================================
@@ -615,9 +660,25 @@
   }
 
   /* Product Grid Alignment Fix - Ensure all cards align properly */
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Default mobile */
+    gap: 16px;
+  }
+  
+  @media screen and (min-width: 750px) {
+    .product-grid {
+      grid-template-columns: repeat(4, 1fr); /* Default desktop */
+    }
+  }
+
   .product-grid__item {
     display: flex;
     flex-direction: column;
+    position: relative;
+    width: 100%;
+    /* Prevent display: contents from leaking children into grid */
+    box-sizing: border-box;
   }
 
   .product-grid__item .product-card,
@@ -626,6 +687,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    width: 100%;
   }
 
   .product-grid__item .product-card__content,

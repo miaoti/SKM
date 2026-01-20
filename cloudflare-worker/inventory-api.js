@@ -1,3 +1,5 @@
+
+
 // ============================================
 // SKM INVENTORY MANAGER - CLOUDFLARE WORKER
 // ============================================
@@ -80,7 +82,7 @@ export default {
     const path = url.pathname;
 
     // Authentication check (skip for health check, B2B storefront, and public dealer endpoints)
-    const publicPaths = ["/health", "/b2b/checkout", "/b2b/cart-preview", "/checkout/create", "/shop/profile", "/categories", "/dealers", "/apply-dealer", "/my-dealer"];
+    const publicPaths = ["/health", "/b2b/checkout", "/b2b/cart-preview", "/checkout/create", "/shop/profile", "/categories", "/dealers", "/apply-dealer", "/my-dealer", "/products/check-vehicle-fit"];
     const isPublicDealerPath = path.startsWith("/dealers/") && request.method === "GET";
     const isCustomerUpdate = path.startsWith("/customers/") && request.method === "PUT";
 
@@ -97,6 +99,14 @@ export default {
         // Health check (no auth required)
         case path === "/health":
           return jsonResponse({ status: "ok", timestamp: Date.now() });
+
+        // ==========================================
+        // PUBLIC ROUTES (No Admin Key needed)
+        // ==========================================
+        case path === "/products/check-vehicle-fit" && request.method === "GET":
+          const fitCheckVehicleId = url.searchParams.get("vehicleId");
+          const fitCheckProductIds = url.searchParams.get("productIds");
+          return jsonResponse(await checkProductFitment(env, fitCheckVehicleId, fitCheckProductIds));
 
         // ==========================================
         // VEHICLE ROUTES
@@ -195,6 +205,8 @@ export default {
         case path.match(/^\/products\/[^/]+$/) && request.method === "DELETE":
           const deleteProductId = path.split("/").pop();
           return jsonResponse(await deleteProduct(env, deleteProductId));
+
+
 
         case path === "/products/update-fitment" && request.method === "POST":
           const fitmentBody = await request.json();
@@ -2378,6 +2390,68 @@ async function deleteProduct(env, productId) {
 // ============================================
 // FITMENT OPERATIONS
 // ============================================
+
+// ============================================
+// CHECK VEHICLE FITMENT
+// ============================================
+async function checkProductFitment(env, vehicleId, productIdsStr) {
+  if (!vehicleId || !productIdsStr) throw new Error("vehicleId and productIds are required");
+
+  const productIds = productIdsStr.split(",").map(id =>
+    id.startsWith("gid://") ? id : `gid://shopify/Product/${id}`
+  );
+
+  if (productIds.length === 0) return { fits: [], notFits: [] };
+
+  // Ensure vehicleId is a GID
+  const vehicleGid = vehicleId.startsWith("gid://") ? vehicleId : `gid://shopify/Metaobject/${vehicleId}`;
+
+  const query = `
+    query GetProductFitments($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on Product {
+          id
+          metafield(namespace: "custom", key: "fits_vehicles") {
+            value
+          }
+        }
+      }
+    }
+  `;
+
+  const result = await shopifyGraphQL(env, query, { ids: productIds });
+  const nodes = result.nodes || [];
+
+  const fits = [];
+  const notFits = [];
+
+  for (const node of nodes) {
+    if (!node) continue;
+
+    let isFit = false;
+    try {
+      if (node.metafield?.value) {
+        const vehicleGids = JSON.parse(node.metafield.value);
+        if (Array.isArray(vehicleGids) && vehicleGids.includes(vehicleGid)) {
+          isFit = true;
+        }
+      }
+    } catch (e) {
+      // ignore parse error
+    }
+
+    // Convert GID back to simple ID for frontend to match standard usage
+    const simpleId = node.id.split("/").pop();
+
+    if (isFit) {
+      fits.push(simpleId);
+    } else {
+      notFits.push(simpleId);
+    }
+  }
+
+  return { fits, notFits };
+}
 
 async function updateProductFitment(env, data) {
   const { product_id, vehicle_id, vehicle_ids } = data;
