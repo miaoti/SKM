@@ -165,6 +165,9 @@ async function initDealersTab() {
   }
 }
 
+// Expose initDealersTab globally for switchToTab to call
+window.initDealersTab = initDealersTab;
+
 /**
  * View dealer's connected customer account
  * Switches to Customers tab, searches for the dealer's email, and auto-selects the customer

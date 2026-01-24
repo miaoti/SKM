@@ -220,11 +220,20 @@
       }
 
       if (order.customer) {
-        $('order-customer-name').textContent = order.customer.displayName || `${order.customer.firstName || ''} ${order.customer.lastName || ''}`.trim() || 'Guest';
-        $('order-customer-email').textContent = order.customer.email || order.email || '-';
-        $('order-customer-phone').textContent = order.customer.phone || order.phone || '-';
-        $('order-customer-orders').textContent = order.customer.ordersCount || '0';
-        $('order-customer-spent').textContent = `$${parseFloat(order.customer.totalSpent?.amount || 0).toFixed(2)}`;
+        const c = order.customer;
+        // Use same calculation logic as Customer Tab (recentOrders length preferred if available)
+        const ordersCount = c.recentOrders?.length || c.ordersCount || 0;
+
+        // Calculate total spent (prefer Shopify value, fall back to calculating from recent orders)
+        const totalSpent = parseFloat(c.totalSpent || 0) ||
+          (c.recentOrders?.filter(o => o.financial !== 'REFUNDED')
+            .reduce((sum, o) => sum + parseFloat(o.total || 0), 0) || 0);
+
+        $('order-customer-name').textContent = c.displayName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Guest';
+        $('order-customer-email').textContent = c.email || order.email || '-';
+        $('order-customer-phone').textContent = c.phone || order.phone || '-';
+        $('order-customer-orders').textContent = ordersCount;
+        $('order-customer-spent').textContent = `$${totalSpent.toFixed(2)}`;
 
         const tagsHtml = (order.customer.tags || []).map(t => `<span class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-100 text-gray-600">${t}</span>`).join('');
         $('order-customer-tags').innerHTML = tagsHtml || '';
@@ -300,7 +309,7 @@
                 </p>
               </div>
             </div>
-            <a href="https://admin.shopify.com/store/skm-exhaust/orders/${numericId}" 
+            <a href="https://admin.shopify.com/store/skm-ex/orders/${numericId}" 
                target="_blank" 
                class="mt-2 inline-flex items-center gap-1 text-xs font-medium ${textColor} hover:underline">
               <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -538,10 +547,23 @@
       $('btn-create-label').addEventListener('click', () => {
         if (!S.selectedOrderFull) return;
         const numericId = S.selectedOrderFull.id.split('/').pop();
-        // Shopify doesn't expose label creation via API - redirect to Shopify Admin
-        const labelUrl = `https://admin.shopify.com/store/skm-exhaust/orders/${numericId}/fulfill`;
+
+        // Try to find an open fulfillment order to link directly to
+        const fos = S.selectedOrderFull.fulfillmentOrders || [];
+        const openFo = fos.find(fo => fo.status === 'OPEN' || fo.status === 'IN_PROGRESS');
+
+        let labelUrl;
+        if (openFo) {
+          const foIds = openFo.id.split('/');
+          const foNumericId = foIds[foIds.length - 1]; // Handle both raw numeric and GID formats
+          labelUrl = `https://admin.shopify.com/store/skm-ex/orders/${numericId}/fulfillment_orders/${foNumericId}/fulfill`;
+        } else {
+          // Fallback to main order page if no open fulfillment orders (e.g., all fulfilled)
+          labelUrl = `https://admin.shopify.com/store/skm-ex/orders/${numericId}`;
+          toast('No open fulfillment orders found. Opening order details...', 'info');
+        }
+
         window.open(labelUrl, '_blank');
-        toast('Opening Shopify to create shipping label...', 'info');
       });
     }
 
@@ -785,7 +807,7 @@
               break;
 
             case 'view-shopify':
-              const shopifyUrl = `https://admin.shopify.com/store/skm-exhaust/orders/${numericId}`;
+              const shopifyUrl = `https://admin.shopify.com/store/skm-ex/orders/${numericId}`;
               window.open(shopifyUrl, '_blank');
               break;
 

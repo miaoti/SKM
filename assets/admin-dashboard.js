@@ -145,8 +145,110 @@
 
   function $(id) { return document.getElementById(id); }
 
+  // Email Preview Modal
+  async function showEmailPreview(orderId, emailType) {
+    const modal = $('email-preview-modal');
+    const content = $('email-preview-content');
+    const subject = $('email-preview-subject');
+    const meta = $('email-preview-meta');
+
+    // Show modal with loading state
+    modal.classList.remove('hidden');
+    content.innerHTML = `
+      <div class="flex items-center justify-center h-64">
+        <div class="text-center text-gray-500">
+          <svg class="w-8 h-8 mx-auto mb-2 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p>Loading email preview...</p>
+        </div>
+      </div>
+    `;
+    subject.textContent = 'Email Preview';
+    meta.textContent = 'Loading...';
+
+    try {
+      const result = await api.get(`/orders/${orderId}/email-preview?type=${emailType}`);
+
+      // result is already the data (api.get extracts d.data and throws on failure)
+      subject.textContent = result.subject || 'Email Preview';
+      meta.textContent = `To: ${result.customerEmail || 'customer'} • ${new Date(result.sentAt).toLocaleString()}`;
+
+      // Render the HTML email in a sandboxed iframe-like container
+      content.innerHTML = `
+        <div style="background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <iframe 
+            srcdoc="${result.html.replace(/"/g, '&quot;')}"
+            style="width: 100%; height: 600px; border: none;"
+            sandbox="allow-same-origin"
+          ></iframe>
+        </div>
+      `;
+    } catch (err) {
+      content.innerHTML = `
+        <div class="flex items-center justify-center h-64">
+          <div class="text-center">
+            <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-red-100 flex items-center justify-center">
+              <svg class="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+            </div>
+            <p class="text-red-600 font-medium">Failed to load email</p>
+            <p class="text-sm text-gray-500 mt-1">${err.message}</p>
+          </div>
+        </div>
+      `;
+      meta.textContent = 'Error loading preview';
+    }
+  }
+
+  // Close email preview modal
+  const emailPreviewClose = $('email-preview-close');
+  if (emailPreviewClose) {
+    emailPreviewClose.addEventListener('click', () => {
+      $('email-preview-modal').classList.add('hidden');
+    });
+  }
+
+  // Close on backdrop click
+  const emailPreviewModal = $('email-preview-modal');
+  if (emailPreviewModal) {
+    emailPreviewModal.addEventListener('click', (e) => {
+      if (e.target === emailPreviewModal) {
+        emailPreviewModal.classList.add('hidden');
+      }
+    });
+  }
+
   // Expose context for external scripts - switchToTab added after function is defined
   window.AdminDashboard = { API_BASE, api, toast, S };
+
+  // ==========================================
+  // URL STATE MANAGEMENT - Persist tab and selection on refresh
+  // ==========================================
+  function updateUrlState(tab, itemType = null, itemId = null) {
+    let hash = `tab=${tab}`;
+    if (itemType && itemId) {
+      hash += `&${itemType}=${itemId}`;
+    }
+    history.replaceState(null, '', `#${hash}`);
+  }
+
+  function getUrlState() {
+    const hash = window.location.hash.slice(1); // Remove #
+    if (!hash) return null;
+    const params = new URLSearchParams(hash);
+    return {
+      tab: params.get('tab'),
+      customer: params.get('customer'),
+      product: params.get('product'),
+      order: params.get('order')
+    };
+  }
+
+  // Store current tab for URL updates
+  let currentTab = 'product';
 
   // ==========================================
   // MOBILE SIDEBAR TOGGLE
@@ -175,7 +277,14 @@
   }
 
   // Tab Switching Function (reusable)
-  function switchToTab(tabName) {
+  function switchToTab(tabName, skipUrlUpdate = false) {
+    currentTab = tabName;
+
+    // Update URL hash (unless restoring from URL)
+    if (!skipUrlUpdate) {
+      updateUrlState(tabName);
+    }
+
     document.querySelectorAll('.tab').forEach(x => x.classList.remove('tab-active'));
     const targetTab = document.querySelector(`.tab[data-tab="${tabName}"]`);
     if (targetTab) targetTab.classList.add('tab-active');
@@ -236,6 +345,11 @@
     if (tabName === 'profile' && window.AdminProfile) {
       window.AdminProfile.init();
     }
+
+    // Initialize dealers tab when first visited
+    if (tabName === 'dealers' && window.initDealersTab) {
+      window.initDealersTab();
+    }
   }
 
   // Expose switchToTab for external scripts (deep linking from email)
@@ -245,6 +359,40 @@
   document.querySelectorAll('.tab').forEach(t => {
     t.addEventListener('click', () => switchToTab(t.dataset.tab));
   });
+
+  // Restore state from URL on page load
+  async function restoreStateFromUrl() {
+    const state = getUrlState();
+    if (!state || !state.tab) return;
+
+    // Switch to the saved tab (skip URL update since we're restoring)
+    switchToTab(state.tab, true);
+
+    // Wait for data to load, then restore selection
+    if (state.customer && state.tab === 'customers') {
+      // Wait a bit for customers to load
+      const waitForCustomers = setInterval(() => {
+        if (S.dataLoaded.customers) {
+          clearInterval(waitForCustomers);
+          selectCustomer(state.customer);
+        }
+      }, 200);
+      setTimeout(() => clearInterval(waitForCustomers), 5000); // Timeout after 5s
+    }
+
+    if (state.product && state.tab === 'product') {
+      const waitForProducts = setInterval(() => {
+        if (S.dataLoaded.products) {
+          clearInterval(waitForProducts);
+          selectProduct(state.product);
+        }
+      }, 200);
+      setTimeout(() => clearInterval(waitForProducts), 5000);
+    }
+  }
+
+  // Call restore on page load
+  restoreStateFromUrl();
 
   // ==========================================
   // PRODUCT LIST
@@ -463,8 +611,8 @@
         S.pendingMedia = [];
       }
 
-      // Switch to Products tab if not already there
-      switchToTab('product');
+      // Switch to Products tab if not already there (skip URL update - we'll update with product ID)
+      switchToTab('product', true);
 
       // Also switch to Products subtab (in case user is on Types subtab)
       if (window.ProductSubtabs) {
@@ -474,6 +622,9 @@
       const numId = id.includes('gid://') ? id.split('/').pop() : id;
       const p = await api.get(`/products/${numId}`);
       S.selected = p;
+
+      // Update URL with product selection
+      updateUrlState('product', 'product', numId);
 
       // Update subtab text with product name
       if (window.ProductSubtabs) {
@@ -2623,6 +2774,10 @@
     try {
       const cust = await api.get(`/customers/${id.split('/').pop()}`);
       S.selectedCustomer = cust;
+
+      // Update URL with customer selection
+      updateUrlState('customers', 'customer', id.split('/').pop());
+
       renderCustomerList();
       showCustomerEditor(cust);
     } catch (e) {
@@ -2633,6 +2788,10 @@
   function showCustomerEditor(c) {
     $('customer-empty').classList.add('hidden');
     $('customer-editor').classList.remove('hidden');
+
+    // Add mobile detail view class for panel toggle
+    const grid = document.querySelector('.customers-grid');
+    if (grid) grid.classList.add('mobile-detail-view');
 
     // Header info
     $('cust-name').textContent = c.displayName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unknown';
@@ -2710,6 +2869,106 @@
     } else {
       ordersEl.innerHTML = '<p class="text-sm text-gray-400">No orders yet</p>';
     }
+
+    // Marketing Preferences
+    const emailStatus = c.emailMarketing === 'SUBSCRIBED';
+    $('cust-email-marketing').textContent = emailStatus ? 'Email subscribed' : 'Email not subscribed';
+    $('cust-email-marketing-icon').className = `w-2 h-2 rounded-full ${emailStatus ? 'bg-green-500' : 'bg-gray-300'}`;
+
+    const smsStatus = c.smsMarketing === 'SUBSCRIBED';
+    $('cust-sms-marketing').textContent = smsStatus ? 'SMS subscribed' : 'SMS not subscribed';
+    $('cust-sms-marketing-icon').className = `w-2 h-2 rounded-full ${smsStatus ? 'bg-green-500' : 'bg-gray-300'}`;
+
+    // Tax Details
+    $('cust-tax-status').textContent = c.taxExempt ? 'Tax exempt' : 'Collect tax';
+    if (c.taxExemptions && c.taxExemptions.length > 0) {
+      $('cust-tax-exemptions').textContent = 'Exemptions: ' + c.taxExemptions.join(', ');
+    } else {
+      $('cust-tax-exemptions').textContent = '';
+    }
+
+    // Store Credit
+    const creditAmount = parseFloat(c.storeCredit || 0);
+    $('cust-store-credit').textContent = creditAmount > 0 ? `$${creditAmount.toFixed(2)}` : 'None';
+
+    // Timeline
+    const timelineEl = $('cust-timeline');
+    const customerId = c.id.split('/').pop();
+
+    // Get the most recent order ID for email previews
+    const mostRecentOrderId = c.recentOrders?.[0]?.id?.split('/')?.pop() || null;
+
+    if (c.timeline && c.timeline.length > 0) {
+      timelineEl.innerHTML = c.timeline.map((event, idx) => {
+        const date = new Date(event.createdAt);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+        // Check if this is an email event and determine type
+        const msgLower = (event.message || '').toLowerCase();
+        const isEmailEvent = msgLower.includes('email') && msgLower.includes('sent');
+
+        // Determine email type from message content
+        let emailType = 'confirmation';
+        if (msgLower.includes('shipping') || msgLower.includes('shipped') || msgLower.includes('fulfillment')) {
+          emailType = 'shipped';
+        } else if (msgLower.includes('refund') || msgLower.includes('cancel')) {
+          emailType = 'refunded';
+        }
+
+        // Try to extract order number from message (e.g., "#1001" or "Order 1001")
+        const orderMatch = event.message?.match(/(?:#|Order\s+)(\d+)/i);
+        const orderFromMessage = orderMatch ? orderMatch[1] : null;
+
+        // Find matching order from customer's orders
+        let orderId = null;
+        if (orderFromMessage && c.recentOrders) {
+          const matchingOrder = c.recentOrders.find(o => o.name?.includes(orderFromMessage));
+          if (matchingOrder) {
+            orderId = matchingOrder.id.split('/').pop();
+          }
+        } else if (!orderFromMessage) {
+          // Fallback to most recent only if we couldn't parse an order number
+          orderId = mostRecentOrderId;
+        }
+
+        const viewEmailLink = isEmailEvent
+          ? `<button class="view-email-btn inline-flex items-center gap-1 mt-1 px-2 py-0.5 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 cursor-pointer" 
+              data-order-id="${orderId || ''}" 
+              data-order-number="${orderFromMessage || ''}"
+              data-email-type="${emailType}">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              View email
+            </button>`
+          : '';
+
+        return `
+          <div class="flex items-start gap-3 pb-3 border-b border-gray-100 last:border-b-0">
+            <div class="w-2 h-2 mt-1.5 rounded-full ${isEmailEvent ? 'bg-red-400' : 'bg-gray-400'} flex-shrink-0"></div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-gray-700">${event.message || 'Activity recorded'}</p>
+              ${event.author ? `<p class="text-xs text-gray-500">by ${event.author}</p>` : ''}
+              ${viewEmailLink}
+            </div>
+            <div class="text-xs text-gray-400 text-right whitespace-nowrap">
+              <div>${dateStr}</div>
+              <div>${timeStr}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Attach click handlers for view email buttons
+      timelineEl.querySelectorAll('.view-email-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const orderId = btn.dataset.orderId;
+          const emailType = btn.dataset.emailType;
+          showEmailPreview(orderId, emailType);
+        });
+      });
+    } else {
+      timelineEl.innerHTML = '<p class="text-sm text-gray-400">No activity recorded</p>';
+    }
   }
 
   function renderCustomerTags(tags) {
@@ -2756,6 +3015,12 @@
   // Customer tag filter
   $('cf-tag').addEventListener('change', () => {
     renderCustomerList();
+  });
+
+  // Mobile back button handler
+  $('btn-customer-back')?.addEventListener('click', () => {
+    const grid = document.querySelector('.customers-grid');
+    if (grid) grid.classList.remove('mobile-detail-view');
   });
 
   // Add tag dropdown
@@ -3979,8 +4244,15 @@
         } else if (tabParam === 'customers') {
           switchToTab('customers');
         } else {
-          // Default: products tab - lazy load via switchToTab
-          switchToTab('product');
+          // Check if hash state exists (set by restoreStateFromUrl) - don't override it
+          const hashState = getUrlState();
+          if (hashState && hashState.tab) {
+            // Hash state exists - just ensure tab UI is correct without updating URL
+            switchToTab(hashState.tab, true);
+          } else {
+            // Default: products tab - lazy load via switchToTab
+            switchToTab('product');
+          }
         }
       } else {
         showAuth();
@@ -3989,6 +4261,64 @@
       toast('Cannot connect to API', 'error');
     }
   }
+
+  // Global event listener for dynamic email preview
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.view-email-btn');
+    if (!btn) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const orderId = btn.dataset.orderId;
+    const orderNumber = btn.dataset.orderNumber;
+    const emailType = btn.dataset.emailType;
+
+    if (orderId) {
+      showEmailPreview(orderId, emailType);
+    } else if (orderNumber) {
+      // Fetch order ID by number if missing
+      try {
+        const originalContent = btn.innerHTML;
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-wait');
+
+        // Try to find the order
+        const q = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
+        const data = await api.get(`/orders?q=${encodeURIComponent(q)}`);
+
+        let foundId = null;
+        if (data && data.orders && Array.isArray(data.orders)) {
+          // Look for exact name match
+          const match = data.orders.find(o => o.name === q || o.name === orderNumber);
+          if (match) {
+            foundId = match.id.split('/').pop();
+          } else if (data.orders.length > 0) {
+            // Fallback to first if only one result
+            if (data.orders.length === 1) foundId = data.orders[0].id.split('/').pop();
+          }
+        }
+
+        if (foundId) {
+          btn.dataset.orderId = foundId;
+          btn.innerHTML = originalContent; // Restore button
+          btn.classList.remove('opacity-50', 'cursor-wait');
+          btn.disabled = false;
+          showEmailPreview(foundId, emailType);
+        } else {
+          toast(`Order ${orderNumber} not found`, 'error');
+          btn.innerHTML = originalContent;
+          btn.classList.remove('opacity-50', 'cursor-wait');
+          btn.disabled = false;
+        }
+      } catch (err) {
+        console.error('Error fetching order:', err);
+        toast('Failed to load order details', 'error');
+        btn.classList.remove('opacity-50', 'cursor-wait');
+        btn.disabled = false;
+      }
+    }
+  });
 
   init();
 })();

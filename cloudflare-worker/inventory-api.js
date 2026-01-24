@@ -146,7 +146,8 @@ export default {
           const updateCustomerId = path.split("/").pop();
           const updateCustomerBody = await request.json();
           const signature = request.headers.get("X-Customer-Signature");
-          return jsonResponse(await updateCustomerProfile(env, updateCustomerId, updateCustomerBody, signature));
+          const adminKey = request.headers.get("X-Admin-Key");
+          return jsonResponse(await updateCustomerProfile(env, updateCustomerId, updateCustomerBody, signature, adminKey));
 
         case path.match(/^\/customers\/[^/]+\/tags$/) && request.method === "POST":
           const tagCustomerId = path.split("/")[2];
@@ -471,6 +472,11 @@ export default {
           const receiptOrderId = path.split("/")[2];
           return jsonResponse(await sendOrderReceipt(env, receiptOrderId));
 
+        // Get email preview (reconstructed)
+        case path.match(/^\/orders\/[^/]+\/email-preview$/) && request.method === "GET":
+          const emailPreviewOrderId = path.split("/")[2];
+          const emailType = url.searchParams.get("type") || "confirmation";
+          return jsonResponse(await getEmailPreview(env, emailPreviewOrderId, emailType));
 
 
         // ==========================================
@@ -823,10 +829,20 @@ async function getCustomer(env, customerId) {
         tags
         note
         taxExempt
+        taxExemptions
         numberOfOrders
         amountSpent { amount currencyCode }
         createdAt
         updatedAt
+        locale
+        emailMarketingConsent {
+          marketingState
+          consentUpdatedAt
+        }
+        smsMarketingConsent {
+          marketingState
+          consentUpdatedAt
+        }
         defaultAddress {
           id
           address1
@@ -863,6 +879,23 @@ async function getCustomer(env, customerId) {
             }
           }
         }
+        events(first: 20, sortKey: CREATED_AT, reverse: true) {
+          edges {
+            node {
+              __typename
+              createdAt
+              message
+              ... on CommentEvent {
+                author {
+                  name
+                }
+              }
+            }
+          }
+        }
+        metafield(namespace: "shopify", key: "store_credit") {
+          value
+        }
       }
     }
   `;
@@ -886,7 +919,12 @@ async function getCustomer(env, customerId) {
       state: c.state,
       tags: c.tags,
       note: c.note,
+      locale: c.locale,
       taxExempt: c.taxExempt,
+      taxExemptions: c.taxExemptions || [],
+      emailMarketing: c.emailMarketingConsent?.marketingState || 'NOT_SUBSCRIBED',
+      smsMarketing: c.smsMarketingConsent?.marketingState || 'NOT_SUBSCRIBED',
+      storeCredit: c.metafield?.value ? parseFloat(c.metafield.value) : 0,
       ordersCount: c.numberOfOrders,
       totalSpent: c.amountSpent?.amount,
       currency: c.amountSpent?.currencyCode,
@@ -902,7 +940,13 @@ async function getCustomer(env, customerId) {
         currency: node.totalPriceSet?.shopMoney?.currencyCode,
         fulfillment: node.displayFulfillmentStatus,
         financial: node.displayFinancialStatus
-      }))
+      })),
+      timeline: c.events?.edges?.map(({ node }) => ({
+        type: node.__typename,
+        message: node.message,
+        createdAt: node.createdAt,
+        author: node.author?.name || null
+      })) || []
     }
   };
 }
@@ -5554,6 +5598,18 @@ async function getOrder(env, orderId) {
             country
             zip
           }
+          orders(first: 10) {
+            edges {
+              node {
+                id
+                name
+                createdAt
+                totalPriceSet { shopMoney { amount currencyCode } }
+                displayFulfillmentStatus
+                displayFinancialStatus
+              }
+            }
+          }
         }
         
         shippingAddress {
@@ -5853,7 +5909,16 @@ async function getOrder(env, orderId) {
       customer: order.customer ? {
         ...order.customer,
         ordersCount: order.customer.numberOfOrders,
-        totalSpent: order.customer.amountSpent
+        totalSpent: order.customer.amountSpent?.amount,
+        recentOrders: order.customer.orders?.edges.map(({ node }) => ({
+          id: node.id,
+          name: node.name,
+          createdAt: node.createdAt,
+          total: node.totalPriceSet?.shopMoney?.amount,
+          currency: node.totalPriceSet?.shopMoney?.currencyCode,
+          fulfillment: node.displayFulfillmentStatus,
+          financial: node.displayFinancialStatus
+        })) || []
       } : null
     }
   };
@@ -7212,16 +7277,21 @@ async function getShippingRates(env, orderId) {
  * Update customer profile (name, email, phone, password)
  * Used by Customer Account page
  */
-async function updateCustomerProfile(env, customerId, data, signature) {
-  // 1. Security Check: Verify Signature
-  // This ensures the request comes from the authenticated storefront session
-  const secret = "skm-customer-update-secret";
-  const expectedSignature = await hmacSha256(secret, customerId);
+async function updateCustomerProfile(env, customerId, data, signature, adminKey = null) {
+  // 1. Security Check: Admin Key OR Signature
+  // Admin users can update any customer, customers can update themselves via signature
+  const isAdminAuth = adminKey && adminKey === env.ADMIN_SECRET;
 
-  if (!signature || signature !== expectedSignature) {
-    // Log for debugging
-    console.warn(`[Auth Fail] ID: ${customerId}, Sig: ${signature}, Expected: ${expectedSignature}`);
-    throw new Error("Unauthorized: Invalid signature");
+  if (!isAdminAuth) {
+    // Fall back to signature-based auth for customer self-updates
+    const secret = "skm-customer-update-secret";
+    const expectedSignature = await hmacSha256(secret, customerId);
+
+    if (!signature || signature !== expectedSignature) {
+      // Log for debugging
+      console.warn(`[Auth Fail] ID: ${customerId}, Sig: ${signature}, Expected: ${expectedSignature}`);
+      throw new Error("Unauthorized: Invalid signature");
+    }
   }
 
   // Add global ID prefix if missing
@@ -7330,6 +7400,436 @@ async function sendOrderReceipt(env, orderId) {
     console.error('[sendOrderReceipt] Error:', err);
     throw new Error(`Failed to send receipt: ${err.message}`);
   }
+}
+
+/**
+ * Get reconstructed email preview for an order
+ * @param {Object} env - Environment variables
+ * @param {string} orderId - Order ID
+ * @param {string} emailType - Type: confirmation, shipped, refunded
+ */
+async function getEmailPreview(env, orderId, emailType) {
+  // Fetch the full order data
+  const orderResult = await getOrder(env, orderId);
+  if (!orderResult.success) {
+    throw new Error("Order not found");
+  }
+
+  const order = orderResult.order;
+  const storeName = "SKM Exhaust Systems";
+  const storeUrl = "https://skm-ex.myshopify.com";
+  const supportEmail = "support@skmexhaust.com";
+
+  // Format date for display
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  // Format currency
+  const formatMoney = (amount) => {
+    return parseFloat(amount || 0).toLocaleString('en-US', {
+      style: 'currency',
+      currency: order.currencyCode || 'USD'
+    });
+  };
+
+  // Helper to extract price from PriceSet objects
+  const getPrice = (priceSet) => priceSet?.shopMoney?.amount || 0;
+
+  // Calculate original totals from line items (for cancelled orders where order-level totals are 0)
+  const calculateOriginalTotals = () => {
+    // Calculate subtotal from line items
+    let subtotal = 0;
+    let totalTax = 0;
+    let totalDiscount = 0;
+
+    order.lineItems.forEach(item => {
+      // Use originalTotalSet for the original price
+      subtotal += parseFloat(getPrice(item.originalTotalSet) || 0);
+
+      // Calculate tax from line item tax lines
+      if (item.taxLines) {
+        item.taxLines.forEach(tax => {
+          totalTax += parseFloat(getPrice(tax.priceSet) || 0);
+        });
+      }
+
+      // Calculate discounts from discount allocations
+      if (item.discountAllocations) {
+        item.discountAllocations.forEach(discount => {
+          totalDiscount += parseFloat(getPrice(discount.allocatedAmountSet) || 0);
+        });
+      }
+    });
+
+    // Get original shipping from shipping line
+    const shipping = parseFloat(getPrice(order.shippingLine?.originalPriceSet) || 0);
+
+    // Calculate total
+    const total = subtotal + shipping + totalTax - totalDiscount;
+
+    return { subtotal, shipping, totalTax, totalDiscount, total };
+  };
+
+  // Use order-level totals if available, otherwise calculate from line items
+  const orderTotals = (() => {
+    const orderSubtotal = parseFloat(getPrice(order.subtotalPriceSet) || 0);
+    const orderTotal = parseFloat(getPrice(order.totalPriceSet) || 0);
+
+    // If order totals are 0 (cancelled/fully refunded), calculate from line items
+    if (orderTotal === 0) {
+      const calculated = calculateOriginalTotals();
+      return {
+        subtotal: calculated.subtotal,
+        shipping: calculated.shipping,
+        tax: calculated.totalTax,
+        discounts: calculated.totalDiscount,
+        total: calculated.total,
+        refunded: parseFloat(getPrice(order.totalRefundedSet) || 0)
+      };
+    }
+
+    // Use order-level totals
+    return {
+      subtotal: orderSubtotal,
+      shipping: parseFloat(getPrice(order.totalShippingPriceSet) || 0),
+      tax: parseFloat(getPrice(order.totalTaxSet) || 0),
+      discounts: parseFloat(getPrice(order.totalDiscountsSet) || 0),
+      total: orderTotal,
+      refunded: parseFloat(getPrice(order.totalRefundedSet) || 0)
+    };
+  })();
+
+  // Generate line items HTML
+  const lineItemsHtml = order.lineItems.map(item => `
+    <tr>
+      <td style="padding: 16px; border-bottom: 1px solid #e5e7eb;">
+        <table style="width: 100%;">
+          <tr>
+            <td style="width: 80px; vertical-align: top;">
+              ${item.image?.url
+      ? `<img src="${item.image.url}" alt="${item.name}" style="width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;">`
+      : `<div style="width: 64px; height: 64px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #9ca3af;">No Image</div>`
+    }
+            </td>
+            <td style="padding-left: 16px; vertical-align: top;">
+              <div style="font-weight: 600; color: #111827; margin-bottom: 4px;">${item.name}</div>
+              ${item.variantTitle ? `<div style="font-size: 13px; color: #6b7280;">${item.variantTitle}</div>` : ''}
+              ${item.sku ? `<div style="font-size: 12px; color: #9ca3af;">SKU: ${item.sku}</div>` : ''}
+            </td>
+            <td style="text-align: right; vertical-align: top; white-space: nowrap;">
+              <div style="font-weight: 500; color: #111827;">${formatMoney(item.discountedTotalSet?.shopMoney?.amount || item.originalTotalSet?.shopMoney?.amount)}</div>
+              <div style="font-size: 13px; color: #6b7280;">Qty: ${item.quantity}</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  `).join('');
+
+  // Get shipping address
+  const addr = order.shippingAddress || {};
+  const addressHtml = addr.address1 ? `
+    <div style="font-size: 14px; color: #374151; line-height: 1.6;">
+      ${addr.name || `${addr.firstName || ''} ${addr.lastName || ''}`.trim()}<br>
+      ${addr.address1}<br>
+      ${addr.address2 ? `${addr.address2}<br>` : ''}
+      ${addr.city}, ${addr.provinceCode || addr.province} ${addr.zip}<br>
+      ${addr.country}
+      ${addr.phone ? `<br>${addr.phone}` : ''}
+    </div>
+  ` : '<div style="font-size: 14px; color: #9ca3af;">No shipping address</div>';
+
+  // Fulfillment info for shipped emails
+  const fulfillment = order.fulfillments?.[0];
+  const trackingHtml = fulfillment?.trackingInfo?.[0] ? `
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+      <div style="font-weight: 600; color: #166534; margin-bottom: 8px;">📦 Tracking Information</div>
+      <div style="font-size: 14px; color: #374151;">
+        <strong>Carrier:</strong> ${fulfillment.trackingInfo[0].company || 'N/A'}<br>
+        <strong>Tracking Number:</strong> ${fulfillment.trackingInfo[0].number || 'N/A'}
+      </div>
+      ${fulfillment.trackingInfo[0].url ? `
+        <a href="${fulfillment.trackingInfo[0].url}" style="display: inline-block; margin-top: 12px; background: #166534; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 500;">Track Package</a>
+      ` : ''}
+    </div>
+  ` : '';
+
+  // Generate refunded items section for refund emails
+  const refunds = order.refunds || [];
+  const refundedItemsHtml = refunds.length > 0 ? (() => {
+    let itemsHtml = '';
+    let totalRefundAmount = 0;
+
+    refunds.forEach((refund, idx) => {
+      const refundLineItems = refund.refundLineItems?.edges?.map(e => e.node) || [];
+      const refundDate = new Date(refund.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric'
+      });
+
+      if (refundLineItems.length > 0) {
+        itemsHtml += `
+          <tr>
+            <td style="padding: 16px 0 8px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">
+              Refund #${idx + 1} – ${refundDate}
+              ${refund.note ? `<span style="font-weight: normal; text-transform: none;"> (${refund.note})</span>` : ''}
+            </td>
+          </tr>
+        `;
+
+        refundLineItems.forEach(item => {
+          const refundPrice = item.subtotalSet?.shopMoney?.amount || item.priceSet?.shopMoney?.amount || 0;
+          totalRefundAmount += parseFloat(refundPrice);
+          itemsHtml += `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #fecaca;">
+                <table style="width: 100%;">
+                  <tr>
+                    <td style="font-size: 14px; color: #374151;">
+                      <span style="font-weight: 500;">${item.lineItem?.name || 'Item'}</span>
+                      ${item.lineItem?.sku ? `<span style="color: #9ca3af; font-size: 12px;"> (SKU: ${item.lineItem.sku})</span>` : ''}
+                      <br><span style="font-size: 12px; color: #6b7280;">Qty: ${item.quantity}</span>
+                    </td>
+                    <td style="text-align: right; font-size: 14px; font-weight: 500; color: #dc2626;">
+                      -${formatMoney(refundPrice)}
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          `;
+        });
+      }
+    });
+
+    if (!itemsHtml) return '';
+
+    return `
+      <tr>
+        <td style="padding: 24px 32px;">
+          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px;">
+            <div style="font-size: 15px; font-weight: 600; color: #991b1b; margin-bottom: 16px; display: flex; align-items: center;">
+              <span style="margin-right: 8px;">↩️</span> Refunded Items
+            </div>
+            <table style="width: 100%;">
+              ${itemsHtml}
+              <tr>
+                <td colspan="2" style="padding-top: 12px; border-top: 2px solid #fecaca;">
+                  <table style="width: 100%;">
+                    <tr>
+                      <td style="font-size: 14px; font-weight: 600; color: #991b1b;">Total Refunded</td>
+                      <td style="text-align: right; font-size: 16px; font-weight: 700; color: #dc2626;">
+                        -${formatMoney(getPrice(order.totalRefundedSet))}
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </td>
+      </tr>
+    `;
+  })() : '';
+
+  // Email subject and header based on type
+  let subject, headerTitle, headerSubtitle, headerBgColor, headerIcon;
+
+  switch (emailType) {
+    case 'shipped':
+      subject = `Your order ${order.name} is on its way!`;
+      headerTitle = "Your order is on the way!";
+      headerSubtitle = "Great news – your order has shipped";
+      headerBgColor = "#166534";
+      headerIcon = "🚚";
+      break;
+    case 'refunded':
+      subject = `Refund processed for order ${order.name}`;
+      headerTitle = "Refund Processed";
+      headerSubtitle = `We've issued a refund of ${formatMoney(orderTotals.refunded)} for your order`;
+      headerBgColor = "#dc2626";
+      headerIcon = "💸";
+      break;
+    default: // confirmation
+      subject = `Order ${order.name} confirmed`;
+      headerTitle = "Thank you for your order!";
+      headerSubtitle = "We've received your order and are getting it ready";
+      headerBgColor = "#111827";
+      headerIcon = "✓";
+  }
+
+  // Build the full HTML email
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table style="width: 100%; background-color: #f3f4f6; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table style="width: 100%; max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background: ${headerBgColor}; padding: 32px; text-align: center;">
+              <div style="font-size: 48px; margin-bottom: 16px;">${headerIcon}</div>
+              <div style="font-size: 13px; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">${storeName}</div>
+              <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #ffffff;">${headerTitle}</h1>
+              <p style="margin: 8px 0 0; font-size: 14px; color: rgba(255,255,255,0.8);">${headerSubtitle}</p>
+            </td>
+          </tr>
+          
+          <!-- Order Info Bar -->
+          <tr>
+            <td style="background: #f9fafb; padding: 16px 32px; border-bottom: 1px solid #e5e7eb;">
+              <table style="width: 100%;">
+                <tr>
+                  <td style="font-size: 14px; color: #6b7280;">
+                    <strong style="color: #111827;">Order ${order.name}</strong>
+                  </td>
+                  <td style="font-size: 14px; color: #6b7280; text-align: right;">
+                    ${formatDate(order.createdAt)}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Tracking Info (for shipped emails) -->
+          ${emailType === 'shipped' ? `
+          <tr>
+            <td style="padding: 24px 32px 0;">
+              ${trackingHtml}
+            </td>
+          </tr>
+          ` : ''}
+          
+          <!-- Refunded Items (for refund emails) -->
+          ${emailType === 'refunded' ? refundedItemsHtml : ''}
+          
+          <!-- Line Items -->
+          <tr>
+            <td style="padding: 0 24px;">
+              <table style="width: 100%;">
+                <tr>
+                  <td style="padding: 24px 8px 12px; font-size: 13px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e5e7eb;">
+                    Items in your order
+                  </td>
+                </tr>
+                ${lineItemsHtml}
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Order Totals -->
+          <tr>
+            <td style="padding: 24px 32px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 8px 0; font-size: 14px; color: #6b7280;">Subtotal</td>
+                  <td style="padding: 8px 0; font-size: 14px; color: #111827; text-align: right;">${formatMoney(orderTotals.subtotal)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-size: 14px; color: #6b7280;">Shipping</td>
+                  <td style="padding: 8px 0; font-size: 14px; color: #111827; text-align: right;">${formatMoney(orderTotals.shipping)}</td>
+                </tr>
+                ${orderTotals.discounts > 0 ? `
+                <tr>
+                  <td style="padding: 8px 0; font-size: 14px; color: #059669;">Discounts</td>
+                  <td style="padding: 8px 0; font-size: 14px; color: #059669; text-align: right;">-${formatMoney(orderTotals.discounts)}</td>
+                </tr>
+                ` : ''}
+                <tr>
+                  <td style="padding: 8px 0; font-size: 14px; color: #6b7280;">Tax</td>
+                  <td style="padding: 8px 0; font-size: 14px; color: #111827; text-align: right;">${formatMoney(orderTotals.tax)}</td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="border-top: 1px solid #e5e7eb;"></td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; font-size: 16px; font-weight: 600; color: #111827;">Total</td>
+                  <td style="padding: 12px 0; font-size: 16px; font-weight: 600; color: #111827; text-align: right;">${formatMoney(orderTotals.total)}</td>
+                </tr>
+                ${emailType === 'refunded' && orderTotals.refunded > 0 ? `
+                <tr>
+                  <td style="padding: 8px 0; font-size: 14px; color: #dc2626; font-weight: 500;">Refunded</td>
+                  <td style="padding: 8px 0; font-size: 14px; color: #dc2626; font-weight: 500; text-align: right;">-${formatMoney(orderTotals.refunded)}</td>
+                </tr>
+                ` : ''}
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Shipping Address -->
+          <tr>
+            <td style="padding: 0 32px 24px;">
+              <table style="width: 100%; background: #f9fafb; border-radius: 8px; padding: 16px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <div style="font-size: 13px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Shipping Address</div>
+                    ${addressHtml}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- View Order Button -->
+          <tr>
+            <td style="padding: 0 32px 32px; text-align: center;">
+              <a href="${storeUrl}/account" style="display: inline-block; background: #111827; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">View Your Order</a>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background: #f9fafb; padding: 24px 32px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <div style="font-size: 14px; color: #6b7280; margin-bottom: 8px;">
+                Need help? Contact us at <a href="mailto:${supportEmail}" style="color: #dc2626;">${supportEmail}</a>
+              </div>
+              <div style="font-size: 12px; color: #9ca3af;">
+                ${storeName} • Performance Exhaust Systems
+              </div>
+            </td>
+          </tr>
+          
+        </table>
+        
+        <!-- Legal Footer -->
+        <table style="width: 100%; max-width: 600px; margin-top: 16px;">
+          <tr>
+            <td style="text-align: center; font-size: 11px; color: #9ca3af; padding: 0 20px;">
+              This is a reconstructed preview of the email sent to the customer. The actual email may have slight visual differences.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+
+  return {
+    success: true,
+    data: {
+      html,
+      subject,
+      orderName: order.name,
+      customerEmail: order.email,
+      sentAt: order.createdAt
+    }
+  };
 }
 
 // ============================================
