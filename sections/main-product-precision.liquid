@@ -203,6 +203,7 @@
     font-size: 14px;
     line-height: 1.7;
     color: #333;
+    white-space: pre-line;
   }
   
   .tcc-tech-brief-content p {
@@ -436,6 +437,124 @@
         <div class="tcc-tech-brief-content">
           {{ product.description }}
         </div>
+      </div>
+    {%- endif -%}
+
+    <!-- Dynamic Product Sections -->
+    {%- if product.metafields.custom.product_sections.value != blank -%}
+      <div class="tcc-dynamic-sections mt-12 pt-8 border-t border-[var(--tcc-border)]">
+        {%- assign sections_data = product.metafields.custom.product_sections.value -%}
+        {%- for section_item in sections_data -%}
+          <div class="tcc-dynamic-section mb-12">
+            {%- comment -%} Check for new mixed-content structure vs legacy {%- endcomment -%}
+            {%- if section_item.blocks -%}
+              {%- comment -%} New structure with blocks array {%- endcomment -%}
+              {%- assign layout = section_item.layout | default: 'stacked' -%}
+              
+              {%- if layout == 'stacked' -%}
+                {%- comment -%} Stacked: Full width, blocks in order {%- endcomment -%}
+                {%- if section_item.name != blank -%}
+                  <div class="tcc-tech-brief-header">[ {{ section_item.name }} ]</div>
+                {%- endif -%}
+                <div class="tcc-section-stacked space-y-6">
+                  {%- for block in section_item.blocks -%}
+                    {%- if block.type == 'text' -%}
+                      <div class="tcc-content-text font-sans text-sm leading-relaxed text-[#333] whitespace-pre-line">
+                        {{ block.content }}
+                      </div>
+                    {%- elsif block.type == 'media' or block.type == 'image' -%}
+                      {%- if block.url != blank -%}
+                        {%- if block.mimeType contains 'video' or block.mimeType contains 'VIDEO' or block.url contains '.mp4' or block.url contains '.webm' or block.url contains '.mov' -%}
+                          <div class="tcc-content-video aspect-w-16 aspect-h-9 bg-black overflow-hidden rounded-lg">
+                            <video src="{{ block.url }}" controls class="w-full h-full object-cover">
+                              Your browser does not support the video tag.
+                            </video>
+                          </div>
+                        {%- else -%}
+                          <div class="tcc-content-image">
+                            <img src="{{ block.url }}" alt="Product detail" class="w-full h-auto border border-[var(--tcc-border)] rounded-lg" loading="lazy">
+                          </div>
+                        {%- endif -%}
+                      {%- endif -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                </div>
+                
+              {%- elsif layout == 'media_left' or layout == 'media_right' -%}
+                {%- comment -%} Side-by-side layout: Media on one side, text on other {%- endcomment -%}
+                {%- assign text_blocks = '' -%}
+                {%- assign media_block = nil -%}
+                {%- for block in section_item.blocks -%}
+                  {%- if block.type == 'text' -%}
+                    {%- capture text_blocks -%}{{ text_blocks }}<div class="tcc-content-text font-sans text-sm leading-relaxed text-[#333] whitespace-pre-line mb-4">{{ block.content }}</div>{%- endcapture -%}
+                  {%- elsif block.type == 'media' or block.type == 'image' -%}
+                    {%- if media_block == nil and block.url != blank -%}
+                      {%- assign media_block = block -%}
+                    {%- endif -%}
+                  {%- endif -%}
+                {%- endfor -%}
+                
+                {%- if section_item.name != blank -%}
+                  <div class="tcc-tech-brief-header">[ {{ section_item.name }} ]</div>
+                {%- endif -%}
+                <div class="tcc-section-split grid md:grid-cols-2 gap-8 items-start">
+                  {%- if layout == 'media_left' -%}
+                    {%- comment -%} Media on left {%- endcomment -%}
+                    <div class="tcc-media-column">
+                      {%- if media_block -%}
+                        {%- if media_block.mimeType contains 'video' or media_block.mimeType contains 'VIDEO' or media_block.url contains '.mp4' or media_block.url contains '.webm' -%}
+                          <div class="aspect-w-16 aspect-h-9 bg-black overflow-hidden rounded-lg">
+                            <video src="{{ media_block.url }}" controls class="w-full h-full object-cover"></video>
+                          </div>
+                        {%- else -%}
+                          <img src="{{ media_block.url }}" alt="Product detail" class="w-full h-auto border border-[var(--tcc-border)] rounded-lg" loading="lazy">
+                        {%- endif -%}
+                      {%- endif -%}
+                    </div>
+                    <div class="tcc-text-column">{{ text_blocks }}</div>
+                  {%- else -%}
+                    {%- comment -%} Media on right {%- endcomment -%}
+                    <div class="tcc-text-column">{{ text_blocks }}</div>
+                    <div class="tcc-media-column">
+                      {%- if media_block -%}
+                        {%- if media_block.mimeType contains 'video' or media_block.mimeType contains 'VIDEO' or media_block.url contains '.mp4' or media_block.url contains '.webm' -%}
+                          <div class="aspect-w-16 aspect-h-9 bg-black overflow-hidden rounded-lg">
+                            <video src="{{ media_block.url }}" controls class="w-full h-full object-cover"></video>
+                          </div>
+                        {%- else -%}
+                          <img src="{{ media_block.url }}" alt="Product detail" class="w-full h-auto border border-[var(--tcc-border)] rounded-lg" loading="lazy">
+                        {%- endif -%}
+                      {%- endif -%}
+                    </div>
+                  {%- endif -%}
+                </div>
+              {%- endif -%}
+              
+            {%- else -%}
+              {%- comment -%} Legacy structure fallback {%- endcomment -%}
+              {%- case section_item.type -%}
+                {%- when 'text' -%}
+                  <div class="tcc-content-text font-sans text-sm leading-relaxed text-[#333] whitespace-pre-line">
+                    {{ section_item.content }}
+                  </div>
+                {%- when 'image' -%}
+                  {%- if section_item.url != blank -%}
+                    <div class="tcc-content-image my-6">
+                      <img src="{{ section_item.url }}" alt="Product detail" class="w-full h-auto border border-[var(--tcc-border)]" loading="lazy">
+                    </div>
+                  {%- endif -%}
+                {%- when 'video' -%}
+                  {%- if section_item.url != blank -%}
+                    <div class="tcc-content-video my-6 aspect-w-16 aspect-h-9 bg-black overflow-hidden">
+                      <video src="{{ section_item.url }}" controls class="w-full h-full object-cover">
+                        Your browser does not support the video tag.
+                      </video>
+                    </div>
+                  {%- endif -%}
+              {%- endcase -%}
+            {%- endif -%}
+          </div>
+        {%- endfor -%}
       </div>
     {%- endif -%}
     

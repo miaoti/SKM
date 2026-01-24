@@ -645,7 +645,7 @@
     }
   }
 
-  function showEditor(p) {
+  async function showEditor(p) {
     $('product-empty').classList.add('hidden');
     $('new-product-form').classList.add('hidden');
     $('product-editor').classList.remove('hidden');
@@ -690,11 +690,16 @@
     renderFitments(p.fitments || []);
     renderFitmentFilters();
 
-    // Shipping
+    // Shipping - load packages first, then product shipping info
+    await loadPackages();
     loadProductShipping(p);
 
     // Variants & Options
     loadProductVariants(p);
+
+    // Sections
+    renderSections(p.sections || []);
+    initSectionsLogic();
   }
 
   // Discount Price UI State
@@ -1043,7 +1048,8 @@
         b2bPrice: $('edit-b2b-price').value || null,
         discountPrice: $('edit-discount-price').value || null,
         variantId: S.selected.variants?.[0]?.id,
-        sku: shouldIncludeSku ? $('edit-sku').value : undefined
+        sku: shouldIncludeSku ? $('edit-sku').value : undefined,
+        sections: S.selected.sections || []
       });
 
       // Also update inventory if changed
@@ -1395,7 +1401,10 @@
     filters: { year: '', make: '', model: '', submodel: '' },
     options: [], // Array of { name: string, values: string[], isAddOn: boolean, priceModifiers: {} }
     variants: [], // Generated variant combinations
-    mediaTags: {} // Map of media index to array of option values
+    options: [], // Array of { name: string, values: string[], isAddOn: boolean, priceModifiers: {} }
+    variants: [], // Generated variant combinations
+    mediaTags: {}, // Map of media index to array of option values
+    sections: [] // Array of section objects
   };
 
   function showNewProduct() {
@@ -1423,8 +1432,10 @@
     newProductPending.fitments.clear();
     newProductPending.filters = { year: '', make: '', model: '', submodel: '' };
     newProductPending.options = [];
+    newProductPending.options = [];
     newProductPending.variants = [];
     newProductPending.mediaTags = {};
+    newProductPending.sections = [];
 
     renderNewMediaGrid();
     renderNewFitmentsList();
@@ -2064,7 +2075,9 @@
         trackInventory: $('new-track-inventory').checked,
         requiresShipping: $('new-requires-shipping').checked,
         weight: parseFloat($('new-weight').value) || 0,
-        weightUnit: $('new-weight-unit').value
+        weightUnit: $('new-weight-unit').value,
+        packageId: $('new-package').value || undefined,
+        sections: newProductPending.sections || []
       });
 
       const newProductId = createResult.data?.id?.split('/').pop() || createResult.productId;
@@ -3076,14 +3089,20 @@
   // Load packages from API
   async function loadPackages() {
     try {
+      console.log('[loadPackages] Fetching packages...');
       const result = await api.get('/shipping/packages');
+      console.log('[loadPackages] Got result:', result);
       shippingState.packages.custom = result.customPackages || [];
       shippingState.packages.carrier = result.carrierPackages || [];
       shippingState.defaultPackageId = result.defaultPackageId;
+      console.log('[loadPackages] Custom packages:', shippingState.packages.custom.length);
       populatePackageDropdowns();
       renderPackageLists();
     } catch (e) {
-      console.error('Failed to load packages:', e);
+      console.error('[loadPackages] Failed to load packages:', e);
+      // Still populate with empty state
+      populatePackageDropdowns();
+      renderPackageLists();
     }
   }
 
@@ -3101,6 +3120,12 @@
     const editPkg = $('edit-package');
     if (editPkg) {
       editPkg.innerHTML = `<option value="">Select a package...</option>${options}`;
+    }
+
+    // Also populate new product form package dropdown
+    const newPkg = $('new-package');
+    if (newPkg) {
+      newPkg.innerHTML = `<option value="">Select a package...</option>${options}`;
     }
   }
 
@@ -3122,7 +3147,7 @@
                   <span class="text-sm font-medium text-gray-900">${p.name}</span>
                   ${isDefault ? '<span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Default</span>' : ''}
                 </div>
-                <p class="text-xs text-gray-500">${typeLabel} Â· ${p.length} x ${p.width} x ${p.height} ${p.sizeUnit}</p>
+                <p class="text-xs text-gray-500">${typeLabel} · ${p.length} x ${p.width} x ${p.height} ${p.size_unit || p.sizeUnit || p.unit || 'in'}</p>
               </div>
               <div class="flex items-center gap-1">
                 ${!isDefault ? `<button class="set-default-pkg text-xs text-blue-600 hover:text-blue-800 px-2 py-1" data-id="${p.id}">Set Default</button>` : ''}
@@ -3223,7 +3248,9 @@
     const confirmed = await showConfirmModal('Delete this package?', 'Delete Package');
     if (!confirmed) return;
     try {
-      await api.del(`/shipping/packages/${packageId}`);
+      // URL-encode the package ID since GIDs contain slashes
+      const encodedId = encodeURIComponent(packageId);
+      await api.del(`/shipping/packages/${encodedId}`);
       toast('Package deleted', 'success');
       await loadPackages();
     } catch (e) {
@@ -3258,7 +3285,32 @@
     const weightSection = $('shipping-weight-section');
     const packageSection = $('shipping-package-section');
     if (weightSection) weightSection.style.display = requiresShipping ? 'block' : 'none';
+    if (weightSection) weightSection.style.display = requiresShipping ? 'block' : 'none';
     if (packageSection) packageSection.style.display = requiresShipping ? 'block' : 'none';
+  }
+
+  // Handle new package change in Create Form
+  const newPackageSelect = $('new-package');
+  if (newPackageSelect) {
+    newPackageSelect.addEventListener('change', (e) => {
+      const pkgId = e.target.value;
+      const dimEl = $('new-package-dimensions');
+      if (!dimEl) return;
+
+      if (!pkgId) {
+        dimEl.textContent = '';
+        return;
+      }
+
+      const allPackages = [...shippingState.packages.custom, ...shippingState.packages.carrier];
+      const pkg = allPackages.find(p => p.id === pkgId);
+
+      if (pkg) {
+        dimEl.textContent = `${pkg.length} x ${pkg.width} x ${pkg.height} ${pkg.size_unit || pkg.sizeUnit || pkg.unit || 'in'} (${pkg.type === 'soft_package' ? 'Soft Package' : pkg.type})`;
+      } else {
+        dimEl.textContent = '';
+      }
+    });
   }
 
   // Save shipping info
@@ -3336,9 +3388,11 @@
   $('btn-save-shipping').addEventListener('click', saveProductShipping);
 
   // Manage packages button
-  $('btn-manage-packages').addEventListener('click', () => {
+  $('btn-manage-packages').addEventListener('click', async () => {
     $('package-modal-overlay').classList.add('open');
     document.body.style.overflow = 'hidden';
+    // Reload packages to ensure fresh data
+    await loadPackages();
   });
 
   // Close package modal
@@ -4320,5 +4374,765 @@
     }
   });
 
+  // ==========================================
+  // SECTIONS LOGIC (Advanced Mixed Content)
+  // ==========================================
+  let currentEditingSection = null; // Temporary state for new section being added
+  let activeBlockIndex = null; // For media picker
+
+  function initSectionsLogic() {
+    // Add New Section Button
+    const btnAdd = $('btn-add-section');
+    if (btnAdd) {
+      btnAdd.replaceWith(btnAdd.cloneNode(true));
+      $('btn-add-section').addEventListener('click', () => {
+        resetSectionForm();
+        $('add-section-form').classList.remove('hidden');
+      });
+    }
+
+    // Add Block Buttons
+    const btnAddText = $('btn-add-text-block');
+    if (btnAddText) {
+      btnAddText.replaceWith(btnAddText.cloneNode(true));
+      $('btn-add-text-block').addEventListener('click', () => addBlockToSection('text'));
+    }
+    const btnAddMedia = $('btn-add-media-block');
+    if (btnAddMedia) {
+      btnAddMedia.replaceWith(btnAddMedia.cloneNode(true));
+      $('btn-add-media-block').addEventListener('click', () => openMediaPickerForBlock());
+    }
+
+    // Cancel buttons
+    const cancelBtns = ['btn-cancel-section', 'btn-cancel-section-alt'];
+    cancelBtns.forEach(id => {
+      const btn = $(id);
+      if (btn) {
+        btn.replaceWith(btn.cloneNode(true));
+        $(id).addEventListener('click', () => {
+          $('add-section-form').classList.add('hidden');
+        });
+      }
+    });
+
+    // Confirm/Save Section
+    const btnConfirm = $('btn-confirm-section');
+    if (btnConfirm) {
+      btnConfirm.replaceWith(btnConfirm.cloneNode(true));
+      $('btn-confirm-section').addEventListener('click', saveSection);
+    }
+
+    // Media Picker Logic
+    initMediaPicker();
+  }
+
+  let editingSectionIndex = null; // Track if we're editing an existing section
+
+  function resetSectionForm(sectionToEdit = null, editIndex = null) {
+    editingSectionIndex = editIndex;
+
+    if (sectionToEdit) {
+      // Editing existing section
+      currentEditingSection = JSON.parse(JSON.stringify(sectionToEdit)); // Deep clone
+    } else {
+      // New section
+      currentEditingSection = {
+        id: Date.now().toString(),
+        name: '',
+        type: 'mixed',
+        layout: 'stacked',
+        blocks: []
+      };
+    }
+
+    const nameEl = $('new-section-name');
+    if (nameEl) nameEl.value = currentEditingSection.name || '';
+
+    const layoutEl = $('new-section-layout');
+    if (layoutEl) layoutEl.value = currentEditingSection.layout || 'stacked';
+
+    // Update form title based on mode
+    const formTitle = document.querySelector('#add-section-form h3');
+    if (formTitle) {
+      formTitle.textContent = editingSectionIndex !== null ? 'Edit Section' : 'New Section';
+    }
+
+    const confirmBtn = $('btn-confirm-section');
+    if (confirmBtn) {
+      confirmBtn.textContent = editingSectionIndex !== null ? 'Update Section' : 'Add Section';
+    }
+
+    renderSectionBlocksEditor();
+  }
+
+  function renderSectionBlocksEditor() {
+    const container = $('section-blocks-container');
+    if (!container || !currentEditingSection) return;
+
+    const blocks = currentEditingSection.blocks;
+
+    if (blocks.length === 0) {
+      container.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No content blocks added. Add text or media.</p>';
+      return;
+    }
+
+    container.innerHTML = blocks.map((block, idx) => {
+      if (block.type === 'text') {
+        return `
+          <div class="bg-white border border-gray-200 rounded p-3 relative group mb-2">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-xs font-semibold text-gray-500 uppercase">Text Block</span>
+              <button class="remove-block text-gray-400 hover:text-red-500" data-idx="${idx}">&times;</button>
+            </div>
+            <textarea class="block-content w-full text-sm border border-gray-200 rounded p-2" rows="3" 
+              data-idx="${idx}" placeholder="Enter text...">${block.content || ''}</textarea>
+          </div>
+        `;
+      } else {
+        // Media Block
+        const isVideo = block.mimeType?.includes('video') || block.url?.match(/\.(mp4|mov|webm)$/i);
+        const preview = block.url
+          ? (isVideo
+            ? `<video src="${block.url}" class="h-16 w-16 object-cover rounded bg-black"></video>`
+            : `<img src="${block.url}" class="h-16 w-16 object-cover rounded border border-gray-200">`)
+          : `<div class="h-16 w-16 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs">Empty</div>`;
+
+        return `
+          <div class="bg-white border border-gray-200 rounded p-3 relative group flex gap-3 items-center mb-2">
+            ${preview}
+            <div class="flex-1">
+              <span class="text-xs font-semibold text-gray-500 uppercase block mb-1">Media Block</span>
+              <div class="flex gap-2">
+                <button class="select-media-btn text-xs text-blue-600 hover:underline" data-idx="${idx}">Select Media</button>
+                <button class="remove-block text-xs text-red-600 hover:underline" data-idx="${idx}">Remove</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }).join('');
+
+    // Bind events
+    container.querySelectorAll('.remove-block').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        currentEditingSection.blocks.splice(idx, 1);
+        renderSectionBlocksEditor();
+      });
+    });
+
+    container.querySelectorAll('.block-content').forEach(textarea => {
+      textarea.addEventListener('input', (e) => {
+        const idx = parseInt(e.target.dataset.idx);
+        currentEditingSection.blocks[idx].content = e.target.value;
+      });
+    });
+
+    container.querySelectorAll('.select-media-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        openMediaPickerForBlock(idx);
+      });
+    });
+  }
+
+  function addBlockToSection(type) {
+    if (!currentEditingSection) resetSectionForm();
+
+    if (type === 'text') {
+      currentEditingSection.blocks.push({ type: 'text', content: '' });
+    } else {
+      currentEditingSection.blocks.push({ type: 'media', url: '', mimeType: '' });
+    }
+    renderSectionBlocksEditor();
+  }
+
+  function saveSection() {
+    if (!S.selected) return;
+    if (!currentEditingSection || currentEditingSection.blocks.length === 0) {
+      toast('Please add at least one block', 'error');
+      return;
+    }
+
+    // Get name and layout from inputs
+    const nameEl = $('new-section-name');
+    currentEditingSection.name = nameEl ? nameEl.value.trim() : '';
+
+    const layoutEl = $('new-section-layout');
+    currentEditingSection.layout = layoutEl ? layoutEl.value : 'stacked';
+
+    const sections = S.selected.sections || [];
+
+    if (editingSectionIndex !== null) {
+      // Update existing section
+      sections[editingSectionIndex] = { ...currentEditingSection };
+      toast('Section updated (unsaved - click Save to persist)', 'success');
+    } else {
+      // Add new section
+      sections.push({ ...currentEditingSection });
+      toast('Section added (unsaved - click Save to persist)', 'success');
+    }
+
+    // Update product sections
+    S.selected.sections = sections;
+    renderSections(sections);
+
+    $('add-section-form').classList.add('hidden');
+    editingSectionIndex = null;
+  }
+
+  function renderSections(sections) {
+    if (!sections || !Array.isArray(sections)) {
+      sections = [];
+    }
+
+    if (S.selected) {
+      S.selected.sections = sections;
+    }
+
+    const container = $('sections-list');
+    if (!container) return;
+
+    if (sections.length === 0) {
+      container.innerHTML = '<p class="text-sm text-gray-400 text-center py-2">No sections added.</p>';
+      return;
+    }
+
+    container.innerHTML = sections.map((section, index) => {
+      // Preview logic for mixed content
+      let preview = '';
+      if (section.blocks && section.blocks.length > 0) {
+        const textCount = section.blocks.filter(b => b.type === 'text').length;
+        const mediaCount = section.blocks.filter(b => b.type === 'media' || b.type === 'image' || b.type === 'video').length;
+        preview = `<span class="text-xs text-gray-500">${section.layout || 'stacked'} • ${textCount} Text, ${mediaCount} Media</span>`;
+      } else {
+        // Legacy structure fallback
+        preview = `<span class="text-xs text-gray-500">${section.type}</span>`;
+      }
+
+      const sectionName = section.name || `Section ${index + 1}`;
+
+      return `
+        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg group cursor-pointer hover:bg-gray-100 transition-colors edit-section-btn" data-idx="${index}">
+          <div class="w-8 h-8 bg-white border border-gray-200 rounded flex items-center justify-center text-gray-400 font-bold text-xs">
+            ${index + 1}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-900">${sectionName}</p>
+            ${preview}
+          </div>
+          <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button class="remove-section-btn p-1 text-gray-400 hover:text-red-600" data-idx="${index}">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </button>
+            <div class="flex flex-col gap-1">
+              <button class="move-section-btn p-1 text-gray-400 hover:text-gray-700 ${index === 0 ? 'opacity-30 cursor-not-allowed' : ''}" data-idx="${index}" data-dir="-1" ${index === 0 ? 'disabled' : ''}>
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
+              </button>
+              <button class="move-section-btn p-1 text-gray-400 hover:text-gray-700 ${index === sections.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}" data-idx="${index}" data-dir="1" ${index === sections.length - 1 ? 'disabled' : ''}>
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Bind remove
+    container.querySelectorAll('.remove-section-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const idx = parseInt(btn.dataset.idx);
+        const confirmed = await showConfirmModal('Delete this section?', 'Delete Section');
+        if (!confirmed) return;
+        S.selected.sections.splice(idx, 1);
+        renderSections(S.selected.sections);
+        toast('Section removed (unsaved)', 'info');
+      });
+    });
+
+    // Bind move
+    container.querySelectorAll('.move-section-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent edit from triggering
+        const idx = parseInt(btn.dataset.idx);
+        const dir = parseInt(btn.dataset.dir);
+        const newIdx = idx + dir;
+        if (newIdx < 0 || newIdx >= S.selected.sections.length) return;
+        const temp = S.selected.sections[idx];
+        S.selected.sections[idx] = S.selected.sections[newIdx];
+        S.selected.sections[newIdx] = temp;
+        renderSections(S.selected.sections);
+      });
+    });
+
+    // Bind edit (click on section row)
+    container.querySelectorAll('.edit-section-btn').forEach(row => {
+      row.addEventListener('click', (e) => {
+        // Don't trigger if clicking remove or move buttons
+        if (e.target.closest('.remove-section-btn') || e.target.closest('.move-section-btn')) return;
+
+        const idx = parseInt(row.dataset.idx);
+        const sectionToEdit = S.selected.sections[idx];
+        if (!sectionToEdit) return;
+
+        resetSectionForm(sectionToEdit, idx);
+        $('add-section-form').classList.remove('hidden');
+      });
+    });
+  }
+
+  // ==========================================
+  // MEDIA PICKER LOGIC
+  // ==========================================
+  function initMediaPicker() {
+    // Close button
+    const closeBtn = $('btn-close-media-picker');
+    if (closeBtn) {
+      closeBtn.replaceWith(closeBtn.cloneNode(true));
+      $('btn-close-media-picker').addEventListener('click', () => {
+        $('media-picker-modal').classList.add('hidden');
+      });
+    }
+
+    // Dropzone click - handle file upload for sections
+    const dropzone = $('section-media-dropzone');
+    const uploadInput = $('media-picker-upload');
+    if (dropzone && uploadInput) {
+      // Clone and re-attach upload input listener first
+      uploadInput.replaceWith(uploadInput.cloneNode(true));
+      const newUploadInput = $('media-picker-upload');
+      newUploadInput.addEventListener('change', async (e) => {
+        if (e.target && e.target.files && e.target.files.length > 0) {
+          const file = e.target.files[0];
+          try {
+            toast('Uploading...', 'info');
+            const url = await uploadFileForSection(file);
+            selectMediaForBlock(url, file.type);
+          } catch (err) {
+            toast('Upload failed: ' + err.message, 'error');
+          }
+          e.target.value = '';
+        }
+      });
+
+      // Now set up dropzone to click the NEW input reference
+      dropzone.replaceWith(dropzone.cloneNode(true));
+      $('section-media-dropzone').addEventListener('click', () => {
+        $('media-picker-upload').click();
+      });
+    }
+  }
+
+  function openMediaPickerForBlock(idx = null) {
+    // If idx is null, we're adding a new media block
+    if (idx === null) {
+      if (!currentEditingSection) resetSectionForm();
+      currentEditingSection.blocks.push({ type: 'media', url: '', mimeType: '' });
+      activeBlockIndex = currentEditingSection.blocks.length - 1;
+    } else {
+      activeBlockIndex = idx;
+    }
+    $('media-picker-modal').classList.remove('hidden');
+    renderMediaPickerGrid();
+  }
+
+  function renderMediaPickerGrid() {
+    const container = $('media-picker-grid');
+    if (!container) return;
+
+    if (!S.selected || !S.selected.media || S.selected.media.length === 0) {
+      container.innerHTML = '<p class="col-span-4 text-center text-gray-400 text-sm py-4">No media found. Upload a new file above.</p>';
+      return;
+    }
+
+    container.innerHTML = S.selected.media.map(media => {
+      const isVideo = media.mediaContentType === 'VIDEO' || media.type === 'VIDEO';
+      const url = media.url || media.preview_image?.url;
+
+      return `
+        <div class="media-pick-item aspect-square bg-gray-50 border border-gray-200 rounded cursor-pointer hover:border-red-500 overflow-hidden relative"
+             data-url="${media.url}" data-type="${media.mediaContentType || 'IMAGE'}">
+          <img src="${url}" class="w-full h-full object-cover">
+          ${isVideo ? '<div class="absolute inset-0 flex items-center justify-center bg-black/20"><svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" /></svg></div>' : ''}
+        </div>
+      `;
+    }).join('');
+
+    container.querySelectorAll('.media-pick-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const url = item.dataset.url;
+        const type = item.dataset.type;
+        selectMediaForBlock(url, type);
+      });
+    });
+  }
+
+  function selectMediaForBlock(url, type) {
+    if (activeBlockIndex === null || !currentEditingSection) return;
+
+    currentEditingSection.blocks[activeBlockIndex].url = url;
+    currentEditingSection.blocks[activeBlockIndex].mimeType = type;
+
+    renderSectionBlocksEditor();
+    $('media-picker-modal').classList.add('hidden');
+    activeBlockIndex = null;
+  }
+
+  async function uploadFileForSection(file) {
+    if (!S.selected) throw new Error('Product not selected');
+    const pid = S.selected.id.split('/').pop();
+
+    // Use existing staged upload flow
+    const stagedRes = await api.post('/media/staged-upload', {
+      filename: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      fileSize: file.size
+    });
+
+    if (!stagedRes.success || !stagedRes.data) throw new Error('Failed to get upload URL');
+    const { uploadUrl, resourceUrl, parameters } = stagedRes.data;
+
+    const formData = new FormData();
+    parameters.forEach(p => formData.append(p.name, p.value));
+    formData.append('file', file);
+
+    const uploadRes = await fetch(uploadUrl, { method: 'POST', body: formData });
+    if (!uploadRes.ok) throw new Error('Storage upload failed');
+
+    // Return the resourceUrl directly without attaching to product media
+    // This keeps section media standalone (not in product gallery)
+    const mediaType = file.type.startsWith('video/') ? 'VIDEO' : 'IMAGE';
+    return resourceUrl;
+  }
+
+  // ==========================================
+  // NEW SECTIONS LOGIC (For New Product Form)
+  // ==========================================
+  let currentNewProductSection = null;
+  let activeNewBlockIndex = null;
+  let editingNewSectionIndex = null;
+
+  function initNewSectionsLogic() {
+    // Add New Section Button
+    const btnAdd = $('btn-add-new-section');
+    if (btnAdd) {
+      btnAdd.addEventListener('click', () => {
+        resetNewSectionForm();
+        $('new-add-section-form').classList.remove('hidden');
+      });
+    }
+
+    // Add Block Buttons
+    const btnAddText = $('btn-new-add-text-block');
+    if (btnAddText) {
+      btnAddText.addEventListener('click', () => addBlockToNewSection('text'));
+    }
+    const btnAddMedia = $('btn-new-add-media-block');
+    if (btnAddMedia) {
+      btnAddMedia.addEventListener('click', () => openNewMediaPickerForBlock());
+    }
+
+    // Cancel buttons
+    const cancelBtns = ['btn-new-cancel-section', 'btn-new-cancel-section-alt'];
+    cancelBtns.forEach(id => {
+      const btn = $(id);
+      if (btn) {
+        btn.addEventListener('click', () => {
+          $('new-add-section-form').classList.add('hidden');
+        });
+      }
+    });
+
+    // Confirm/Save Section
+    const btnConfirm = $('btn-new-confirm-section');
+    if (btnConfirm) {
+      btnConfirm.addEventListener('click', saveNewSection);
+    }
+
+    // Pick media from new product media grid (reuse reused modal logic or custom?)
+    // Re-using the same modal but filling it with pending media
+  }
+
+  function resetNewSectionForm(sectionToEdit = null, editIndex = null) {
+    editingNewSectionIndex = editIndex;
+
+    if (sectionToEdit) {
+      currentNewProductSection = JSON.parse(JSON.stringify(sectionToEdit));
+    } else {
+      currentNewProductSection = {
+        id: Date.now().toString(),
+        name: '',
+        type: 'mixed',
+        layout: 'stacked',
+        blocks: []
+      };
+    }
+
+    const nameEl = $('new-section-create-name');
+    if (nameEl) nameEl.value = currentNewProductSection.name || '';
+
+    const layoutEl = $('new-section-create-layout');
+    if (layoutEl) layoutEl.value = currentNewProductSection.layout || 'stacked';
+
+    const formTitle = document.querySelector('#new-add-section-form h3');
+    if (formTitle) {
+      formTitle.textContent = editingNewSectionIndex !== null ? 'Edit Section' : 'New Section';
+    }
+
+    const confirmBtn = $('btn-new-confirm-section');
+    if (confirmBtn) {
+      confirmBtn.textContent = editingNewSectionIndex !== null ? 'Update Section' : 'Add Section';
+    }
+
+    renderNewSectionBlocksEditor();
+  }
+
+  function renderNewSectionBlocksEditor() {
+    const container = $('new-section-blocks-container');
+    if (!container || !currentNewProductSection) return;
+
+    const blocks = currentNewProductSection.blocks;
+
+    if (blocks.length === 0) {
+      container.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No content blocks added. Add text or media.</p>';
+      return;
+    }
+
+    container.innerHTML = blocks.map((block, idx) => {
+      if (block.type === 'text') {
+        return `
+          <div class="bg-white border border-gray-200 rounded p-3 relative group mb-2">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-xs font-semibold text-gray-500 uppercase">Text Block</span>
+              <button class="remove-new-block text-gray-400 hover:text-red-500" data-idx="${idx}">&times;</button>
+            </div>
+            <textarea class="new-block-content w-full text-sm border border-gray-200 rounded p-2" rows="3" 
+              data-idx="${idx}" placeholder="Enter text...">${block.content || ''}</textarea>
+          </div>
+        `;
+      } else {
+        // Media Block
+        const isVideo = block.mimeType?.includes('video') || block.url?.match(/\.(mp4|mov|webm)$/i);
+        const previewHost = block.url || (isVideo ? '' : ''); // Preview might need cleanup if blob
+        // For new product, URLs are blobs.
+
+        const preview = block.url
+          ? (isVideo
+            ? `<video src="${block.url}" class="h-16 w-16 object-cover rounded bg-black"></video>`
+            : `<img src="${block.url}" class="h-16 w-16 object-cover rounded border border-gray-200">`)
+          : `<div class="h-16 w-16 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs">Empty</div>`;
+
+        return `
+          <div class="bg-white border border-gray-200 rounded p-3 relative group flex gap-3 items-center mb-2">
+            ${preview}
+            <div class="flex-1">
+              <span class="text-xs font-semibold text-gray-500 uppercase block mb-1">Media Block</span>
+              <div class="flex gap-2">
+                <button class="select-new-media-btn text-xs text-blue-600 hover:underline" data-idx="${idx}">Select Media</button>
+                <button class="remove-new-block text-xs text-red-600 hover:underline" data-idx="${idx}">Remove</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }).join('');
+
+    // Bind events
+    container.querySelectorAll('.remove-new-block').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        currentNewProductSection.blocks.splice(idx, 1);
+        renderNewSectionBlocksEditor();
+      });
+    });
+
+    container.querySelectorAll('.new-block-content').forEach(textarea => {
+      textarea.addEventListener('input', (e) => {
+        const idx = parseInt(e.target.dataset.idx);
+        currentNewProductSection.blocks[idx].content = e.target.value;
+      });
+    });
+
+    container.querySelectorAll('.select-new-media-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        openNewMediaPickerForBlock(idx);
+      });
+    });
+  }
+
+  function addBlockToNewSection(type) {
+    if (!currentNewProductSection) resetNewSectionForm();
+    if (type === 'text') {
+      currentNewProductSection.blocks.push({ type: 'text', content: '' });
+    } else {
+      currentNewProductSection.blocks.push({ type: 'media', url: '', mimeType: '' });
+    }
+    renderNewSectionBlocksEditor();
+  }
+
+  function saveNewSection() {
+    if (!currentNewProductSection || currentNewProductSection.blocks.length === 0) {
+      toast('Please add at least one block', 'error');
+      return;
+    }
+
+    const nameEl = $('new-section-create-name');
+    currentNewProductSection.name = nameEl ? nameEl.value.trim() : '';
+
+    const layoutEl = $('new-section-create-layout');
+    currentNewProductSection.layout = layoutEl ? layoutEl.value : 'stacked';
+
+    const sections = newProductPending.sections;
+
+    if (editingNewSectionIndex !== null) {
+      sections[editingNewSectionIndex] = { ...currentNewProductSection };
+      toast('Section updated', 'success');
+    } else {
+      sections.push({ ...currentNewProductSection });
+      toast('Section added', 'success');
+    }
+
+    renderNewSectionsList();
+    $('new-add-section-form').classList.add('hidden');
+    editingNewSectionIndex = null;
+  }
+
+  function renderNewSectionsList() {
+    const sections = newProductPending.sections || [];
+    const container = $('new-sections-list');
+    if (!container) return;
+
+    if (sections.length === 0) {
+      container.innerHTML = '<p class="text-sm text-gray-400 text-center py-2">No sections added.</p>';
+      return;
+    }
+
+    container.innerHTML = sections.map((section, index) => {
+      let preview = '';
+      if (section.blocks && section.blocks.length > 0) {
+        const textCount = section.blocks.filter(b => b.type === 'text').length;
+        const mediaCount = section.blocks.filter(b => b.type === 'media').length;
+        preview = `<span class="text-xs text-gray-500">${section.layout || 'stacked'} • ${textCount} Text, ${mediaCount} Media</span>`;
+      }
+
+      const sectionName = section.name || `Section ${index + 1}`;
+
+      return `
+        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg group cursor-pointer hover:bg-gray-100 transition-colors edit-new-section-btn" data-idx="${index}">
+          <div class="w-8 h-8 bg-white border border-gray-200 rounded flex items-center justify-center text-gray-400 font-bold text-xs">
+            ${index + 1}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-900">${sectionName}</p>
+            ${preview}
+          </div>
+          <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button class="remove-new-section-btn p-1 text-gray-400 hover:text-red-600" data-idx="${index}">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </button>
+            <div class="flex flex-col gap-1">
+              <button class="move-new-section-btn p-1 text-gray-400 hover:text-gray-700 ${index === 0 ? 'opacity-30 cursor-not-allowed' : ''}" data-idx="${index}" data-dir="-1" ${index === 0 ? 'disabled' : ''}>
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
+              </button>
+              <button class="move-new-section-btn p-1 text-gray-400 hover:text-gray-700 ${index === sections.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}" data-idx="${index}" data-dir="1" ${index === sections.length - 1 ? 'disabled' : ''}>
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Bind remove
+    container.querySelectorAll('.remove-new-section-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx);
+        newProductPending.sections.splice(idx, 1);
+        renderNewSectionsList();
+      });
+    });
+
+    // Bind move
+    container.querySelectorAll('.move-new-section-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx);
+        const dir = parseInt(btn.dataset.dir);
+        const newIdx = idx + dir;
+        if (newIdx < 0 || newIdx >= sections.length) return;
+        const temp = sections[idx];
+        sections[idx] = sections[newIdx];
+        sections[newIdx] = temp;
+        renderNewSectionsList();
+      });
+    });
+
+    // Bind edit
+    container.querySelectorAll('.edit-new-section-btn').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.remove-new-section-btn') || e.target.closest('.move-new-section-btn')) return;
+        const idx = parseInt(row.dataset.idx);
+        const sectionToEdit = newProductPending.sections[idx];
+        resetNewSectionForm(sectionToEdit, idx);
+        $('new-add-section-form').classList.remove('hidden');
+      });
+    });
+  }
+
+  function openNewMediaPickerForBlock(idx = null) {
+    if (idx === null) {
+      if (!currentNewProductSection) resetNewSectionForm();
+      currentNewProductSection.blocks.push({ type: 'media', url: '', mimeType: '' });
+      activeNewBlockIndex = currentNewProductSection.blocks.length - 1;
+    } else {
+      activeNewBlockIndex = idx;
+    }
+    // We can reuse the media picker modal if we clear it and populate with pending media
+    $('media-picker-modal').classList.remove('hidden');
+    renderNewPendingMediaPickerGrid();
+  }
+
+  function renderNewPendingMediaPickerGrid() {
+    const container = $('media-picker-grid');
+    if (!container) return;
+
+    if (newProductPending.media.length === 0) {
+      container.innerHTML = '<p class="col-span-4 text-center text-gray-400 text-sm py-4">No pending media. Upload files to the product first.</p>';
+      return;
+    }
+
+    container.innerHTML = newProductPending.media.map(item => {
+      const isVideo = item.file?.type?.startsWith('video/') || item.name?.match(/\.(mp4|mov|webm)$/i);
+      return `
+        <div class="new-media-pick-item aspect-square bg-gray-50 border border-gray-200 rounded cursor-pointer hover:border-red-500 overflow-hidden relative"
+             data-url="${item.preview}" data-type="${item.file?.type || 'image/jpeg'}">
+          <img src="${item.preview}" class="w-full h-full object-cover">
+          ${isVideo ? '<div class="absolute inset-0 flex items-center justify-center bg-black/20"><svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" /></svg></div>' : ''}
+        </div>
+      `;
+    }).join('');
+
+    container.querySelectorAll('.new-media-pick-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const url = item.dataset.url;
+        const type = item.dataset.type;
+        selectNewMediaForBlock(url, type);
+      });
+    });
+  }
+
+  function selectNewMediaForBlock(url, type) {
+    if (activeNewBlockIndex === null || !currentNewProductSection) return;
+    currentNewProductSection.blocks[activeNewBlockIndex].url = url;
+    currentNewProductSection.blocks[activeNewBlockIndex].mimeType = type;
+    renderNewSectionBlocksEditor();
+    $('media-picker-modal').classList.add('hidden');
+    activeNewBlockIndex = null;
+  }
+
   init();
+  initNewSectionsLogic();
+
 })();

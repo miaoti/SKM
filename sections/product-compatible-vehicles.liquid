@@ -4,34 +4,51 @@
       <!-- Header -->
       <div class="tcc-fitment-header">Vehicle Fitment</div>
       
-      <div class="overflow-x-auto">
-        <table class="tcc-fitment-table">
-          <thead>
-            <tr>
-              <th></th>
-              <th>Year</th>
-              <th>Make</th>
-              <th>Model</th>
-              <th>Submodel</th>
-            </tr>
-          </thead>
-          <tbody>
-            {%- for vehicle in product.metafields.custom.fits_vehicles.value -%}
-              <tr>
-                <td class="tcc-check-cell">
-                  <svg class="tcc-check-icon" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                  </svg>
-                </td>
-                <td>{{ vehicle.year }}</td>
-                <td>{{ vehicle.make }}</td>
-                <td>{{ vehicle.model }}</td>
-                <td>{{ vehicle.submodel | default: '—' }}</td>
-              </tr>
-            {%- endfor -%}
-          </tbody>
-        </table>
-      </div>
+      {%- comment -%} Group by Make logic {%- endcomment -%}
+      {%- assign makes_string = '' -%}
+      {%- for vehicle in product.metafields.custom.fits_vehicles.value -%}
+        {%- assign make_clean = vehicle.make | strip -%}
+        {%- unless makes_string contains make_clean -%}
+          {%- assign makes_string = makes_string | append: make_clean | append: '|||' -%}
+        {%- endunless -%}
+      {%- endfor -%}
+      {%- assign unique_makes = makes_string | split: '|||' -%}
+
+      {%- for make in unique_makes -%}
+        {%- if make != blank -%}
+          <div class="tcc-make-section mb-8">
+            <h3 class="tcc-make-header">{{ make }}</h3>
+            <div class="overflow-x-auto">
+              <table class="tcc-fitment-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Year</th>
+                    <th>Model</th>
+                    <th>Submodel</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {%- for vehicle in product.metafields.custom.fits_vehicles.value -%}
+                    {%- if vehicle.make == make -%}
+                      <tr>
+                        <td class="tcc-check-cell">
+                          <svg class="tcc-check-icon" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                          </svg>
+                        </td>
+                        <td>{{ vehicle.year }}</td>
+                        <td>{{ vehicle.model }}</td>
+                        <td>{{ vehicle.submodel | default: '—' }}</td>
+                      </tr>
+                    {%- endif -%}
+                  {%- endfor -%}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {%- endif -%}
+      {%- endfor -%}
     </div>
   </div>
 
@@ -47,9 +64,20 @@
       color: #111;
       text-transform: uppercase;
       letter-spacing: -0.01em;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
       padding-bottom: 12px;
       border-bottom: 0.5px solid #E5E5E5;
+    }
+
+    .tcc-make-header {
+      font-family: 'Inter', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 16px;
+      padding-left: 4px;
+      border-left: 3px solid #CC0000;
+      line-height: 1.2;
     }
     
     .tcc-fitment-table {

@@ -277,7 +277,7 @@ export default {
 
         // Delete custom package
         case path.match(/^\/shipping\/packages\/[^/]+$/) && request.method === "DELETE":
-          const deletePkgId = path.split("/").pop();
+          const deletePkgId = decodeURIComponent(path.split("/").pop());
           return jsonResponse(await deletePackage(env, deletePkgId));
 
         // Set default package
@@ -1539,6 +1539,10 @@ async function getProduct(env, productId) {
           id
           value
         }
+        productSections: metafield(namespace: "custom", key: "product_sections") {
+          id
+          value
+        }
       }
     }
   `;
@@ -1574,6 +1578,7 @@ async function getProduct(env, productId) {
       price: p.priceRangeV2?.minVariantPrice?.amount,
       currency: p.priceRangeV2?.minVariantPrice?.currencyCode,
       inventory: p.totalInventory,
+      sections: p.productSections?.value ? JSON.parse(p.productSections.value) : [],
       image: p.featuredImage?.url,
       options: p.options?.map(o => ({
         id: o.id,
@@ -2255,6 +2260,17 @@ async function updateProduct(env, productId, data) {
         value: formatPrice(data.b2bPrice)
       });
     }
+  }
+
+  // Add product_sections metafield if provided
+  if (data.sections !== undefined) {
+    input.metafields = input.metafields || [];
+    input.metafields.push({
+      namespace: "custom",
+      key: "product_sections",
+      type: "json",
+      value: JSON.stringify(data.sections)
+    });
   }
 
   // Add or clear Discount price metafield

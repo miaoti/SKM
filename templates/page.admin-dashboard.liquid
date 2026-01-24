@@ -166,6 +166,28 @@
     
     /* Hide mobile back button on desktop */
     .mobile-back-btn { display: none; }
+    
+    /* Fix button/element overflow in right sidebar panels */
+    .sidebar-panel > div {
+      min-width: 0;
+      overflow: hidden;
+    }
+    .sidebar-panel .flex.gap-2 {
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+    .sidebar-panel .flex.gap-2 > input,
+    .sidebar-panel .flex.gap-2 > select,
+    .sidebar-panel .flex.gap-2 > button {
+      min-width: 0;
+      flex-shrink: 1;
+      max-width: 100%;
+    }
+    .sidebar-panel button {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
   </style>
   {{ content_for_header }}
 </head>
@@ -606,6 +628,94 @@
                   </div>
                 </div>
                 
+                <!-- Sections Editor -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-gray-900">Sections</h2>
+                    <button id="btn-add-section" class="text-xs text-red-600 hover:text-red-700 font-medium">+ Add Section</button>
+                  </div>
+                  
+                  <div id="sections-list" class="space-y-3">
+                    <p class="text-sm text-gray-400 text-center py-2">No sections added.</p>
+                  </div>
+                  
+                  <!-- Add Section Form (Block-Based Editor) -->
+                  <div id="add-section-form" class="hidden mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="flex items-center justify-between mb-3">
+                      <h3 class="text-sm font-semibold text-gray-800">New Section</h3>
+                      <button id="btn-cancel-section" class="text-xs text-gray-500 hover:text-gray-700">&times; Close</button>
+                    </div>
+                    
+                    <!-- Section Name -->
+                    <div class="mb-3">
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Section Name</label>
+                      <input type="text" id="new-section-name" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg" placeholder="e.g., Features, Specifications, Installation...">
+                    </div>
+                    
+                    <!-- Layout Selector -->
+                    <div class="mb-3">
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Layout</label>
+                      <select id="new-section-layout" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg">
+                        <option value="stacked">Stacked (Full Width)</option>
+                        <option value="media_left">Media Left, Text Right</option>
+                        <option value="media_right">Media Right, Text Left</option>
+                      </select>
+                    </div>
+                    
+                    <!-- Block Container -->
+                    <div class="mb-3">
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Content Blocks</label>
+                      <div id="section-blocks-container" class="min-h-[60px] bg-white border border-dashed border-gray-300 rounded-lg p-2">
+                        <p class="text-xs text-gray-400 text-center py-4">No content blocks added. Add text or media.</p>
+                      </div>
+                    </div>
+                    
+                    <!-- Add Block Buttons -->
+                    <div class="flex gap-2 mb-4">
+                      <button id="btn-add-text-block" class="flex-1 h-8 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                        Add Text
+                      </button>
+                      <button id="btn-add-media-block" class="flex-1 h-8 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Add Media
+                      </button>
+                    </div>
+                    
+                    <div class="flex justify-end gap-2 pt-2 border-t border-gray-200">
+                      <button id="btn-cancel-section-alt" class="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded hover:bg-gray-100">Cancel</button>
+                      <button id="btn-confirm-section" class="px-3 py-1.5 text-xs text-white bg-red-600 rounded hover:bg-red-700">Add Section</button>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Media Picker Modal -->
+                <div id="media-picker-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                  <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+                    <div class="flex items-center justify-between p-4 border-b border-gray-200">
+                      <h3 class="text-sm font-semibold text-gray-900">Select Media</h3>
+                      <button id="btn-close-media-picker" class="text-gray-400 hover:text-gray-600">&times;</button>
+                    </div>
+                    <div class="p-4 overflow-y-auto flex-1">
+                      <!-- Upload Zone -->
+                      <div class="mb-4">
+                        <label class="text-xs font-medium text-gray-600 mb-2 block">Upload New</label>
+                        <div id="section-media-dropzone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-red-400 hover:bg-red-50/30 transition-colors">
+                          <svg class="w-6 h-6 mx-auto text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                          <p class="text-xs text-gray-500">Click or drag file to upload</p>
+                        </div>
+                        <input type="file" id="media-picker-upload" class="hidden" accept="image/*,video/*">
+                      </div>
+                      
+                      <!-- Existing Media Grid -->
+                      <label class="text-xs font-medium text-gray-600 mb-2 block">Or Select Existing</label>
+                      <div id="media-picker-grid" class="grid grid-cols-4 gap-2">
+                        <p class="col-span-4 text-center text-gray-400 text-sm py-4">No media found.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
                 <!-- Vehicle Fitment -->
                 <div class="bg-white rounded-xl border border-gray-200 p-5">
                   <h2 class="text-sm font-semibold text-gray-900 mb-4">Vehicle Fitment</h2>
@@ -686,7 +796,7 @@
               </div>
               
               <!-- Right Column: Pricing & Inventory -->
-              <div class="space-y-4 sm:space-y-6">
+              <div class="sidebar-panel space-y-4 sm:space-y-6">
                 
                 <!-- Pricing -->
                 <div class="bg-white rounded-xl border border-gray-200 p-5">
@@ -784,8 +894,8 @@
                     <div id="shipping-weight-section">
                       <label class="text-xs font-medium text-gray-600 mb-1 block">Weight</label>
                       <div class="flex gap-2">
-                        <input type="number" step="0.01" id="edit-weight" class="flex-1 h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="0">
-                        <select id="edit-weight-unit" class="h-10 px-2 text-sm border border-gray-200 rounded-lg">
+                        <input type="number" step="0.01" id="edit-weight" class="flex-1 min-w-0 h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="0">
+                        <select id="edit-weight-unit" class="w-20 flex-shrink-0 h-10 px-2 text-sm border border-gray-200 rounded-lg">
                           <option value="GRAMS">g</option>
                           <option value="KILOGRAMS">kg</option>
                           <option value="OUNCES">oz</option>
@@ -913,6 +1023,61 @@
                     <input type="file" id="new-media-file-input" multiple accept="image/*,video/*" class="hidden">
                     <p class="text-sm text-gray-600">Drag & drop files here, or <span class="text-red-600 font-medium">click to browse</span></p>
                     <p class="text-xs text-gray-400 mt-1">Images (JPG, PNG, GIF) or Videos (MP4, MOV)</p>
+                  </div>
+                </div>
+
+                <!-- Sections (New Product) -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                  <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-gray-900">Sections</h2>
+                    <button id="btn-add-new-section" class="text-xs text-red-600 hover:text-red-700 font-medium">+ Add Section</button>
+                  </div>
+                  
+                  <div id="new-sections-list" class="space-y-3">
+                    <p class="text-sm text-gray-400 text-center py-2">No sections added.</p>
+                  </div>
+                  
+                  <!-- Add Section Form (Block-Based Editor) - Reusing class structure but unique ID -->
+                  <div id="new-add-section-form" class="hidden mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="flex items-center justify-between mb-3">
+                      <h3 class="text-sm font-semibold text-gray-800">New Section</h3>
+                      <button id="btn-new-cancel-section" class="text-xs text-gray-500 hover:text-gray-700">&times; Close</button>
+                    </div>
+                    
+                    <!-- Section Name -->
+                    <div class="mb-3">
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Section Name</label>
+                      <input type="text" id="new-section-create-name" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg" placeholder="e.g., Features, Specifications...">
+                    </div>
+                    
+                    <!-- Layout Selector -->
+                    <div class="mb-3">
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Layout</label>
+                      <select id="new-section-create-layout" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg">
+                        <option value="stacked">Stacked (Full Width)</option>
+                        <option value="media_left">Media Left, Text Right</option>
+                        <option value="media_right">Media Right, Text Left</option>
+                      </select>
+                    </div>
+                    
+                    <!-- Block Container -->
+                    <div class="mb-3">
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Content Blocks</label>
+                      <div id="new-section-blocks-container" class="min-h-[60px] bg-white border border-dashed border-gray-300 rounded-lg p-2">
+                        <p class="text-xs text-gray-400 text-center py-4">No content blocks added.</p>
+                      </div>
+                    </div>
+                    
+                    <!-- Add Block Buttons -->
+                    <div class="flex gap-2 mb-4">
+                      <button id="btn-new-add-text-block" class="flex-1 h-8 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-1">Add Text</button>
+                      <button id="btn-new-add-media-block" class="flex-1 h-8 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-1">Add Media</button>
+                    </div>
+                    
+                    <div class="flex justify-end gap-2 pt-2 border-t border-gray-200">
+                      <button id="btn-new-cancel-section-alt" class="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded hover:bg-gray-100">Cancel</button>
+                      <button id="btn-new-confirm-section" class="px-3 py-1.5 text-xs text-white bg-red-600 rounded hover:bg-red-700">Add Section</button>
+                    </div>
                   </div>
                 </div>
                 
@@ -1066,14 +1231,23 @@
                     <div id="new-shipping-weight-section">
                       <label class="text-xs font-medium text-gray-600 mb-1 block">Weight</label>
                       <div class="flex gap-2">
-                        <input type="number" step="0.01" id="new-weight" class="flex-1 h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="0">
-                        <select id="new-weight-unit" class="h-10 px-2 text-sm border border-gray-200 rounded-lg">
+                        <input type="number" step="0.01" id="new-weight" class="flex-1 min-w-0 h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="0">
+                        <select id="new-weight-unit" class="w-20 flex-shrink-0 h-10 px-2 text-sm border border-gray-200 rounded-lg">
                           <option value="GRAMS">g</option>
                           <option value="KILOGRAMS">kg</option>
                           <option value="OUNCES">oz</option>
                           <option value="POUNDS" selected>lb</option>
                         </select>
                       </div>
+                    </div>
+                    
+                    <!-- Package Selection (New Product) -->
+                    <div id="new-shipping-package-section">
+                      <label class="text-xs font-medium text-gray-600 mb-1 block">Package</label>
+                      <select id="new-package" class="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg">
+                        <option value="">Select a package...</option>
+                      </select>
+                      <p id="new-package-dimensions" class="text-xs text-gray-400 mt-1"></p>
                     </div>
                   </div>
                 </div>
