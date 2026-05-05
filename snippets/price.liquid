@@ -228,6 +228,21 @@
     assign use_currency = true
   endif
 
+  # Defensive fallback: if for any reason primary_price ended up nil/0 (e.g. a
+  # variant context that returned no metafield, a product with all-blank
+  # prices, or a Liquid edge case), fall back to the simplest source of truth
+  # before formatting. Without this, the card renders an empty <span class="price">
+  # and users see no price at all.
+  if primary_price == blank or primary_price == 0
+    if product_resource.price != blank and product_resource.price > 0
+      assign primary_price = product_resource.price
+    elsif selected_variant.price != blank and selected_variant.price > 0
+      assign primary_price = selected_variant.price
+    elsif product_resource.price_min != blank and product_resource.price_min > 0
+      assign primary_price = product_resource.price_min
+    endif
+  endif
+
   # Format all prices
   if use_currency
     assign primary_price_formatted = primary_price | money_with_currency
@@ -241,6 +256,37 @@
     assign price_max = price_max | money
   endif
 -%}
+
+{%- comment -%}
+  Debug: leaves a tiny HTML comment AND a window-scoped log so we can
+  inspect the rendered card and confirm what the snippet computed.
+  Remove when the price issue is resolved.
+{%- endcomment -%}
+<!-- price-debug: primary={{ primary_price }} crossed={{ crossed_out_price }} discount={{ discount_price }} b2b={{ b2b_price }} original={{ original_price }} price_min={{ price_min }} price_max={{ price_max }} volume={{ has_volume_pricing }} crossed_shown={{ show_crossed_price }} -->
+<script>
+  (function () {
+    var entry = {
+      productId: {{ product_resource.id | json }},
+      title: {{ product_resource.title | json }},
+      primary: {{ primary_price | json }},
+      crossed: {{ crossed_out_price | json }},
+      discount: {{ discount_price | json }},
+      b2b: {{ b2b_price | json }},
+      original: {{ original_price | json }},
+      price_min_raw: {{ product_resource.price_min | json }},
+      price_max_raw: {{ product_resource.price_max | json }},
+      volume: {{ has_volume_pricing | json }},
+      crossed_shown: {{ show_crossed_price | json }},
+      formatted: {{ primary_price_formatted | json }}
+    };
+    (window.__skmPriceDebug = window.__skmPriceDebug || []).push(entry);
+    if (!window.__skmPriceDebugLogged) {
+      window.__skmPriceDebugLogged = true;
+      console.log('[SKM price debug] open window.__skmPriceDebug for full per-card data');
+    }
+  })();
+</script>
+
 
 <div ref="priceContainer" class="price-container">
   {% if has_volume_pricing %}
@@ -277,8 +323,27 @@
     </div>
     
   {% else %}
-    {%- comment -%} Standard pricing display {%- endcomment -%}
-    <span class="price">{{ primary_price_formatted | default: '&nbsp;' }}</span>
+    {%- comment -%} Standard pricing display — fall back through every price
+       source we know about so a card never renders blank. {%- endcomment -%}
+    {%- liquid
+      assign display_price = primary_price_formatted
+      if display_price == blank
+        if product_resource.price_min != blank and product_resource.price_min > 0
+          if use_currency
+            assign display_price = product_resource.price_min | money_with_currency
+          else
+            assign display_price = product_resource.price_min | money
+          endif
+        elsif selected_variant.price != blank and selected_variant.price > 0
+          if use_currency
+            assign display_price = selected_variant.price | money_with_currency
+          else
+            assign display_price = selected_variant.price | money
+          endif
+        endif
+      endif
+    -%}
+    <span class="price">{{ display_price | default: '&nbsp;' }}</span>
   {% endif %}
   
   {%- if selected_variant.unit_price and show_unit_price %}

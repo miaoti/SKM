@@ -365,4 +365,83 @@
   [product-grid-view='zoom-out'] .card-gallery .slideshow-control {
     min-width: auto;
   }
+
+  /* ========================================
+     Product card slideshow arrows — HUD restyle
+     Replace the theme's default teal with the
+     site's dark-with-red racing aesthetic.
+     ======================================== */
+  .card-gallery slideshow-arrows .slideshow-control {
+    background: rgba(10, 10, 10, 0.78);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow:
+      0 4px 14px rgba(0, 0, 0, 0.35),
+      inset 0 0 0 1px rgba(204, 0, 0, 0.0);
+    padding: 8px 12px;
+    transition:
+      background-color 200ms ease,
+      box-shadow 200ms ease,
+      border-color 200ms ease,
+      transform 160ms ease;
+    /* Corner-bracket detail to match the HUD modals */
+    position: relative;
+  }
+
+  .card-gallery slideshow-arrows .slideshow-control::before,
+  .card-gallery slideshow-arrows .slideshow-control::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-color: #CC0000;
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+  .card-gallery slideshow-arrows .slideshow-control::before {
+    top: 2px;
+    left: 2px;
+    border-top: 1px solid;
+    border-left: 1px solid;
+  }
+  .card-gallery slideshow-arrows .slideshow-control::after {
+    bottom: 2px;
+    right: 2px;
+    border-bottom: 1px solid;
+    border-right: 1px solid;
+  }
+
+  .card-gallery slideshow-arrows .slideshow-control:hover,
+  .card-gallery slideshow-arrows .slideshow-control:focus-visible {
+    background: rgba(204, 0, 0, 0.92);
+    border-color: rgba(255, 80, 80, 0.6);
+    box-shadow:
+      0 6px 18px rgba(204, 0, 0, 0.45),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    transform: translateY(-1px);
+  }
+
+  .card-gallery slideshow-arrows .slideshow-control:hover::before,
+  .card-gallery slideshow-arrows .slideshow-control:hover::after,
+  .card-gallery slideshow-arrows .slideshow-control:focus-visible::before,
+  .card-gallery slideshow-arrows .slideshow-control:focus-visible::after {
+    opacity: 1;
+    border-color: #fff;
+  }
+
+  .card-gallery slideshow-arrows .slideshow-control:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(204, 0, 0, 0.5);
+  }
+
+  /* Make the icon itself crisp on the dark/red background */
+  .card-gallery slideshow-arrows .slideshow-control .svg-wrapper,
+  .card-gallery slideshow-arrows .slideshow-control svg {
+    color: #fff;
+    width: 16px;
+    height: 16px;
+  }
 {% endstylesheet %}
