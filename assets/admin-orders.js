@@ -447,37 +447,15 @@
         return;
       }
 
-      // Friendly labels for FulfillmentEventStatus values used by the
-      // manual-status-override dropdown below each fulfillment.
-      const eventStatuses = [
-        { v: 'CONFIRMED',          l: 'Confirmed' },
-        { v: 'IN_TRANSIT',         l: 'In transit' },
-        { v: 'OUT_FOR_DELIVERY',   l: 'Out for delivery' },
-        { v: 'ATTEMPTED_DELIVERY', l: 'Attempted delivery' },
-        { v: 'READY_FOR_PICKUP',   l: 'Ready for pickup' },
-        { v: 'DELIVERED',          l: 'Delivered' },
-        { v: 'FAILURE',            l: 'Failure' }
-      ];
-      const statusOptions = eventStatuses
-        .map(s => `<option value="${s.v}">${s.l}</option>`)
-        .join('');
-
       container.innerHTML = fulfillments.map(f => {
         const tracking = f.trackingInfo?.[0] || {};
-        const display = (f.displayStatus || f.status || '').toUpperCase();
-        const statusClass = display === 'DELIVERED'         ? 'bg-green-100 text-green-700'
-                          : display === 'OUT_FOR_DELIVERY'  ? 'bg-amber-100 text-amber-700'
-                          : display === 'IN_TRANSIT'        ? 'bg-blue-100 text-blue-700'
-                          : display === 'FAILURE'           ? 'bg-red-100 text-red-700'
-                          : f.status === 'SUCCESS'          ? 'bg-gray-100 text-gray-700'
-                          :                                   'bg-gray-100 text-gray-700';
-        const numericFid = (f.id || '').split('/').pop();
+        const statusClass = f.status === 'SUCCESS' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700';
 
         return `
-          <div class="p-3 bg-gray-50 rounded-lg" data-fulfillment-id="${f.id}">
+          <div class="p-3 bg-gray-50 rounded-lg">
             <div class="flex items-center justify-between mb-2">
               <span class="text-sm font-medium text-gray-900">${f.name || 'Fulfillment'}</span>
-              <span class="px-1.5 py-0.5 text-[10px] font-medium rounded ${statusClass}">${display.replace(/_/g, ' ') || f.status}</span>
+              <span class="px-1.5 py-0.5 text-[10px] font-medium rounded ${statusClass}">${f.displayStatus || f.status}</span>
             </div>
             ${tracking.number ? `
               <div class="text-xs text-gray-600">
@@ -486,63 +464,9 @@
               </div>
             ` : ''}
             <div class="text-xs text-gray-400 mt-1">${formatDateTime(f.createdAt)}</div>
-
-            <div class="mt-2 pt-2 border-t border-gray-200 flex items-center gap-2">
-              <span class="text-[10px] text-gray-500 uppercase tracking-wider whitespace-nowrap">Update status</span>
-              <select class="ff-status-select flex-1 h-7 px-2 text-xs border border-gray-200 rounded" data-fulfillment-id="${numericFid}">
-                <option value="">— select —</option>
-                ${statusOptions}
-              </select>
-              <button class="ff-status-apply h-7 px-2.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded disabled:opacity-50 disabled:cursor-not-allowed" data-fulfillment-id="${numericFid}" disabled>
-                Apply
-              </button>
-            </div>
-            <p class="text-[10px] text-gray-400 mt-1">Use when Shopify hasn't auto-polled the carrier (manual draft-order tracking, off-platform shipping). The customer page reflects this on next load.</p>
           </div>
         `;
       }).join('');
-
-      // Wire up status-update buttons.
-      container.querySelectorAll('.ff-status-select').forEach(sel => {
-        sel.addEventListener('change', (e) => {
-          const fid = sel.dataset.fulfillmentId;
-          const applyBtn = container.querySelector(`.ff-status-apply[data-fulfillment-id="${fid}"]`);
-          if (applyBtn) applyBtn.disabled = !sel.value;
-        });
-      });
-      container.querySelectorAll('.ff-status-apply').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const fid = btn.dataset.fulfillmentId;
-          const sel = container.querySelector(`.ff-status-select[data-fulfillment-id="${fid}"]`);
-          if (!sel || !sel.value) return;
-
-          const friendly = sel.options[sel.selectedIndex].text;
-          if (!window.confirm(`Mark this fulfillment as "${friendly}"?`)) return;
-
-          btn.disabled = true;
-          const originalText = btn.textContent;
-          btn.textContent = '…';
-
-          try {
-            const res = await fetch(`${API_BASE}/fulfillments/${fid}/events`, {
-              method: 'POST',
-              headers: api.headers(),
-              body: JSON.stringify({ status: sel.value })
-            });
-            const data = await res.json();
-            if (!data.success) throw new Error(data.error || 'Failed to update');
-
-            toast(`Status updated to ${friendly}`, 'success');
-            if (S.selectedOrderFull) {
-              await selectOrder(S.selectedOrderFull.id);
-            }
-          } catch (e) {
-            toast('Failed: ' + e.message, 'error');
-            btn.disabled = false;
-            btn.textContent = originalText;
-          }
-        });
-      });
     }
 
     function renderTimeline(events) {

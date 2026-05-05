@@ -348,126 +348,6 @@
     border-color: #aa0000;
   }
 
-  /* Shipments */
-  .shipment-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    padding: 18px 20px;
-    transition: border-color 0.2s ease;
-  }
-  .shipment-card:hover { border-color: var(--racing-red); }
-
-  .shipment-card__head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--border-color);
-    margin-bottom: 14px;
-  }
-  .shipment-card__index {
-    font-size: 9px;
-    color: var(--data-grey);
-    letter-spacing: 0.18em;
-    margin-bottom: 2px;
-  }
-  .shipment-card__title {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--obsidian);
-    letter-spacing: 0.08em;
-  }
-
-  .shipment-status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border: 1px solid var(--border-color);
-    background: #fff;
-    color: var(--obsidian);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    flex-shrink: 0;
-  }
-  .shipment-status-pill .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--data-grey);
-  }
-  .shipment-status-pill.is-transit  { color: #2563eb; border-color: #bfdbfe; background: #eff6ff; }
-  .shipment-status-pill.is-transit  .dot { background: #2563eb; box-shadow: 0 0 6px rgba(37, 99, 235, 0.5); }
-  .shipment-status-pill.is-out       { color: #d97706; border-color: #fde68a; background: #fffbeb; }
-  .shipment-status-pill.is-out       .dot { background: #d97706; box-shadow: 0 0 6px rgba(217, 119, 6, 0.5); }
-  .shipment-status-pill.is-attempted { color: #d97706; border-color: #fde68a; background: #fffbeb; }
-  .shipment-status-pill.is-attempted .dot { background: #d97706; }
-  .shipment-status-pill.is-pickup    { color: #7c3aed; border-color: #ddd6fe; background: #f5f3ff; }
-  .shipment-status-pill.is-pickup    .dot { background: #7c3aed; }
-  .shipment-status-pill.is-delivered { color: var(--signal-green); border-color: #bbf7d0; background: #f0fdf4; }
-  .shipment-status-pill.is-delivered .dot { background: var(--signal-green); box-shadow: 0 0 6px rgba(22, 163, 74, 0.5); }
-  .shipment-status-pill.is-failure   { color: var(--racing-red); border-color: #fecaca; background: #fef2f2; }
-  .shipment-status-pill.is-failure   .dot { background: var(--racing-red); }
-  .shipment-status-pill.is-pending   { color: #6b7280; border-color: #e5e7eb; background: #f9fafb; }
-  .shipment-status-pill.is-pending   .dot { background: #9ca3af; }
-
-  .shipment-card__body { display: flex; flex-direction: column; gap: 14px; }
-  .shipment-meta { display: flex; flex-direction: column; gap: 6px; }
-  .shipment-meta__row {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    font-size: 12px;
-  }
-  .shipment-meta__key {
-    font-size: 10px;
-    color: var(--data-grey);
-    letter-spacing: 0.16em;
-    width: 84px;
-    flex-shrink: 0;
-  }
-  .shipment-meta__val { color: var(--obsidian); }
-  .shipment-meta__val--muted { color: var(--data-grey); }
-  .shipment-link {
-    color: var(--racing-red);
-    text-decoration: none;
-    font-weight: 600;
-    transition: color 0.15s ease;
-  }
-  .shipment-link:hover { color: #aa0000; text-decoration: underline; }
-
-  .shipment-items {
-    border-top: 1px dashed var(--border-color);
-    padding-top: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .shipment-items__label {
-    font-size: 9px;
-    color: var(--racing-red);
-    letter-spacing: 0.18em;
-    margin-bottom: 4px;
-  }
-  .shipment-item {
-    font-size: 12px;
-    color: #374151;
-    line-height: 1.5;
-  }
-  .shipment-item__qty {
-    color: var(--racing-red);
-    font-weight: 700;
-    margin-right: 8px;
-  }
-  .shipment-item__variant {
-    font-size: 11px;
-    color: var(--data-grey);
-    margin-left: 4px;
-  }
-
   /* Layout helpers */
   .grid-12 {
     display: grid;
@@ -579,22 +459,23 @@
     {%- comment -%} ===== Status timeline =====
        Steps: Placed → Paid → Fulfilled → Delivered. If refunded, last
        step shows refund instead. {%- endcomment -%}
+    {%- comment -%}
+      Timeline stops at "Shipped" because Shopify doesn't reliably
+      track delivery state for our draft-order checkouts (manual
+      tracking numbers don't get auto-polled by Shopify Shipping).
+      Customers can click the per-line-item tracking number to check
+      live status with the carrier directly.
+    {%- endcomment -%}
     {%- liquid
       assign step_placed = true
       assign step_paid = false
       if payment_status == 'paid' or payment_status == 'partially_paid' or payment_status == 'refunded' or payment_status == 'partially_refunded'
         assign step_paid = true
       endif
-      assign step_fulfilled = false
+      assign step_shipped = false
       if fulfillment_status_raw == 'fulfilled' or fulfillment_status_raw == 'partial'
-        assign step_fulfilled = true
+        assign step_shipped = true
       endif
-      assign step_delivered = false
-      for fulfillment in order.fulfillments
-        if fulfillment.shipment_status == 'delivered'
-          assign step_delivered = true
-        endif
-      endfor
       assign step_refunded = false
       if payment_status == 'refunded' or payment_status == 'partially_refunded'
         assign step_refunded = true
@@ -605,7 +486,7 @@
         <span class="label">// PROGRESS</span>
         <span class="sub">Order journey</span>
       </div>
-      <div class="timeline-track" style="--steps: 4;">
+      <div class="timeline-track" style="--steps: 3;">
         <div class="timeline-step is-done">
           <div class="dot"></div>
           <div class="label">Placed</div>
@@ -623,212 +504,14 @@
             <div class="ts">CREDIT ISSUED</div>
           </div>
         {% else %}
-          <div class="timeline-step {% if step_fulfilled %}is-done{% elsif step_paid %}is-current{% endif %}">
+          <div class="timeline-step {% if step_shipped %}is-done{% elsif step_paid %}is-current{% endif %}">
             <div class="dot"></div>
-            <div class="label">Fulfilled</div>
-            <div class="ts">{% if step_fulfilled %}SHIPPED{% else %}PENDING{% endif %}</div>
+            <div class="label">Shipped</div>
+            <div class="ts">{% if step_shipped %}DISPATCHED{% else %}PROCESSING{% endif %}</div>
           </div>
         {% endif %}
-        <div class="timeline-step {% if step_delivered %}is-done{% elsif step_fulfilled %}is-current{% endif %}">
-          <div class="dot"></div>
-          <div class="label">Delivered</div>
-          <div class="ts">{% if step_delivered %}COMPLETE{% else %}—{% endif %}</div>
-        </div>
       </div>
     </div>
-
-    {%- comment -%}
-      ===== Shipments =====
-      Reads Shopify's standard customer-order Liquid object — no API
-      call needed. Each `fulfillment` exposes:
-        - tracking_numbers (array) + tracking_urls (array) — used so
-          multi-package shipments under one fulfillment all show
-        - tracking_company — carrier name (e.g. "UPS", "FedEx"); we
-          fall back to "Carrier" when a manual fulfillment didn't fill
-          this in
-        - shipment_status — set automatically by Shopify Shipping or
-          via the carrier integration. May be nil on manual
-          fulfillments where the merchant only typed in a tracking
-          number; we degrade to "Awaiting carrier scan" so the user
-          sees something coherent
-        - fulfillment_line_items — gives us the FULFILLED quantity per
-          line item (more accurate than fulfillment.line_items, which
-          can echo the original ordered qty)
-        - created_at — when fulfillment was created in Shopify
-
-      The section only renders when at least one fulfillment exists.
-      For pre-fulfillment orders, the timeline above already shows
-      "Fulfilled · pending".
-    {%- endcomment -%}
-    {%- comment -%}
-      Build the shipments view from `line_item.fulfillment` rather than
-      `order.fulfillments`, because the latter sometimes comes back empty
-      on draft-order-derived orders even when each line item carries the
-      same tracking data we'd render anyway. Group items by tracking
-      number (with a "+timestamp" fallback for fulfillments shipped
-      without a tracking number) so two packages with the same tracking
-      collapse into one card.
-    {%- endcomment -%}
-    {%- liquid
-      assign ff_keys = ''
-      for li in order.line_items
-        if li.fulfillment
-          assign tn = li.fulfillment.tracking_number | default: ''
-          assign ca = li.fulfillment.created_at | date: '%s' | default: ''
-          if tn != ''
-            assign key = 'TN:' | append: tn
-          else
-            assign key = 'NT:' | append: ca
-          endif
-          unless ff_keys contains key
-            if ff_keys == ''
-              assign ff_keys = key
-            else
-              assign ff_keys = ff_keys | append: '|||' | append: key
-            endif
-          endunless
-        endif
-      endfor
-      assign ff_key_list = ff_keys | split: '|||'
-      assign ff_count = ff_key_list.size
-    -%}
-
-    {% if ff_count > 0 %}
-      <div class="mb-8">
-        <div class="section-head">
-          <span class="label">// SHIPMENTS</span>
-          <span class="sub">{{ ff_count }} {% if ff_count == 1 %}package{% else %}packages{% endif %}</span>
-        </div>
-
-        <div class="space-y-4">
-          {% for ff_key in ff_key_list %}
-            {%- liquid
-              # Find the representative fulfillment for this group by
-              # walking the line items until we hit one whose key matches.
-              assign sample_fulfillment = nil
-              for li in order.line_items
-                if li.fulfillment
-                  assign tn = li.fulfillment.tracking_number | default: ''
-                  assign ca = li.fulfillment.created_at | date: '%s' | default: ''
-                  if tn != ''
-                    assign this_key = 'TN:' | append: tn
-                  else
-                    assign this_key = 'NT:' | append: ca
-                  endif
-                  if this_key == ff_key and sample_fulfillment == nil
-                    assign sample_fulfillment = li.fulfillment
-                  endif
-                endif
-              endfor
-
-              assign ship_status_raw = sample_fulfillment.shipment_status
-              assign has_tracking_number = false
-              if sample_fulfillment.tracking_number != blank
-                assign has_tracking_number = true
-              endif
-              assign ship_status = ship_status_raw | downcase
-              if ship_status == blank
-                if has_tracking_number
-                  assign ship_status = 'awaiting_scan'
-                else
-                  assign ship_status = 'fulfilled'
-                endif
-              endif
-              assign ship_status_label = ship_status | replace: '_', ' ' | upcase
-              assign ship_status_class = 'is-transit'
-              if ship_status == 'delivered'
-                assign ship_status_class = 'is-delivered'
-              elsif ship_status == 'out_for_delivery'
-                assign ship_status_class = 'is-out'
-              elsif ship_status == 'failure'
-                assign ship_status_class = 'is-failure'
-              elsif ship_status == 'attempted_delivery'
-                assign ship_status_class = 'is-attempted'
-              elsif ship_status == 'ready_for_pickup'
-                assign ship_status_class = 'is-pickup'
-              elsif ship_status == 'awaiting_scan'
-                assign ship_status_class = 'is-pending'
-                assign ship_status_label = 'AWAITING CARRIER SCAN'
-              elsif ship_status == 'fulfilled'
-                assign ship_status_class = 'is-pending'
-                assign ship_status_label = 'AWAITING TRACKING'
-              endif
-            -%}
-            <div class="shipment-card hud-corner">
-              <span class="hud-corner__bl"></span><span class="hud-corner__br"></span>
-
-              <div class="shipment-card__head">
-                <div>
-                  <div class="shipment-card__index mono">PACKAGE {{ forloop.index }} OF {{ ff_count }}</div>
-                  <div class="shipment-card__title mono">
-                    {%- if sample_fulfillment.tracking_company != blank -%}
-                      {{ sample_fulfillment.tracking_company | upcase }}
-                    {%- else -%}
-                      CARRIER
-                    {%- endif -%}
-                  </div>
-                </div>
-                <span class="shipment-status-pill mono {{ ship_status_class }}">
-                  <span class="dot"></span>{{ ship_status_label }}
-                </span>
-              </div>
-
-              <div class="shipment-card__body">
-                <div class="shipment-meta">
-                  <div class="shipment-meta__row">
-                    <span class="shipment-meta__key mono">TRACKING</span>
-                    <span class="shipment-meta__val mono">
-                      {% if sample_fulfillment.tracking_url != blank and sample_fulfillment.tracking_number != blank %}
-                        <a href="{{ sample_fulfillment.tracking_url }}" target="_blank" rel="noopener" class="shipment-link">
-                          {{ sample_fulfillment.tracking_number }}
-                          <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="margin-left: 4px; display: inline-block; vertical-align: -1px;"><path stroke-linecap="round" stroke-linejoin="round" d="M14 3h7v7m0-7L10 14M5 5h4v4M5 5v9a2 2 0 002 2h9"/></svg>
-                        </a>
-                      {% elsif sample_fulfillment.tracking_number != blank %}
-                        {{ sample_fulfillment.tracking_number }}
-                      {% else %}
-                        <span class="shipment-meta__val--muted">Not yet provided</span>
-                      {% endif %}
-                    </span>
-                  </div>
-                  {% if sample_fulfillment.created_at %}
-                    <div class="shipment-meta__row">
-                      <span class="shipment-meta__key mono">SHIPPED</span>
-                      <span class="shipment-meta__val mono">{{ sample_fulfillment.created_at | date: "%Y-%m-%d %H:%M" }}</span>
-                    </div>
-                  {% endif %}
-                </div>
-
-                <div class="shipment-items">
-                  <div class="shipment-items__label mono">CONTENTS</div>
-                  {% for li in order.line_items %}
-                    {% if li.fulfillment %}
-                      {%- liquid
-                        assign tn2 = li.fulfillment.tracking_number | default: ''
-                        assign ca2 = li.fulfillment.created_at | date: '%s' | default: ''
-                        if tn2 != ''
-                          assign li_key = 'TN:' | append: tn2
-                        else
-                          assign li_key = 'NT:' | append: ca2
-                        endif
-                      -%}
-                      {% if li_key == ff_key %}
-                        <div class="shipment-item">
-                          <span class="shipment-item__qty mono">{{ li.quantity }}×</span>
-                          <span class="shipment-item__title">{{ li.title }}</span>
-                          {% if li.variant.title and li.variant.title != 'Default Title' %}
-                            <span class="shipment-item__variant mono">· {{ li.variant.title }}</span>
-                          {% endif %}
-                        </div>
-                      {% endif %}
-                    {% endif %}
-                  {% endfor %}
-                </div>
-              </div>
-            </div>
-          {% endfor %}
-        </div>
-      </div>
-    {% endif %}
 
     {%- comment -%} ===== Items + Ledger ===== {%- endcomment -%}
     <div class="grid-12 mb-8">
