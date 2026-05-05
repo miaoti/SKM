@@ -375,6 +375,13 @@ export default {
           const orderCursor = url.searchParams.get("cursor") || null;
           return jsonResponse(await listOrders(env, { status: orderStatus, fulfillment: orderFulfillment, financial: orderFinancial, query: orderQuery, limit: orderLimit, cursor: orderCursor }));
 
+        // Aggregate counts for the admin Orders-tab chips. Uses Shopify's
+        // ordersCount field with aliased queries so a single GraphQL
+        // round-trip returns every bucket. Counts are global (not
+        // affected by which page of results is currently loaded).
+        case path === "/orders/counts" && request.method === "GET":
+          return jsonResponse(await getOrderCounts(env));
+
         // Get single order with full details
         case path.match(/^\/orders\/[^/]+$/) && request.method === "GET":
           const getOrderId = path.split("/").pop();
@@ -5604,6 +5611,50 @@ async function listOrders(env, filters = {}) {
       endCursor: result.orders.pageInfo.endCursor
     }
   };
+}
+
+/**
+ * Aggregate counts for the admin Orders-tab quick filters.
+ * Uses Shopify's `ordersCount(query: …)` field — added to the Admin
+ * GraphQL API in 2024-04 — with multiple aliased calls so one
+ * round-trip returns every bucket. Counts are GLOBAL (not affected
+ * by which page is currently loaded), which is what the chips need.
+ *
+ * "Needs Fulfillment" excludes refunded/partially-refunded and
+ * cancelled orders, matching the user's intuition that a refunded-
+ * but-unfulfilled order isn't waiting on us to ship anything.
+ */
+async function getOrderCounts(env) {
+  const query = `
+    query OrdersCounts {
+      all:           ordersCount { count precision }
+      needsFulfill:  ordersCount(query: "(fulfillment_status:unfulfilled OR fulfillment_status:partial) -financial_status:refunded -financial_status:partially_refunded -status:cancelled") { count precision }
+      refundReq:     ordersCount(query: "tag:refund-requested") { count precision }
+      refunded:      ordersCount(query: "financial_status:refunded OR financial_status:partially_refunded") { count precision }
+      cancelled:     ordersCount(query: "status:cancelled") { count precision }
+    }
+  `;
+
+  try {
+    const result = await shopifyGraphQL(env, query, {});
+    // Shopify returns precision: EXACT or AT_LEAST. We surface both so
+    // the admin UI can render "150+" when the answer is approximate.
+    return {
+      success: true,
+      counts: {
+        all:          { count: result.all?.count          ?? 0, precision: result.all?.precision          ?? "EXACT" },
+        needsFulfill: { count: result.needsFulfill?.count ?? 0, precision: result.needsFulfill?.precision ?? "EXACT" },
+        refundReq:    { count: result.refundReq?.count    ?? 0, precision: result.refundReq?.precision    ?? "EXACT" },
+        refunded:     { count: result.refunded?.count     ?? 0, precision: result.refunded?.precision     ?? "EXACT" },
+        cancelled:    { count: result.cancelled?.count    ?? 0, precision: result.cancelled?.precision    ?? "EXACT" }
+      }
+    };
+  } catch (e) {
+    // Frontend falls back to loaded-data counts if this errors —
+    // don't bring the whole orders tab down because a count failed.
+    console.warn("[orders/counts] Failed:", e.message);
+    return { success: false, error: e.message };
+  }
 }
 
 /**

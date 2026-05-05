@@ -83,6 +83,23 @@
       if (btn) { btn.disabled = false; btn.textContent = 'Load More Orders'; }
     }
 
+    // Fetch global counts for the chip row. Decoupled from loadOrders
+    // so the chip badges stay accurate no matter which filter is
+    // active or how many pages have been loaded.
+    async function loadOrderCounts() {
+      try {
+        const res = await fetch(`${API_BASE}/orders/counts`, { headers: api.headers() });
+        const data = await res.json();
+        if (data && data.success && data.counts) {
+          S.orderCounts = data.counts;
+          renderOrdersQuickChips();
+        }
+      } catch (e) {
+        // Chips fall back to loaded-data counts if this fails.
+        console.warn('[orders] count fetch failed:', e.message);
+      }
+    }
+
     function renderOrdersList() {
       const list = $('orders-list');
       renderOrdersQuickChips();
@@ -163,37 +180,58 @@
       const chipsEl = $('orders-quick-chips');
       if (!chipsEl) return;
 
-      // Counts derived from currently loaded orders. Annotated "+" when
-      // there are more pages on the server so the operator knows the
-      // shown count is a floor, not a total.
+      // Counts come from the dedicated /orders/counts endpoint
+      // (S.orderCounts), which gives accurate global numbers that
+      // don't change when the operator clicks a chip. If that fetch
+      // hasn't returned yet (or failed), fall back to loaded-data
+      // counts so the chips still render with something sensible.
       const loaded = S.orders || [];
       const moreOnServer = S.orderPagination.hasNextPage;
-      const cap = (n) => moreOnServer && S.orderFilters.quick === '' ? `${n}+` : `${n}`;
+      const remote = S.orderCounts;
 
-      const countAll          = loaded.length;
-      const countNeedsFulfill = loaded.filter(o => {
-        const fs = (o.fulfillmentStatus || '').toUpperCase();
-        const finS = (o.financialStatus || '').toUpperCase();
-        const isUnfulfilled = fs === 'UNFULFILLED' || fs === 'PARTIALLY_FULFILLED';
-        const isRefunded    = finS === 'REFUNDED' || finS === 'PARTIALLY_REFUNDED';
-        const isCancelled   = !!o.cancelledAt;
-        return isUnfulfilled && !isRefunded && !isCancelled;
-      }).length;
-      const countRefundReq    = loaded.filter(o => (o.tags || []).includes('refund-requested')).length;
-      const countRefunded     = loaded.filter(o => {
-        const finS = (o.financialStatus || '').toUpperCase();
-        return finS === 'REFUNDED' || finS === 'PARTIALLY_REFUNDED';
-      }).length;
-      const countCancelled    = loaded.filter(o => !!o.cancelledAt).length;
+      const fmt = (entry) => {
+        if (!entry) return '0';
+        const n = entry.count || 0;
+        return entry.precision === 'AT_LEAST' ? `${n}+` : `${n}`;
+      };
+      const fmtLoaded = (n) => moreOnServer && S.orderFilters.quick === '' ? `${n}+` : `${n}`;
+
+      let countAll, countNeedsFulfill, countRefundReq, countRefunded, countCancelled;
+      if (remote) {
+        countAll          = fmt(remote.all);
+        countNeedsFulfill = fmt(remote.needsFulfill);
+        countRefundReq    = fmt(remote.refundReq);
+        countRefunded     = fmt(remote.refunded);
+        countCancelled    = fmt(remote.cancelled);
+      } else {
+        countAll          = fmtLoaded(loaded.length);
+        countNeedsFulfill = fmtLoaded(loaded.filter(o => {
+          const fs = (o.fulfillmentStatus || '').toUpperCase();
+          const finS = (o.financialStatus || '').toUpperCase();
+          const isUnfulfilled = fs === 'UNFULFILLED' || fs === 'PARTIALLY_FULFILLED';
+          const isRefunded    = finS === 'REFUNDED' || finS === 'PARTIALLY_REFUNDED';
+          const isCancelled   = !!o.cancelledAt;
+          return isUnfulfilled && !isRefunded && !isCancelled;
+        }).length);
+        countRefundReq    = fmtLoaded(loaded.filter(o => (o.tags || []).includes('refund-requested')).length);
+        countRefunded     = fmtLoaded(loaded.filter(o => {
+          const finS = (o.financialStatus || '').toUpperCase();
+          return finS === 'REFUNDED' || finS === 'PARTIALLY_REFUNDED';
+        }).length);
+        countCancelled    = fmtLoaded(loaded.filter(o => !!o.cancelledAt).length);
+      }
 
       const active = S.orderFilters.quick || '';
 
+      // Helper to decide whether to hide a zero-count chip.
+      const numeric = (s) => parseInt(String(s).replace(/\D/g, ''), 10) || 0;
+
       const chips = [
-        { key: '',             label: 'All',               count: cap(countAll),          color: 'gray' },
-        { key: 'needsFulfill', label: 'Needs Fulfillment', count: cap(countNeedsFulfill), color: 'amber' },
-        { key: 'refundReq',    label: 'Refund Requests',   count: cap(countRefundReq),    color: 'orange', hideIfZero: true },
-        { key: 'refunded',     label: 'Refunded',          count: cap(countRefunded),     color: 'red',    hideIfZero: true },
-        { key: 'cancelled',    label: 'Cancelled',         count: cap(countCancelled),    color: 'gray',   hideIfZero: true }
+        { key: '',             label: 'All',               count: countAll,          color: 'gray' },
+        { key: 'needsFulfill', label: 'Needs Fulfillment', count: countNeedsFulfill, color: 'amber' },
+        { key: 'refundReq',    label: 'Refund Requests',   count: countRefundReq,    color: 'orange', hideIfZero: true },
+        { key: 'refunded',     label: 'Refunded',          count: countRefunded,     color: 'red',    hideIfZero: true },
+        { key: 'cancelled',    label: 'Cancelled',         count: countCancelled,    color: 'gray',   hideIfZero: true }
       ];
 
       const colorClasses = (color, isActive) => {
@@ -210,7 +248,7 @@
       };
 
       chipsEl.innerHTML = chips
-        .filter(c => !c.hideIfZero || (parseInt(c.count) > 0 || c.key === active))
+        .filter(c => !c.hideIfZero || (numeric(c.count) > 0 || c.key === active))
         .map(c => {
           const isActive = c.key === active;
           return `<button type="button" data-quick-key="${c.key}"
@@ -1057,6 +1095,7 @@
               // Force a small delay to allow Shopify to update the order status
               await new Promise(resolve => setTimeout(resolve, 500));
               await loadOrders();
+              loadOrderCounts();
               $('order-empty').classList.remove('hidden');
               $('order-detail').classList.add('hidden');
               S.selectedOrder = null;
@@ -1407,6 +1446,8 @@
 
         toast('Refund request declined', 'success');
         await selectOrder(S.selectedOrderFull.id);
+        // The refund-requested tag may have been removed; refresh chip counts.
+        loadOrderCounts();
       } catch (e) {
         toast('Failed to decline: ' + e.message, 'error');
       } finally {
@@ -1863,6 +1904,9 @@
         // Refresh order data
         await selectOrder(S.selectedOrderFull.id);
         await loadOrders();
+        // Counts shift when refund moves an order into Refunded /
+        // out of Needs Fulfillment, etc. Refresh in the background.
+        loadOrderCounts();
 
       } catch (e) {
         toast('Failed to process refund: ' + e.message, 'error');
@@ -1900,8 +1944,9 @@
       });
     }
 
-    // Return loadOrders so it can be called from main script
-    return { loadOrders, selectOrderByNumber };
+    // Return loadOrders + count fetcher so the main script can
+    // refresh both when the orders tab opens.
+    return { loadOrders, loadOrderCounts, selectOrderByNumber };
   }
 
   // Expose to window

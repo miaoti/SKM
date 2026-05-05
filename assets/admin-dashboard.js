@@ -21,6 +21,9 @@
     productYmmFilter: { year: '', make: '', model: '' }, // Product sidebar YMM filter
     orderFilters: { status: '', fulfillment: '', financial: '', query: '', quick: '' },
     orderPagination: { hasNextPage: false, endCursor: null },
+    // Global counts for chip badges, populated by /orders/counts.
+    // Stays in sync independently of which page of orders is loaded.
+    orderCounts: null,
     create: { year: '', make: '', model: '', submodel: '' },
     pendingMedia: [],
     // Pagination state for products
@@ -4325,7 +4328,14 @@
   // ==========================================
   let orderMgmt = null;
   function loadOrders() {
-    if (orderMgmt) orderMgmt.loadOrders();
+    if (orderMgmt) {
+      orderMgmt.loadOrders();
+      // Counts come from a separate endpoint so the chip badges stay
+      // accurate regardless of which page is loaded. Fire in parallel
+      // with the list fetch so the chips populate as soon as either
+      // returns.
+      if (orderMgmt.loadOrderCounts) orderMgmt.loadOrderCounts();
+    }
   }
 
   // Initialize order management when script loads
