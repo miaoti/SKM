@@ -87,31 +87,40 @@
       // just visible ones, so the badge stays accurate when filter is on.
       pendingRefundReqCount = S.orders.filter(o => (o.tags || []).includes('refund-requested')).length;
 
+      // Reset the filter automatically if there's nothing left to filter to.
+      if (pendingRefundReqCount === 0 && S.refundInboxFilter) {
+        S.refundInboxFilter = false;
+      }
+
       const countEl = $('orders-count');
       if (countEl) {
         const visLabel = onlyShowRefundRequests
           ? `${visibleOrders.length} of ${S.orders.length} orders`
           : `${S.orders.length} orders`;
-        countEl.innerHTML = pendingRefundReqCount > 0
-          ? `${visLabel} <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded bg-orange-100 text-orange-700 align-middle">${pendingRefundReqCount} REFUND REQUEST${pendingRefundReqCount === 1 ? '' : 'S'}</span>`
-          : visLabel;
-      }
 
-      // Refund-request inbox banner above the list.
-      const banner = $('refund-inbox-banner');
-      const headline = $('refund-inbox-headline');
-      const toggleBtn = $('refund-inbox-toggle');
-      if (banner && headline && toggleBtn) {
-        if (pendingRefundReqCount > 0) {
-          banner.classList.remove('hidden');
-          headline.textContent = `${pendingRefundReqCount} customer refund request${pendingRefundReqCount === 1 ? '' : 's'} pending review`;
-          toggleBtn.textContent = onlyShowRefundRequests ? 'Show all' : 'Filter';
-        } else {
-          banner.classList.add('hidden');
-          // Reset filter if there's nothing to filter to.
-          if (S.refundInboxFilter) {
-            S.refundInboxFilter = false;
-          }
+        // The pill is the filter toggle. When active it inverts to
+        // a darker fill so the on/off state is obvious; click anywhere
+        // on the pill to toggle (handler bound below to #orders-count).
+        const pill = pendingRefundReqCount > 0
+          ? `<button type="button" id="refund-filter-pill"
+                aria-pressed="${onlyShowRefundRequests}"
+                title="${onlyShowRefundRequests ? 'Showing only refund requests — click to clear' : 'Click to filter to refund requests only'}"
+                class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider align-middle transition-colors
+                  ${onlyShowRefundRequests
+                    ? 'bg-orange-600 text-white hover:bg-orange-700'
+                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}">
+                <span class="w-1.5 h-1.5 rounded-full ${onlyShowRefundRequests ? 'bg-white' : 'bg-orange-500'}"></span>
+                ${pendingRefundReqCount} REFUND REQUEST${pendingRefundReqCount === 1 ? '' : 'S'}
+              </button>`
+          : '';
+        countEl.innerHTML = `${visLabel}${pill}`;
+
+        const filterPill = $('refund-filter-pill');
+        if (filterPill) {
+          filterPill.addEventListener('click', () => {
+            S.refundInboxFilter = !S.refundInboxFilter;
+            renderOrdersList();
+          });
         }
       }
 
@@ -525,14 +534,6 @@
       $('order-filter-financial').addEventListener('change', (e) => {
         S.orderFilters.financial = e.target.value;
         loadOrders();
-      });
-    }
-
-    // Refund-request inbox: one-click filter to pending refund requests.
-    if ($('refund-inbox-toggle')) {
-      $('refund-inbox-toggle').addEventListener('click', () => {
-        S.refundInboxFilter = !S.refundInboxFilter;
-        renderOrdersList();
       });
     }
 
