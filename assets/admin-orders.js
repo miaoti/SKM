@@ -1253,11 +1253,22 @@
 
         refundCalculation = data.calculation;
 
+        // Defensive coercion — toFixed(2) crashes on undefined.
+        const subtotalAmt   = parseFloat(refundCalculation.subtotal || 0);
+        const taxAmt        = parseFloat(refundCalculation.totalTax || 0);
+        const shippingAmt   = parseFloat(refundCalculation.shippingRefund || 0);
+        const totalAmt      = parseFloat(refundCalculation.totalRefund || 0);
+
         // Update calculation summary
-        $('refund-calc-subtotal').textContent = `$${refundCalculation.subtotal.toFixed(2)}`;
-        $('refund-calc-tax').textContent = `$${refundCalculation.totalTax.toFixed(2)}`;
-        $('refund-calc-shipping').textContent = `$${refundCalculation.shippingRefund.toFixed(2)}`;
-        $('refund-calc-total').textContent = `$${refundCalculation.totalRefund.toFixed(2)}`;
+        $('refund-calc-subtotal').textContent = `$${subtotalAmt.toFixed(2)}`;
+        $('refund-calc-tax').textContent      = `$${taxAmt.toFixed(2)}`;
+        $('refund-calc-shipping').textContent = `$${shippingAmt.toFixed(2)}`;
+        $('refund-calc-total').textContent    = `$${totalAmt.toFixed(2)}`;
+
+        // Sync the editable Refund Amount field with the calculated total
+        // so the operator sees what will actually post (subtotal + tax + shipping).
+        // The user can still override before confirming.
+        $('refund-amount').value = totalAmt.toFixed(2);
 
         $('refund-calculation-summary').classList.remove('hidden');
 
@@ -1265,7 +1276,7 @@
         $('btn-confirm-refund').disabled = false;
         $('btn-confirm-refund').classList.remove('bg-gray-400', 'cursor-not-allowed');
         $('btn-confirm-refund').classList.add('bg-red-600', 'hover:bg-red-700');
-        $('refund-btn-text').textContent = `Refund $${refundCalculation.totalRefund.toFixed(2)}`;
+        $('refund-btn-text').textContent = `Refund $${totalAmt.toFixed(2)}`;
 
         toast('Refund calculated. Review and confirm.', 'success');
 
@@ -1323,7 +1334,8 @@
         // Get restock type from selector
         const restockType = $('refund-restock-type').value.toUpperCase();
 
-        // Include unit prices for refund amount calculation
+        // Include unit prices so the worker's fallback path can still compute
+        // an amount if needed; the primary path uses refundCalculation below.
         const refundLineItemsWithPrices = refundLineItems.map(item => {
           const input = document.querySelector(`.refund-qty-input[data-line-item-id="${item.lineItemId}"]`);
           const unitPrice = input ? parseFloat(input.dataset.unitPrice) || 0 : 0;
@@ -1334,14 +1346,28 @@
           };
         });
 
-        // Calculate total refund amount
+        // Use Shopify's calculated total (subtotal + tax + shipping) when we
+        // have a calculation. The previous code summed unitPrice*qty + shipping
+        // which silently DROPPED tax — Shopify either rejected the refund or
+        // accepted a short-refund and left the order in partially_refunded
+        // state with tax owed back. The user-editable refund-amount field
+        // (synced to the calculation in calculateRefund() above) is the
+        // source of truth so the operator can override if needed.
         const shippingRefund = parseFloat($('refund-shipping').value) || 0;
-        const itemsTotal = refundLineItemsWithPrices.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
-        // Use the refund-amount input field if items total is 0 (fallback)
-        const manualRefundAmount = parseFloat($('refund-amount').value) || 0;
-        const totalRefundAmount = itemsTotal > 0 ? (itemsTotal + shippingRefund) : (manualRefundAmount + shippingRefund);
-// 
-        // console.log('[Refund] Items total:', itemsTotal, 'Manual amount:', manualRefundAmount, 'Total:', totalRefundAmount);
+        const editableAmount = parseFloat($('refund-amount').value) || 0;
+        const calculatedTotal = refundCalculation
+          ? parseFloat(refundCalculation.totalRefund || 0)
+          : 0;
+        // Prefer the editable field (operator may have overridden);
+        // fall back to the worker's calculation; final fallback is the
+        // raw subtotal+shipping so we never send 0.
+        const itemsSubtotal = refundLineItemsWithPrices.reduce(
+          (sum, item) => sum + (item.unitPrice * item.quantity),
+          0
+        );
+        const totalRefundAmount = editableAmount > 0
+          ? editableAmount
+          : (calculatedTotal > 0 ? calculatedTotal : (itemsSubtotal + shippingRefund));
 
         const response = await fetch(`${API_BASE}/orders/${numericId}/refund`, {
           method: 'POST',
