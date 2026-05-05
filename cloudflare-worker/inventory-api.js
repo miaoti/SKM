@@ -377,10 +377,12 @@ export default {
 
         // Aggregate counts for the admin Orders-tab chips. Uses Shopify's
         // ordersCount field with aliased queries so a single GraphQL
-        // round-trip returns every bucket. Counts are global (not
-        // affected by which page of results is currently loaded).
+        // round-trip returns every bucket. Counts respect the active
+        // base query (search + dropdown filters) so chip badges narrow
+        // alongside the visible orders list.
         case path === "/orders/counts" && request.method === "GET":
-          return jsonResponse(await getOrderCounts(env));
+          const countBaseQuery = url.searchParams.get("q") || "";
+          return jsonResponse(await getOrderCounts(env, countBaseQuery));
 
         // Get single order with full details
         case path.match(/^\/orders\/[^/]+$/) && request.method === "GET":
@@ -5617,26 +5619,59 @@ async function listOrders(env, filters = {}) {
  * Aggregate counts for the admin Orders-tab quick filters.
  * Uses Shopify's `ordersCount(query: …)` field — added to the Admin
  * GraphQL API in 2024-04 — with multiple aliased calls so one
- * round-trip returns every bucket. Counts are GLOBAL (not affected
- * by which page is currently loaded), which is what the chips need.
+ * round-trip returns every bucket.
+ *
+ * `baseQuery` is whatever the operator typed into the search box +
+ * any dropdown filter expressions. Each chip's specific filter is
+ * AND'd on top so a count answers "of orders matching the active
+ * search, how many also match this chip?". Without this combination
+ * the chip badges drifted from the visible orders list whenever the
+ * search was active.
  *
  * "Needs Fulfillment" excludes refunded/partially-refunded and
  * cancelled orders, matching the user's intuition that a refunded-
  * but-unfulfilled order isn't waiting on us to ship anything.
  */
-async function getOrderCounts(env) {
+async function getOrderCounts(env, baseQuery) {
+  baseQuery = (baseQuery || "").trim();
+  // AND the base query with each chip's filter expression. If the
+  // base is empty the chip filter stands alone; if both are empty
+  // (the All chip with no search) we pass null so Shopify returns
+  // the global total.
+  const combine = (chipFilter) => {
+    const parts = [];
+    if (baseQuery) parts.push(baseQuery);
+    if (chipFilter) parts.push(chipFilter);
+    if (parts.length === 0) return null;
+    return parts.join(" ");
+  };
+
   const query = `
-    query OrdersCounts {
-      all:           ordersCount { count precision }
-      needsFulfill:  ordersCount(query: "(fulfillment_status:unfulfilled OR fulfillment_status:partial) -financial_status:refunded -financial_status:partially_refunded -status:cancelled") { count precision }
-      refundReq:     ordersCount(query: "tag:refund-requested") { count precision }
-      refunded:      ordersCount(query: "financial_status:refunded OR financial_status:partially_refunded") { count precision }
-      cancelled:     ordersCount(query: "status:cancelled") { count precision }
+    query OrdersCounts(
+      $qAll: String,
+      $qNeedsFulfill: String,
+      $qRefundReq: String,
+      $qRefunded: String,
+      $qCancelled: String
+    ) {
+      all:           ordersCount(query: $qAll) { count precision }
+      needsFulfill:  ordersCount(query: $qNeedsFulfill) { count precision }
+      refundReq:     ordersCount(query: $qRefundReq) { count precision }
+      refunded:      ordersCount(query: $qRefunded) { count precision }
+      cancelled:     ordersCount(query: $qCancelled) { count precision }
     }
   `;
 
+  const variables = {
+    qAll:          combine(""),
+    qNeedsFulfill: combine("(fulfillment_status:unfulfilled OR fulfillment_status:partial) -financial_status:refunded -financial_status:partially_refunded -status:cancelled"),
+    qRefundReq:    combine("tag:refund-requested"),
+    qRefunded:     combine("financial_status:refunded OR financial_status:partially_refunded"),
+    qCancelled:    combine("status:cancelled")
+  };
+
   try {
-    const result = await shopifyGraphQL(env, query, {});
+    const result = await shopifyGraphQL(env, query, variables);
     // Shopify returns precision: EXACT or AT_LEAST. We surface both so
     // the admin UI can render "150+" when the answer is approximate.
     return {
@@ -5647,7 +5682,8 @@ async function getOrderCounts(env) {
         refundReq:    { count: result.refundReq?.count    ?? 0, precision: result.refundReq?.precision    ?? "EXACT" },
         refunded:     { count: result.refunded?.count     ?? 0, precision: result.refunded?.precision     ?? "EXACT" },
         cancelled:    { count: result.cancelled?.count    ?? 0, precision: result.cancelled?.precision    ?? "EXACT" }
-      }
+      },
+      baseQuery: baseQuery || null
     };
   } catch (e) {
     // Frontend falls back to loaded-data counts if this errors —

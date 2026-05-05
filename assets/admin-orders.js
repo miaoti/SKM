@@ -83,21 +83,44 @@
       if (btn) { btn.disabled = false; btn.textContent = 'Load More Orders'; }
     }
 
-    // Fetch global counts for the chip row. Decoupled from loadOrders
-    // so the chip badges stay accurate no matter which filter is
-    // active or how many pages have been loaded.
-    async function loadOrderCounts() {
-      try {
-        const res = await fetch(`${API_BASE}/orders/counts`, { headers: api.headers() });
-        const data = await res.json();
-        if (data && data.success && data.counts) {
-          S.orderCounts = data.counts;
-          renderOrdersQuickChips();
+    // Compose the BASE Shopify search query — text-search input plus
+    // any dropdown filters (status / fulfillment / financial). The
+    // chip-specific filter is intentionally NOT included; the worker
+    // adds it per chip so each chip's count = "matches base AND chip".
+    function composeBaseOrdersQuery() {
+      const parts = [];
+      if (S.orderFilters.query) parts.push(S.orderFilters.query.trim());
+      if (S.orderFilters.status)      parts.push(`status:${S.orderFilters.status}`);
+      if (S.orderFilters.fulfillment) parts.push(`fulfillment_status:${S.orderFilters.fulfillment}`);
+      if (S.orderFilters.financial)   parts.push(`financial_status:${S.orderFilters.financial}`);
+      return parts.filter(Boolean).join(' ').trim();
+    }
+
+    // Fetch chip counts scoped to the active search/dropdown filters
+    // (but NOT the active chip — we want each chip to show its own
+    // potential count). Debounced so a fast typist doesn't spam the
+    // worker.
+    let countsFetchTimeout = null;
+    function loadOrderCounts(opts) {
+      if (countsFetchTimeout) clearTimeout(countsFetchTimeout);
+      const wait = (opts && opts.immediate) ? 0 : 300;
+      countsFetchTimeout = setTimeout(async () => {
+        try {
+          const baseQ = composeBaseOrdersQuery();
+          const params = new URLSearchParams();
+          if (baseQ) params.set('q', baseQ);
+          const url = `${API_BASE}/orders/counts${params.toString() ? '?' + params : ''}`;
+          const res = await fetch(url, { headers: api.headers() });
+          const data = await res.json();
+          if (data && data.success && data.counts) {
+            S.orderCounts = data.counts;
+            renderOrdersQuickChips();
+          }
+        } catch (e) {
+          // Chips fall back to loaded-data counts if this fails.
+          console.warn('[orders] count fetch failed:', e.message);
         }
-      } catch (e) {
-        // Chips fall back to loaded-data counts if this fails.
-        console.warn('[orders] count fetch failed:', e.message);
-      }
+      }, wait);
     }
 
     function renderOrdersList() {
@@ -649,7 +672,8 @@
       container.innerHTML = html;
     }
 
-    // Order Filters
+    // Order Filters — every change resets pagination + refreshes both
+    // the visible list and the chip counts so badges narrow alongside.
     if ($('order-search')) {
       let searchTimeout;
       $('order-search').addEventListener('input', (e) => {
@@ -657,6 +681,7 @@
         searchTimeout = setTimeout(() => {
           S.orderFilters.query = e.target.value;
           loadOrders();
+          loadOrderCounts();
         }, 300);
       });
     }
@@ -665,6 +690,7 @@
       $('order-filter-status').addEventListener('change', (e) => {
         S.orderFilters.status = e.target.value;
         loadOrders();
+        loadOrderCounts();
       });
     }
 
@@ -672,6 +698,7 @@
       $('order-filter-fulfillment').addEventListener('change', (e) => {
         S.orderFilters.fulfillment = e.target.value;
         loadOrders();
+        loadOrderCounts();
       });
     }
 
@@ -679,6 +706,7 @@
       $('order-filter-financial').addEventListener('change', (e) => {
         S.orderFilters.financial = e.target.value;
         loadOrders();
+        loadOrderCounts();
       });
     }
 
