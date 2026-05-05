@@ -139,7 +139,7 @@ export default {
         case path === "/customers" && request.method === "GET":
           const customerQuery = url.searchParams.get("q") || "";
           const customerCursor = url.searchParams.get("cursor") || null;
-          const customerLimit = url.searchParams.get("limit") || 25;
+          const customerLimit = parseInt(url.searchParams.get("limit") || "25", 10);
           return jsonResponse(await listCustomers(env, customerQuery, customerCursor, customerLimit));
 
         case path.match(/^\/customers\/[^/]+$/) && request.method === "GET":
@@ -191,7 +191,7 @@ export default {
         case path === "/products" && request.method === "GET":
           const searchQuery = url.searchParams.get("q") || "";
           const cursor = url.searchParams.get("cursor") || null;
-          const limit = url.searchParams.get("limit") || 25;
+          const limit = parseInt(url.searchParams.get("limit") || "25", 10);
           return jsonResponse(await listProducts(env, searchQuery, cursor, limit));
 
         case path === "/products/create" && request.method === "POST":
@@ -8597,6 +8597,7 @@ async function listDealers(env, statusFilter = 'active') {
   const result = await shopifyGraphQL(env, query, { first: 250 });
 
   const dealers = result.metaobjects.edges.map(edge => {
+    /** @type {Record<string, any>} */
     const fields = {};
     edge.node.fields.forEach(f => {
       if (f.key === 'logo' && f.reference?.image?.url) {
@@ -8607,11 +8608,13 @@ async function listDealers(env, statusFilter = 'active') {
         fields[f.key] = f.value;
       }
     });
-    return {
+    /** @type {Record<string, any>} */
+    const dealer = {
       id: edge.node.id,
       handle: edge.node.handle,
       ...fields
     };
+    return dealer;
   }).filter(d => statusFilter === 'all' || d.status === statusFilter);
 
   return { success: true, data: dealers, count: dealers.length };
@@ -8651,6 +8654,7 @@ async function getDealer(env, id) {
     return { success: false, error: "Dealer not found" };
   }
 
+  /** @type {Record<string, any>} */
   const fields = {};
   result.metaobject.fields.forEach(f => {
     if (f.key === 'logo' && f.reference?.image?.url) {
@@ -8662,14 +8666,13 @@ async function getDealer(env, id) {
     }
   });
 
-  return {
-    success: true,
-    data: {
-      id: result.metaobject.id,
-      handle: result.metaobject.handle,
-      ...fields
-    }
+  /** @type {Record<string, any>} */
+  const data = {
+    id: result.metaobject.id,
+    handle: result.metaobject.handle,
+    ...fields
   };
+  return { success: true, data };
 }
 
 /**
@@ -9225,6 +9228,7 @@ async function listDealerApplications(env, statusFilter = "") {
   // console.log('[listDealerApplications] Status filter:', statusFilter);
 
   const applications = result.metaobjects?.edges?.map(edge => {
+    /** @type {Record<string, any>} */
     const fields = {};
     edge.node.fields.forEach(f => {
       if (f.key === 'raw_data' && f.value) {
@@ -9233,11 +9237,13 @@ async function listDealerApplications(env, statusFilter = "") {
         fields[f.key] = f.value;
       }
     });
-    return {
+    /** @type {Record<string, any>} */
+    const app = {
       id: edge.node.id,
       handle: edge.node.handle,
       ...fields
     };
+    return app;
   }).filter(app => !statusFilter || app.status === statusFilter) || [];
 
   return { success: true, data: applications, count: applications?.length || 0 };
@@ -9270,6 +9276,7 @@ async function getDealerApplication(env, id) {
     return { success: false, error: "Application not found" };
   }
 
+  /** @type {Record<string, any>} */
   const fields = {};
   result.metaobject.fields.forEach(f => {
     if (f.key === 'raw_data' && f.value) {
@@ -9279,14 +9286,14 @@ async function getDealerApplication(env, id) {
     }
   });
 
-  return {
-    success: true,
-    data: {
-      id: result.metaobject.id,
-      handle: result.metaobject.handle,
-      ...fields
-    }
+  /** @type {Record<string, any>} */
+  const data = {
+    id: result.metaobject.id,
+    handle: result.metaobject.handle,
+    ...fields
   };
+
+  return { success: true, data };
 }
 
 /**
@@ -9310,6 +9317,7 @@ async function processApplication(env, data) {
     return appResult;
   }
 
+  /** @type {Record<string, any>} */
   const application = appResult.data;
   const gid = applicationId.startsWith('gid://') ? applicationId : `gid://shopify/Metaobject/${applicationId}`;
 
@@ -9418,6 +9426,7 @@ async function getMyDealer(env, customerId) {
   }
 
   const node = result.metaobjects.edges[0].node;
+  /** @type {Record<string, any>} */
   const fields = {};
   node.fields.forEach(f => {
     if (f.key === 'logo' && f.reference?.image?.url) {
@@ -9429,14 +9438,13 @@ async function getMyDealer(env, customerId) {
     }
   });
 
-  return {
-    success: true,
-    data: {
-      id: node.id,
-      handle: node.handle,
-      ...fields
-    }
+  /** @type {Record<string, any>} */
+  const dealerData = {
+    id: node.id,
+    handle: node.handle,
+    ...fields
   };
+  return { success: true, data: dealerData };
 }
 
 /**
