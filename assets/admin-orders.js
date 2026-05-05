@@ -1104,24 +1104,38 @@
         // Image can be nested as item.image.url or item.variant.image.url or direct URL
         const imageUrl = item.image?.url || item.variant?.image?.url || item.image || 'https://via.placeholder.com/60?text=No+Image';
 
+        // Use refundableQuantity (Shopify's authoritative count of remaining
+        // refundable units) — falls back to total quantity if Shopify doesn't
+        // return the field for this order shape.
+        const orderedQty = parseInt(item.quantity) || 0;
+        const refundableQty = item.refundableQuantity != null
+          ? parseInt(item.refundableQuantity)
+          : orderedQty;
+        const alreadyRefunded = orderedQty - refundableQty;
+        const fullyRefunded = refundableQty <= 0;
+
         return `
-          <div class="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-lg">
+          <div class="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-lg ${fullyRefunded ? 'opacity-50' : ''}">
             <img src="${imageUrl}" alt="" class="w-14 h-14 rounded-lg object-cover flex-shrink-0" onerror="this.src='https://via.placeholder.com/60?text=No+Image'">
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-gray-900 truncate">${item.title || item.name}</p>
               <p class="text-xs text-gray-500">${item.variantTitle || ''}</p>
-              <div class="flex items-center gap-2 mt-1">
+              <div class="flex items-center gap-2 mt-1 flex-wrap">
                 ${hasDiscount ? `<span class="text-xs text-gray-400 line-through">$${price.toFixed(2)}</span>` : ''}
-                <span class="text-xs text-gray-700">$${discountedPrice.toFixed(2)} × ${item.quantity}</span>
+                <span class="text-xs text-gray-700">$${discountedPrice.toFixed(2)} × ${orderedQty}</span>
+                ${alreadyRefunded > 0 ? `<span class="text-[10px] uppercase tracking-wider text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">${alreadyRefunded} already refunded</span>` : ''}
+                ${fullyRefunded && alreadyRefunded > 0 ? `<span class="text-[10px] uppercase tracking-wider text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">fully refunded</span>` : ''}
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <input type="number" class="refund-qty-input w-14 h-8 px-2 text-sm text-center border border-gray-200 rounded" 
-                     data-line-item-id="${item.id}" 
-                     data-max-qty="${item.quantity}"
+              <input type="number" class="refund-qty-input w-14 h-8 px-2 text-sm text-center border border-gray-200 rounded ${fullyRefunded ? 'cursor-not-allowed bg-gray-50' : ''}"
+                     data-line-item-id="${item.id}"
+                     data-max-qty="${refundableQty}"
+                     data-ordered-qty="${orderedQty}"
                      data-unit-price="${discountedPrice}"
-                     value="0" min="0" max="${item.quantity}">
-              <span class="text-xs text-gray-500">/ ${item.quantity}</span>
+                     value="0" min="0" max="${refundableQty}"
+                     ${fullyRefunded ? 'disabled' : ''}>
+              <span class="text-xs text-gray-500">/ ${refundableQty} eligible</span>
             </div>
             <div class="w-16 text-right">
               <span class="refund-item-total text-sm text-gray-700" data-line-item-id="${item.id}">$0.00</span>
@@ -1182,7 +1196,15 @@
       let totalAmount = 0;
 
       document.querySelectorAll('.refund-qty-input').forEach(input => {
-        const qty = parseInt(input.value) || 0;
+        // Clamp to [0, max-qty] so operator can't type a value > what's
+        // actually refundable (browser's `max` attribute is only enforced
+        // on stepper buttons, not on direct keyboard input).
+        let qty = parseInt(input.value) || 0;
+        const maxQty = parseInt(input.dataset.maxQty) || 0;
+        if (qty > maxQty) qty = maxQty;
+        if (qty < 0) qty = 0;
+        if (String(qty) !== input.value) input.value = qty;
+
         const unitPrice = parseFloat(input.dataset.unitPrice) || 0;
         const lineItemId = input.dataset.lineItemId;
         const itemTotal = qty * unitPrice;

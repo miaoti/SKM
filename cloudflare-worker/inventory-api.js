@@ -5712,6 +5712,7 @@ async function getOrder(env, orderId) {
               vendor
               requiresShipping
               fulfillableQuantity
+              refundableQuantity
               fulfillmentStatus
               taxable
               originalUnitPriceSet { shopMoney { amount currencyCode } }
