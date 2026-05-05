@@ -136,7 +136,9 @@ export default {
         // ==========================================
         case path === "/customers" && request.method === "GET":
           const customerQuery = url.searchParams.get("q") || "";
-          return jsonResponse(await listCustomers(env, customerQuery));
+          const customerCursor = url.searchParams.get("cursor") || null;
+          const customerLimit = url.searchParams.get("limit") || 25;
+          return jsonResponse(await listCustomers(env, customerQuery, customerCursor, customerLimit));
 
         case path.match(/^\/customers\/[^/]+$/) && request.method === "GET":
           const getCustomerId = path.split("/").pop();
