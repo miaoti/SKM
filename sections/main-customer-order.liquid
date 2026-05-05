@@ -411,6 +411,8 @@
   .shipment-status-pill.is-delivered .dot { background: var(--signal-green); box-shadow: 0 0 6px rgba(22, 163, 74, 0.5); }
   .shipment-status-pill.is-failure   { color: var(--racing-red); border-color: #fecaca; background: #fef2f2; }
   .shipment-status-pill.is-failure   .dot { background: var(--racing-red); }
+  .shipment-status-pill.is-pending   { color: #6b7280; border-color: #e5e7eb; background: #f9fafb; }
+  .shipment-status-pill.is-pending   .dot { background: #9ca3af; }
 
   .shipment-card__body { display: flex; flex-direction: column; gap: 14px; }
   .shipment-meta { display: flex; flex-direction: column; gap: 6px; }
@@ -637,10 +639,26 @@
 
     {%- comment -%}
       ===== Shipments =====
-      Aggregated per-fulfillment view with tracking numbers, carrier,
-      shipment status and the items contained in each shipment. Only
-      renders when fulfillments exist; per-line-item tracking still
-      shows below for redundancy.
+      Reads Shopify's standard customer-order Liquid object — no API
+      call needed. Each `fulfillment` exposes:
+        - tracking_numbers (array) + tracking_urls (array) — used so
+          multi-package shipments under one fulfillment all show
+        - tracking_company — carrier name (e.g. "UPS", "FedEx"); we
+          fall back to "Carrier" when a manual fulfillment didn't fill
+          this in
+        - shipment_status — set automatically by Shopify Shipping or
+          via the carrier integration. May be nil on manual
+          fulfillments where the merchant only typed in a tracking
+          number; we degrade to "Awaiting carrier scan" so the user
+          sees something coherent
+        - fulfillment_line_items — gives us the FULFILLED quantity per
+          line item (more accurate than fulfillment.line_items, which
+          can echo the original ordered qty)
+        - created_at — when fulfillment was created in Shopify
+
+      The section only renders when at least one fulfillment exists.
+      For pre-fulfillment orders, the timeline above already shows
+      "Fulfilled · pending".
     {%- endcomment -%}
     {% if order.fulfillments.size > 0 %}
       <div class="mb-8">
@@ -652,7 +670,26 @@
         <div class="space-y-4">
           {% for fulfillment in order.fulfillments %}
             {%- liquid
-              assign ship_status = fulfillment.shipment_status | default: 'in_transit' | downcase
+              assign ship_status_raw = fulfillment.shipment_status
+              assign has_tracking_number = false
+              if fulfillment.tracking_numbers.size > 0 or fulfillment.tracking_number != blank
+                assign has_tracking_number = true
+              endif
+
+              # Derive a sensible status when Shopify hasn't reported one.
+              # `shipment_status` only populates for carriers that report
+              # back to Shopify (USPS, UPS, FedEx via Shopify Shipping).
+              # Manual fulfillments stay nil — surface that as
+              # "AWAITING CARRIER SCAN" instead of a misleading default.
+              assign ship_status = ship_status_raw | downcase
+              if ship_status == blank
+                if has_tracking_number
+                  assign ship_status = 'awaiting_scan'
+                else
+                  assign ship_status = 'fulfilled'
+                endif
+              endif
+
               assign ship_status_label = ship_status | replace: '_', ' ' | upcase
               assign ship_status_class = 'is-transit'
               if ship_status == 'delivered'
@@ -665,6 +702,12 @@
                 assign ship_status_class = 'is-attempted'
               elsif ship_status == 'ready_for_pickup'
                 assign ship_status_class = 'is-pickup'
+              elsif ship_status == 'awaiting_scan'
+                assign ship_status_class = 'is-pending'
+                assign ship_status_label = 'AWAITING CARRIER SCAN'
+              elsif ship_status == 'fulfilled'
+                assign ship_status_class = 'is-pending'
+                assign ship_status_label = 'AWAITING TRACKING'
               endif
             -%}
             <div class="shipment-card hud-corner">
@@ -674,7 +717,11 @@
                 <div>
                   <div class="shipment-card__index mono">PACKAGE {{ forloop.index }} OF {{ order.fulfillments.size }}</div>
                   <div class="shipment-card__title mono">
-                    {{ fulfillment.tracking_company | default: 'CARRIER' | upcase }}
+                    {%- if fulfillment.tracking_company != blank -%}
+                      {{ fulfillment.tracking_company | upcase }}
+                    {%- else -%}
+                      CARRIER
+                    {%- endif -%}
                   </div>
                 </div>
                 <span class="shipment-status-pill mono {{ ship_status_class }}">
@@ -684,21 +731,49 @@
 
               <div class="shipment-card__body">
                 <div class="shipment-meta">
-                  <div class="shipment-meta__row">
-                    <span class="shipment-meta__key mono">TRACKING</span>
-                    <span class="shipment-meta__val mono">
-                      {% if fulfillment.tracking_url %}
-                        <a href="{{ fulfillment.tracking_url }}" target="_blank" rel="noopener" class="shipment-link">
-                          {{ fulfillment.tracking_number | default: 'PENDING' }}
-                          <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="margin-left: 4px; display: inline-block; vertical-align: -1px;"><path stroke-linecap="round" stroke-linejoin="round" d="M14 3h7v7m0-7L10 14M5 5h4v4M5 5v9a2 2 0 002 2h9"/></svg>
-                        </a>
-                      {% elsif fulfillment.tracking_number %}
-                        {{ fulfillment.tracking_number }}
-                      {% else %}
-                        <span class="shipment-meta__val--muted">PENDING</span>
-                      {% endif %}
-                    </span>
-                  </div>
+                  {%- comment -%}
+                    Render every tracking number on the fulfillment, not just
+                    the first. Some carriers split a single fulfillment into
+                    multiple packages with separate tracking IDs.
+                  {%- endcomment -%}
+                  {% if fulfillment.tracking_numbers.size > 0 %}
+                    {% for tn in fulfillment.tracking_numbers %}
+                      {%- assign turl = fulfillment.tracking_urls[forloop.index0] | default: fulfillment.tracking_url -%}
+                      <div class="shipment-meta__row">
+                        <span class="shipment-meta__key mono">{% if forloop.first %}TRACKING{% else %}&nbsp;{% endif %}</span>
+                        <span class="shipment-meta__val mono">
+                          {% if turl != blank %}
+                            <a href="{{ turl }}" target="_blank" rel="noopener" class="shipment-link">
+                              {{ tn }}
+                              <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="margin-left: 4px; display: inline-block; vertical-align: -1px;"><path stroke-linecap="round" stroke-linejoin="round" d="M14 3h7v7m0-7L10 14M5 5h4v4M5 5v9a2 2 0 002 2h9"/></svg>
+                            </a>
+                          {% else %}
+                            {{ tn }}
+                          {% endif %}
+                        </span>
+                      </div>
+                    {% endfor %}
+                  {% elsif fulfillment.tracking_number != blank %}
+                    <div class="shipment-meta__row">
+                      <span class="shipment-meta__key mono">TRACKING</span>
+                      <span class="shipment-meta__val mono">
+                        {% if fulfillment.tracking_url != blank %}
+                          <a href="{{ fulfillment.tracking_url }}" target="_blank" rel="noopener" class="shipment-link">
+                            {{ fulfillment.tracking_number }}
+                            <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="margin-left: 4px; display: inline-block; vertical-align: -1px;"><path stroke-linecap="round" stroke-linejoin="round" d="M14 3h7v7m0-7L10 14M5 5h4v4M5 5v9a2 2 0 002 2h9"/></svg>
+                          </a>
+                        {% else %}
+                          {{ fulfillment.tracking_number }}
+                        {% endif %}
+                      </span>
+                    </div>
+                  {% else %}
+                    <div class="shipment-meta__row">
+                      <span class="shipment-meta__key mono">TRACKING</span>
+                      <span class="shipment-meta__val shipment-meta__val--muted mono">Not yet provided</span>
+                    </div>
+                  {% endif %}
+
                   {% if fulfillment.created_at %}
                     <div class="shipment-meta__row">
                       <span class="shipment-meta__key mono">SHIPPED</span>
@@ -707,14 +782,33 @@
                   {% endif %}
                 </div>
 
-                {% if fulfillment.item_count > 0 or fulfillment.line_items.size > 0 %}
+                {%- comment -%}
+                  Prefer fulfillment_line_items because its `quantity`
+                  reflects the FULFILLED quantity, not the ordered
+                  quantity. Fall back to fulfillment.line_items if
+                  fulfillment_line_items is missing for any reason.
+                {%- endcomment -%}
+                {% if fulfillment.fulfillment_line_items.size > 0 %}
+                  <div class="shipment-items">
+                    <div class="shipment-items__label mono">CONTENTS</div>
+                    {% for fli in fulfillment.fulfillment_line_items %}
+                      <div class="shipment-item">
+                        <span class="shipment-item__qty mono">{{ fli.quantity }}×</span>
+                        <span class="shipment-item__title">{{ fli.line_item.title }}</span>
+                        {% if fli.line_item.variant.title and fli.line_item.variant.title != 'Default Title' %}
+                          <span class="shipment-item__variant mono">· {{ fli.line_item.variant.title }}</span>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% elsif fulfillment.line_items.size > 0 %}
                   <div class="shipment-items">
                     <div class="shipment-items__label mono">CONTENTS</div>
                     {% for line_item in fulfillment.line_items %}
                       <div class="shipment-item">
                         <span class="shipment-item__qty mono">{{ line_item.quantity }}×</span>
                         <span class="shipment-item__title">{{ line_item.title }}</span>
-                        {% if line_item.variant.title != 'Default Title' %}
+                        {% if line_item.variant.title and line_item.variant.title != 'Default Title' %}
                           <span class="shipment-item__variant mono">· {{ line_item.variant.title }}</span>
                         {% endif %}
                       </div>
