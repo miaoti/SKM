@@ -458,6 +458,16 @@ export default {
           const refundReqSignature = request.headers.get("X-Customer-Signature");
           return jsonResponse(await requestOrderRefund(env, refundReqOrderId, refundReqBody, refundReqSignature));
 
+        // Admin-only: transition a refund request between
+        // pending / approved / rejected. Used by the admin dashboard
+        // when staff approves or declines a customer's request, and
+        // automatically by the refund-execute flow.
+        case path.match(/^\/orders\/[^/]+\/refund-requests\/[^/]+$/) && request.method === "PATCH":
+          const refReqOrderId = path.split("/")[2];
+          const refReqId = decodeURIComponent(path.split("/")[4]);
+          const refReqBody = await request.json();
+          return jsonResponse(await updateRefundRequestStatus(env, refReqOrderId, refReqId, refReqBody));
+
         // Calculate refund (Stage 1)
         case path.match(/^\/orders\/[^/]+\/refund\/calculate$/) && request.method === "POST":
           const calcRefundOrderId = path.split("/")[2];
@@ -7073,10 +7083,11 @@ async function requestOrderRefund(env, orderId, data, signature) {
         id
         name
         tags
+        note
         customer { id }
         metafield(namespace: "custom", key: "refund_request") { value }
         lineItems(first: 50) {
-          nodes { id quantity }
+          nodes { id quantity title }
         }
       }
     }
@@ -7138,24 +7149,59 @@ async function requestOrderRefund(env, orderId, data, signature) {
   };
   const allRequests = [newRequest, ...existingRequests];
 
-  // ---- 6. Write tag + metafield via Shopify Admin GraphQL ----
+  // ---- 6. Write tag + note + metafield via Shopify Admin GraphQL ----
   const tags = Array.from(
     new Set([...(verifyResult.order.tags || []), "refund-requested"])
   );
 
-  const tagMutation = `
-    mutation AddRefundTag($input: OrderInput!) {
+  // Compose a human-readable summary that gets appended to the order
+  // note. Shopify renders an order-note change as a timeline event so
+  // admins see "Note added to this order" with the request details.
+  const reasonLabels = {
+    refund: "Refund",
+    exchange: "Exchange",
+    damaged: "Damaged item",
+    wrong_item: "Wrong item received",
+    other: "Other"
+  };
+  const reasonLabel = reasonLabels[reason] || reason.toUpperCase();
+  const titleByLineId = new Map();
+  (verifyResult.order.lineItems.nodes || []).forEach((li) => {
+    titleByLineId.set(li.id, li.title);
+  });
+  const itemSummary = newRequest.items
+    .map((it) => {
+      const title = titleByLineId.get(it.lineItemId) || "(unknown item)";
+      return `  • ${it.quantity}× ${title}`;
+    })
+    .join("\n");
+  const noteSummary = [
+    `Customer refund request received ${newRequest.requestedAt}`,
+    `Reason: ${reasonLabel}`,
+    `Items:\n${itemSummary}`
+  ];
+  if (notes) noteSummary.push(`Customer notes: ${notes}`);
+  const summaryBlock = noteSummary.join("\n");
+
+  // Append (don't overwrite) so any pre-existing notes survive.
+  const existingNote = (verifyResult.order.note || "").trim();
+  const combinedNote = existingNote
+    ? `${existingNote}\n\n--- ${summaryBlock}`
+    : summaryBlock;
+
+  const orderMutation = `
+    mutation UpdateOrderForRefundRequest($input: OrderInput!) {
       orderUpdate(input: $input) {
-        order { id tags }
+        order { id tags note }
         userErrors { field message }
       }
     }
   `;
-  const tagRes = await shopifyGraphQL(env, tagMutation, {
-    input: { id: orderGid, tags: tags }
+  const orderRes = await shopifyGraphQL(env, orderMutation, {
+    input: { id: orderGid, tags: tags, note: combinedNote }
   });
-  if (tagRes.orderUpdate?.userErrors?.length) {
-    const msg = tagRes.orderUpdate.userErrors.map((e) => e.message).join(", ");
+  if (orderRes.orderUpdate?.userErrors?.length) {
+    const msg = orderRes.orderUpdate.userErrors.map((e) => e.message).join(", ");
     throw new Error(`Failed to tag order: ${msg}`);
   }
 
@@ -7187,6 +7233,114 @@ async function requestOrderRefund(env, orderId, data, signature) {
     success: true,
     request: newRequest,
     orderName: verifyResult.order.name
+  };
+}
+
+/**
+ * Admin: transition a refund request between pending / approved / rejected.
+ * - Looks up the existing custom.refund_request metafield list,
+ * - Finds the entry by id,
+ * - Updates its status + adminNote + reviewedAt,
+ * - Writes the metafield back, and removes the `refund-requested` order
+ *   tag if no pending requests remain.
+ */
+async function updateRefundRequestStatus(env, orderId, requestId, data) {
+  if (!data || typeof data !== "object") throw new Error("Invalid payload");
+  const newStatus = String(data.status || "").toLowerCase();
+  if (!["approved", "rejected", "completed", "pending"].includes(newStatus)) {
+    throw new Error("status must be one of approved, rejected, completed, pending");
+  }
+  const adminNote = data.adminNote ? String(data.adminNote).slice(0, 1000) : "";
+
+  const orderGid = orderId.startsWith("gid://")
+    ? orderId
+    : `gid://shopify/Order/${orderId}`;
+
+  // Fetch current state
+  const fetchQuery = `
+    query GetRefundReqState($id: ID!) {
+      order(id: $id) {
+        id
+        tags
+        metafield(namespace: "custom", key: "refund_request") { value }
+      }
+    }
+  `;
+  const fetched = await shopifyGraphQL(env, fetchQuery, { id: orderGid });
+  if (!fetched.order) throw new Error("Order not found");
+
+  let requests = [];
+  if (fetched.order.metafield && fetched.order.metafield.value) {
+    try {
+      const parsed = JSON.parse(fetched.order.metafield.value);
+      if (Array.isArray(parsed)) requests = parsed;
+    } catch (e) { /* corrupt — start over */ }
+  }
+
+  const idx = requests.findIndex((r) => r && r.id === requestId);
+  if (idx === -1) throw new Error("Refund request not found");
+
+  requests[idx] = {
+    ...requests[idx],
+    status: newStatus,
+    adminNote: adminNote || requests[idx].adminNote || "",
+    reviewedAt: new Date().toISOString()
+  };
+
+  // Drop the tag if nothing else is pending.
+  const stillPending = requests.some((r) => r && r.status === "pending");
+  let nextTags = fetched.order.tags || [];
+  if (!stillPending) {
+    nextTags = nextTags.filter((t) => t !== "refund-requested");
+  } else if (!nextTags.includes("refund-requested")) {
+    nextTags = [...nextTags, "refund-requested"];
+  }
+
+  // Persist tag change first, then metafield.
+  const tagMutation = `
+    mutation UpdateOrderTags($input: OrderInput!) {
+      orderUpdate(input: $input) {
+        order { id tags }
+        userErrors { field message }
+      }
+    }
+  `;
+  const tagRes = await shopifyGraphQL(env, tagMutation, {
+    input: { id: orderGid, tags: nextTags }
+  });
+  if (tagRes.orderUpdate?.userErrors?.length) {
+    const msg = tagRes.orderUpdate.userErrors.map((e) => e.message).join(", ");
+    throw new Error(`Failed to update order tags: ${msg}`);
+  }
+
+  const mfMutation = `
+    mutation SetRefundReqMetafield($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields { id }
+        userErrors { field message }
+      }
+    }
+  `;
+  const mfRes = await shopifyGraphQL(env, mfMutation, {
+    metafields: [
+      {
+        ownerId: orderGid,
+        namespace: "custom",
+        key: "refund_request",
+        type: "json",
+        value: JSON.stringify(requests)
+      }
+    ]
+  });
+  if (mfRes.metafieldsSet?.userErrors?.length) {
+    const msg = mfRes.metafieldsSet.userErrors.map((e) => e.message).join(", ");
+    throw new Error(`Failed to update refund request: ${msg}`);
+  }
+
+  return {
+    success: true,
+    request: requests[idx],
+    pendingRemaining: stillPending
   };
 }
 

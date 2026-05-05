@@ -39,34 +39,50 @@
 
     function renderOrdersList() {
       const list = $('orders-list');
-      $('orders-count').textContent = `${S.orders.length} orders`;
 
       if (S.orders.length === 0) {
         list.innerHTML = '<div class="p-8 text-center text-sm text-gray-400">No orders found</div>';
+        $('orders-count').textContent = '0 orders';
         return;
       }
 
+      // Count pending refund requests so we can surface a header badge later.
+      let pendingRefundReqCount = 0;
       list.innerHTML = S.orders.map(order => {
         const financialClass = getFinancialStatusClass(order.financialStatus);
         const fulfillmentClass = getFulfillmentStatusClass(order.fulfillmentStatus);
         const isSelected = S.selectedOrder?.id === order.id;
+        const hasRefundRequest = (order.tags || []).includes('refund-requested');
+        if (hasRefundRequest) pendingRefundReqCount++;
 
         return `
-          <div class="order-item p-3 cursor-pointer hover:bg-gray-50 ${isSelected ? 'bg-red-50 border-l-2 border-red-600' : ''}" data-order-id="${order.id}">
+          <div class="order-item p-3 cursor-pointer hover:bg-gray-50 ${isSelected ? 'bg-red-50 border-l-2 border-red-600' : ''} ${hasRefundRequest && !isSelected ? 'border-l-2 border-orange-500' : ''}" data-order-id="${order.id}">
             <div class="flex items-start justify-between mb-1">
               <span class="text-sm font-medium text-gray-900">${order.name}</span>
               <span class="text-xs text-gray-500">${formatDate(order.createdAt)}</span>
             </div>
-            <div class="flex items-center gap-1 mb-1">
+            <div class="flex items-center gap-1 mb-1 flex-wrap">
               <span class="px-1.5 py-0.5 text-[10px] font-medium rounded ${financialClass}">${order.financialStatus || 'PENDING'}</span>
               <span class="px-1.5 py-0.5 text-[10px] font-medium rounded ${fulfillmentClass}">${order.fulfillmentStatus || 'UNFULFILLED'}</span>
               ${order.test ? '<span class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-yellow-100 text-yellow-700">TEST</span>' : ''}
+              ${hasRefundRequest ? `
+                <span class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-orange-100 text-orange-700 inline-flex items-center gap-1" title="Customer requested a refund">
+                  <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span>REFUND REQUEST
+                </span>` : ''}
             </div>
             <div class="text-xs text-gray-500">${order.customer?.displayName || order.email || 'Guest'}</div>
             <div class="text-sm font-medium text-gray-900 mt-1">$${parseFloat(order.totalPrice || 0).toFixed(2)}</div>
           </div>
         `;
       }).join('');
+
+      // Surface the count in the orders header so admin sees there's stuff to triage.
+      const countEl = $('orders-count');
+      if (countEl) {
+        countEl.innerHTML = pendingRefundReqCount > 0
+          ? `${S.orders.length} orders <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded bg-orange-100 text-orange-700 align-middle">${pendingRefundReqCount} REFUND REQUEST${pendingRefundReqCount === 1 ? '' : 'S'}</span>`
+          : `${S.orders.length} orders`;
+      }
 
       list.querySelectorAll('.order-item').forEach(item => {
         item.addEventListener('click', () => selectOrder(item.dataset.orderId));
@@ -172,6 +188,8 @@
       const fulfillmentBadge = $('order-fulfillment-badge');
       fulfillmentBadge.textContent = order.displayFulfillmentStatus || 'UNFULFILLED';
       fulfillmentBadge.className = `px-2 py-1 text-xs font-medium rounded ${getFulfillmentStatusClass(order.displayFulfillmentStatus)}`;
+
+      renderRefundRequestPanel(order);
 
       // Disable the Refund action when there's nothing left to refund — both
       // by amount headroom and by per-line-item refundableQuantity. Avoids
@@ -1086,13 +1104,150 @@
     }
 
     // ========================================
+    // CUSTOMER REFUND REQUEST PANEL
+    // ========================================
+
+    // Track the request currently being acted on so openRefundModal can
+    // pre-populate from it and so executeRefund can mark it approved.
+    let activeRefundRequest = null;
+
+    function getRefundRequestsFromOrder(order) {
+      if (!order || !Array.isArray(order.metafields)) return [];
+      const mf = order.metafields.find(m => m && m.namespace === 'custom' && m.key === 'refund_request');
+      if (!mf || !mf.value) return [];
+      try {
+        const parsed = typeof mf.value === 'string' ? JSON.parse(mf.value) : mf.value;
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        console.error('[refund-request] Failed to parse metafield', e);
+        return [];
+      }
+    }
+
+    function renderRefundRequestPanel(order) {
+      const panel = $('refund-request-panel');
+      if (!panel) return;
+
+      const requests = getRefundRequestsFromOrder(order);
+      const pending = requests.find(r => r && r.status === 'pending');
+      activeRefundRequest = pending || null;
+
+      if (!pending) {
+        panel.classList.add('hidden');
+        return;
+      }
+      panel.classList.remove('hidden');
+
+      // Build line-item lookup (id -> {title, quantity, ...}) so we can
+      // render readable names for the requested items.
+      const lookup = new Map();
+      (order.lineItems || []).forEach(li => {
+        if (li && li.id) lookup.set(li.id, li);
+      });
+
+      const reasonLabels = {
+        refund: 'General refund',
+        exchange: 'Exchange / wrong size or fitment',
+        damaged: 'Item arrived damaged',
+        wrong_item: 'Received wrong item',
+        other: 'Other'
+      };
+      const reasonText = reasonLabels[pending.reason] || (pending.reason || '').toUpperCase();
+
+      const meta = $('refund-request-meta');
+      const submitted = pending.requestedAt ? new Date(pending.requestedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+      meta.innerHTML = `
+        <div><strong>Reason:</strong> ${escapeHtml(reasonText)}</div>
+        <div><strong>Submitted:</strong> ${submitted}</div>
+        <div><strong>By:</strong> ${escapeHtml(order.customer?.displayName || order.customer?.email || 'Customer')}</div>
+      `;
+
+      const itemsEl = $('refund-request-items');
+      const itemRows = (pending.items || []).map(req => {
+        const li = lookup.get(req.lineItemId);
+        const title = li ? li.title : '(item not found on order)';
+        const variant = li && li.variantTitle && li.variantTitle !== 'Default Title' ? ` · ${li.variantTitle}` : '';
+        const sku = li && li.sku ? ` · SKU ${li.sku}` : '';
+        return `<div class="py-1 border-b border-orange-50 last:border-b-0"><strong>${req.quantity}×</strong> ${escapeHtml(title)}<span class="text-gray-500">${escapeHtml(variant + sku)}</span></div>`;
+      }).join('');
+      itemsEl.innerHTML = `<div class="font-semibold text-orange-900 mb-1">Items requested</div>${itemRows || '<div class="text-gray-500">No items specified</div>'}`;
+
+      const notesWrap = $('refund-request-notes-wrap');
+      const notesEl = $('refund-request-notes');
+      if (pending.notes && pending.notes.trim()) {
+        notesEl.textContent = pending.notes;
+        notesWrap.classList.remove('hidden');
+      } else {
+        notesWrap.classList.add('hidden');
+      }
+
+      const historyEl = $('refund-request-history');
+      const totalSubmitted = requests.length;
+      historyEl.textContent = totalSubmitted > 1
+        ? `${totalSubmitted - 1} earlier request${totalSubmitted - 1 === 1 ? '' : 's'} on file`
+        : '';
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    async function processRefundRequest() {
+      if (!activeRefundRequest || !S.selectedOrderFull) return;
+      // Open the existing refund modal — openRefundModal reads
+      // activeRefundRequest and pre-fills item quantities + reason.
+      openRefundModal({ fromRequest: activeRefundRequest });
+    }
+
+    async function rejectRefundRequest() {
+      if (!activeRefundRequest || !S.selectedOrderFull) return;
+      const note = window.prompt('Optional note for the customer (visible to staff only):', '');
+      if (note === null) return; // user cancelled
+
+      const btn = $('btn-refund-request-reject');
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Declining…';
+
+      try {
+        const numericId = S.selectedOrderFull.id.split('/').pop();
+        const res = await fetch(`${API_BASE}/orders/${numericId}/refund-requests/${encodeURIComponent(activeRefundRequest.id)}`, {
+          method: 'PATCH',
+          headers: api.headers(),
+          body: JSON.stringify({ status: 'rejected', adminNote: note })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Update failed');
+
+        toast('Refund request declined', 'success');
+        await selectOrder(S.selectedOrderFull.id);
+      } catch (e) {
+        toast('Failed to decline: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    }
+
+    // Wire up panel buttons once. The handlers read activeRefundRequest
+    // each time so they pick up whichever request is currently shown.
+    if ($('btn-refund-request-process')) {
+      $('btn-refund-request-process').addEventListener('click', processRefundRequest);
+    }
+    if ($('btn-refund-request-reject')) {
+      $('btn-refund-request-reject').addEventListener('click', rejectRefundRequest);
+    }
+
+    // ========================================
     // REFUND MODAL HANDLERS
     // ========================================
 
     let refundCalculation = null; // Store calculation result
 
     // Open refund modal
-    function openRefundModal() {
+    function openRefundModal(opts) {
       if (!S.selectedOrderFull) return;
 
       const order = S.selectedOrderFull;
@@ -1191,6 +1346,31 @@
 
       // Add event listener for restock type selector
       $('refund-restock-type').addEventListener('change', updateRestockTypeDescription);
+
+      // Pre-populate from a customer refund request when present.
+      // The qty for each requested line item is set to min(requested,
+      // refundable). Notes carry into the reason-notes textarea.
+      const fromReq = opts && opts.fromRequest ? opts.fromRequest : null;
+      if (fromReq) {
+        const reasonMap = {
+          refund: 'Customer Return',
+          exchange: 'Customer Return',
+          damaged: 'Damaged Item',
+          wrong_item: 'Wrong Item Shipped',
+          other: 'Other'
+        };
+        $('refund-reason').value = reasonMap[fromReq.reason] || 'Other';
+        if (fromReq.notes) $('refund-reason-notes').value = fromReq.notes;
+
+        (fromReq.items || []).forEach(req => {
+          const input = document.querySelector(`.refund-qty-input[data-line-item-id="${req.lineItemId}"]`);
+          if (!input) return;
+          const max = parseInt(input.dataset.maxQty) || 0;
+          const requested = parseInt(req.quantity) || 0;
+          input.value = Math.min(max, requested);
+        });
+        updateRefundItemTotals();
+      }
 
       modal.classList.remove('hidden');
     }
@@ -1436,6 +1616,23 @@
 
         const data = await response.json();
         if (!data.success) throw new Error(data.error);
+
+        // If we were processing a customer refund REQUEST, transition it
+        // to 'approved' so the customer page no longer shows "pending"
+        // and the admin orders list drops the orange badge.
+        if (activeRefundRequest && S.selectedOrderFull) {
+          try {
+            const numId = S.selectedOrderFull.id.split('/').pop();
+            await fetch(`${API_BASE}/orders/${numId}/refund-requests/${encodeURIComponent(activeRefundRequest.id)}`, {
+              method: 'PATCH',
+              headers: api.headers(),
+              body: JSON.stringify({ status: 'approved', adminNote: 'Refund issued' })
+            });
+          } catch (markErr) {
+            console.warn('[refund-request] Failed to mark approved:', markErr);
+          }
+          activeRefundRequest = null;
+        }
 
         // Display refund amount properly
         const refundAmount = parseFloat(data.refund.totalRefunded || 0).toFixed(2);
