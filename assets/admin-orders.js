@@ -333,7 +333,9 @@
       renderShippingAddressWithValidation(order.shippingAddress, order.id);
       $('order-billing-address').innerHTML = formatAddress(order.billingAddress);
 
-      $('order-note').textContent = order.note || 'No note';
+      // Use textContent so newlines in order.note are preserved by the
+      // <pre>-style whitespace-pre-wrap CSS on #order-note.
+      $('order-note').textContent = order.note && order.note.trim() ? order.note : 'No note';
       $('order-note').classList.toggle('italic', !order.note);
 
       const orderTagsHtml = (order.tags || []).map(t => `<span class="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-600">${t}</span>`).join('');
@@ -792,27 +794,71 @@
       });
     }
 
-    // Edit Order Note button
+    // Edit Order Note — open the dedicated modal (textarea, multi-line)
+    // instead of the browser's one-line prompt(), which mangled formatted
+    // notes and made the refund-request summaries impossible to edit.
+    function openEditOrderNoteModal() {
+      if (!S.selectedOrderFull) return;
+      const modal = $('edit-order-note-modal');
+      const textarea = $('edit-order-note-textarea');
+      if (!modal || !textarea) return;
+      textarea.value = S.selectedOrderFull.note || '';
+      modal.classList.remove('hidden');
+      // Focus + put caret at end so the user can append immediately.
+      requestAnimationFrame(() => {
+        textarea.focus();
+        try { textarea.setSelectionRange(textarea.value.length, textarea.value.length); } catch (e) {}
+      });
+    }
+
+    async function saveOrderNoteFromModal() {
+      if (!S.selectedOrderFull) return;
+      const textarea = $('edit-order-note-textarea');
+      const saveBtn = $('btn-save-edit-note');
+      const newNote = textarea ? textarea.value : '';
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+      }
+      try {
+        const numericId = S.selectedOrderFull.id.split('/').pop();
+        const response = await fetch(`${API_BASE}/orders/${numericId}`, {
+          method: 'PUT',
+          headers: api.headers(),
+          body: JSON.stringify({ note: newNote })
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error);
+        toast('Note updated', 'success');
+        $('edit-order-note-modal').classList.add('hidden');
+        await selectOrder(S.selectedOrderFull.id);
+      } catch (e) {
+        toast('Failed to update note: ' + e.message, 'error');
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Note';
+        }
+      }
+    }
+
     if ($('btn-edit-order-note')) {
-      $('btn-edit-order-note').addEventListener('click', async () => {
-        if (!S.selectedOrderFull) return;
-
-        const newNote = prompt('Enter order note:', S.selectedOrderFull.note || '');
-        if (newNote === null) return;
-
-        try {
-          const numericId = S.selectedOrderFull.id.split('/').pop();
-          const response = await fetch(`${API_BASE}/orders/${numericId}`, {
-            method: 'PUT',
-            headers: api.headers(),
-            body: JSON.stringify({ note: newNote })
-          });
-          const data = await response.json();
-          if (!data.success) throw new Error(data.error);
-          toast('Note updated', 'success');
-          await selectOrder(S.selectedOrderFull.id);
-        } catch (e) {
-          toast('Failed to update note: ' + e.message, 'error');
+      $('btn-edit-order-note').addEventListener('click', openEditOrderNoteModal);
+    }
+    if ($('btn-close-edit-note')) {
+      $('btn-close-edit-note').addEventListener('click', () => $('edit-order-note-modal').classList.add('hidden'));
+    }
+    if ($('btn-cancel-edit-note')) {
+      $('btn-cancel-edit-note').addEventListener('click', () => $('edit-order-note-modal').classList.add('hidden'));
+    }
+    if ($('btn-save-edit-note')) {
+      $('btn-save-edit-note').addEventListener('click', saveOrderNoteFromModal);
+    }
+    // Close on backdrop click for parity with other admin modals.
+    if ($('edit-order-note-modal')) {
+      $('edit-order-note-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'edit-order-note-modal') {
+          $('edit-order-note-modal').classList.add('hidden');
         }
       });
     }
@@ -876,17 +922,10 @@
             }
 
             case 'edit-note':
-              const newNote = prompt('Enter order note:', S.selectedOrderFull.note || '');
-              if (newNote === null) return;
-              const noteRes = await fetch(`${API_BASE}/orders/${numericId}`, {
-                method: 'PUT',
-                headers: api.headers(),
-                body: JSON.stringify({ note: newNote })
-              });
-              const noteData = await noteRes.json();
-              if (!noteData.success) throw new Error(noteData.error);
-              toast('Note updated', 'success');
-              await selectOrder(S.selectedOrderFull.id);
+              // Defer to the dedicated multi-line modal so newlines and
+              // refund-request summaries are editable. The modal handles
+              // the PUT + reload itself.
+              openEditOrderNoteModal();
               break;
 
             case 'view-shopify':

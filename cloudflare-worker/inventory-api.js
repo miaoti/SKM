@@ -7165,8 +7165,11 @@ async function requestOrderRefund(env, orderId, data, signature) {
   );
 
   // Compose a human-readable summary that gets appended to the order
-  // note. Shopify renders an order-note change as a timeline event so
-  // admins see "Note added to this order" with the request details.
+  // note. Shopify renders order.note with line breaks preserved (and
+  // the native Edit Note dialog uses a textarea), so this reads well
+  // in Shopify admin + appears as a "Note added" event in the order
+  // timeline. Our own admin dashboard needs to render with
+  // white-space:pre-line and use a textarea editor to match.
   const reasonLabels = {
     refund: "Refund",
     exchange: "Exchange",
@@ -7193,7 +7196,6 @@ async function requestOrderRefund(env, orderId, data, signature) {
   if (notes) noteSummary.push(`Customer notes: ${notes}`);
   const summaryBlock = noteSummary.join("\n");
 
-  // Append (don't overwrite) so any pre-existing notes survive.
   const existingNote = (verifyResult.order.note || "").trim();
   const combinedNote = existingNote
     ? `${existingNote}\n\n--- ${summaryBlock}`

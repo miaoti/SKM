@@ -1588,7 +1588,27 @@
                           <h2 class="text-sm font-semibold text-gray-900">Order Note</h2>
                           <button id="btn-edit-order-note" class="text-xs text-red-600 hover:text-red-700">Edit</button>
                         </div>
-                        <p id="order-note" class="text-sm text-gray-600 italic">No note</p>
+                        <pre id="order-note" class="text-sm text-gray-600 italic font-sans whitespace-pre-wrap break-words m-0">No note</pre>
+                      </div>
+
+                      <!-- Edit Order Note Modal -->
+                      <div id="edit-order-note-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl">
+                          <div class="p-5 border-b border-gray-100 flex items-center justify-between">
+                            <h3 class="text-lg font-semibold text-gray-900">Edit Order Note</h3>
+                            <button id="btn-close-edit-note" class="p-1 text-gray-400 hover:text-gray-600 rounded">
+                              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          </div>
+                          <div class="p-5 space-y-3">
+                            <textarea id="edit-order-note-textarea" rows="14" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg font-mono leading-relaxed resize-y focus:outline-none focus:border-red-500" placeholder="Enter order note (line breaks are preserved)"></textarea>
+                            <p class="text-xs text-gray-500">Line breaks are preserved. Visible to staff and in Shopify admin.</p>
+                          </div>
+                          <div class="p-5 border-t border-gray-100 flex justify-between items-center">
+                            <button id="btn-cancel-edit-note" class="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+                            <button id="btn-save-edit-note" class="h-9 px-4 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg">Save Note</button>
+                          </div>
+                        </div>
                       </div>
                       
                       <!-- Tags -->
