@@ -192,12 +192,37 @@
 
              if (!dealerData) return;
              
-             // Extract hours safely
-             let hoursText = '';
-             if (typeof dealerData.hours === 'string') hoursText = dealerData.hours;
-             else if (dealerData.hours?.display) hoursText = dealerData.hours.display;
-             else if (dealerData.hours?.text) hoursText = dealerData.hours.text;
-             else if (typeof dealerData.hours === 'object') hoursText = JSON.stringify(dealerData.hours, null, 2);
+             // ---- Business Hours: build structured + legacy state ----
+             const HOURS_DAYS = [
+               { key: 'mon', label: 'Monday',    short: 'Mon' },
+               { key: 'tue', label: 'Tuesday',   short: 'Tue' },
+               { key: 'wed', label: 'Wednesday', short: 'Wed' },
+               { key: 'thu', label: 'Thursday',  short: 'Thu' },
+               { key: 'fri', label: 'Friday',    short: 'Fri' },
+               { key: 'sat', label: 'Saturday',  short: 'Sat' },
+               { key: 'sun', label: 'Sunday',    short: 'Sun' }
+             ];
+             function defaultWeekly() {
+               return Object.fromEntries(HOURS_DAYS.map(d => [d.key, null]));
+             }
+             function escapeHtmlAttr(str) {
+               return String(str || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+             }
+             let initialWeekly = defaultWeekly();
+             let legacyFreeText = '';
+             const rawHours = dealerData.hours;
+             if (rawHours && typeof rawHours === 'object' && rawHours.weekly) {
+               // Structured payload — trust it
+               HOURS_DAYS.forEach(d => {
+                 const v = rawHours.weekly[d.key];
+                 if (v && v.open && v.close) initialWeekly[d.key] = { open: v.open, close: v.close };
+               });
+               if (rawHours.display) legacyFreeText = '';
+             } else if (typeof rawHours === 'string') {
+               legacyFreeText = rawHours;
+             } else if (rawHours && typeof rawHours === 'object' && (rawHours.display || rawHours.text)) {
+               legacyFreeText = rawHours.display || rawHours.text || '';
+             }
 
              container.innerHTML = `
                <div style="display: flex; flex-wrap: wrap; gap: 32px;">
@@ -222,9 +247,38 @@
                      </div>
 
                      <div>
-                        <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">Business Hours</label>
-                        <textarea id="b2b-hours" rows="4" class="w-full bg-[#1a1a1a] border border-[#333] text-white text-sm px-3 py-2 rounded focus:border-[#CC0000] focus:ring-0 transition-colors placeholder-gray-600" placeholder="Mon-Fri: 9am - 6pm\nSat: 10am - 4pm">${hoursText}</textarea>
-                        <p class="text-[10px] text-gray-500 mt-1">Free text format supported.</p>
+                        <div class="flex items-center justify-between mb-2">
+                          <label class="block text-[10px] uppercase tracking-wider text-gray-500">Business Hours</label>
+                          <button type="button" id="b2b-hours-quickfill" class="text-[10px] text-[#CC0000] hover:text-[#ff3333] uppercase tracking-wider">Apply Mon-Fri 9-6</button>
+                        </div>
+                        <div id="b2b-hours-grid" class="space-y-1.5 bg-[#1a1a1a] border border-[#333] rounded p-3">
+                          ${HOURS_DAYS.map(d => {
+                             const v = initialWeekly[d.key];
+                             const isOpen = !!v;
+                             return `
+                               <div class="flex items-center gap-2 text-sm" data-day="${d.key}">
+                                 <label class="inline-flex items-center gap-2 w-24 cursor-pointer select-none">
+                                   <input type="checkbox" id="hrs-${d.key}-on" ${isOpen ? 'checked' : ''} class="accent-[#CC0000] w-3.5 h-3.5">
+                                   <span class="text-gray-300 text-xs">${d.label}</span>
+                                 </label>
+                                 <input type="time" id="hrs-${d.key}-open"
+                                   value="${v ? escapeHtmlAttr(v.open) : '09:00'}"
+                                   class="bg-[#0a0a0a] border border-[#333] text-gray-200 text-xs px-2 py-1 rounded focus:border-[#CC0000] focus:ring-0 w-[110px] disabled:opacity-40"
+                                   ${isOpen ? '' : 'disabled'}>
+                                 <span class="text-gray-500 text-xs">to</span>
+                                 <input type="time" id="hrs-${d.key}-close"
+                                   value="${v ? escapeHtmlAttr(v.close) : '18:00'}"
+                                   class="bg-[#0a0a0a] border border-[#333] text-gray-200 text-xs px-2 py-1 rounded focus:border-[#CC0000] focus:ring-0 w-[110px] disabled:opacity-40"
+                                   ${isOpen ? '' : 'disabled'}>
+                                 <span class="text-[10px] text-gray-500 ml-auto closed-tag" ${isOpen ? 'hidden' : ''}>Closed</span>
+                               </div>
+                             `;
+                          }).join('')}
+                        </div>
+                        ${legacyFreeText ? `
+                          <p class="text-[10px] text-gray-500 mt-2 italic">Previous text (saving above will replace it): "${escapeHtmlAttr(legacyFreeText)}"</p>
+                        ` : ''}
+                        <p class="text-[10px] text-gray-500 mt-1">Toggle a day off to mark it closed. Display string is generated automatically.</p>
                      </div>
                   </div>
 
@@ -276,12 +330,106 @@
                   </button>
                </div>
              `;
+
+             // Wire up the day-grid: toggle disables time inputs and shows "Closed".
+             HOURS_DAYS.forEach(d => {
+               const cb = document.getElementById('hrs-' + d.key + '-on');
+               const open = document.getElementById('hrs-' + d.key + '-open');
+               const close = document.getElementById('hrs-' + d.key + '-close');
+               const tag = document.querySelector('[data-day="' + d.key + '"] .closed-tag');
+               if (!cb || !open || !close) return;
+               cb.addEventListener('change', () => {
+                 const isOpen = cb.checked;
+                 open.disabled = !isOpen;
+                 close.disabled = !isOpen;
+                 if (tag) tag.hidden = isOpen;
+               });
+             });
+
+             // Quick-fill: Mon-Fri 9-6, Sat-Sun closed.
+             const quickfill = document.getElementById('b2b-hours-quickfill');
+             if (quickfill) {
+               quickfill.addEventListener('click', () => {
+                 ['mon','tue','wed','thu','fri'].forEach(k => {
+                   const cb = document.getElementById('hrs-' + k + '-on');
+                   const open = document.getElementById('hrs-' + k + '-open');
+                   const close = document.getElementById('hrs-' + k + '-close');
+                   const tag = document.querySelector('[data-day="' + k + '"] .closed-tag');
+                   cb.checked = true;
+                   open.disabled = false; close.disabled = false;
+                   open.value = '09:00'; close.value = '18:00';
+                   if (tag) tag.hidden = true;
+                 });
+                 ['sat','sun'].forEach(k => {
+                   const cb = document.getElementById('hrs-' + k + '-on');
+                   const open = document.getElementById('hrs-' + k + '-open');
+                   const close = document.getElementById('hrs-' + k + '-close');
+                   const tag = document.querySelector('[data-day="' + k + '"] .closed-tag');
+                   cb.checked = false;
+                   open.disabled = true; close.disabled = true;
+                   if (tag) tag.hidden = false;
+                 });
+               });
+             }
+          }
+
+          // Helpers used by save: read the grid + format the display string.
+          function readDealerHoursWeekly() {
+             const days = ['mon','tue','wed','thu','fri','sat','sun'];
+             const weekly = {};
+             days.forEach(k => {
+               const cb = document.getElementById('hrs-' + k + '-on');
+               const open = document.getElementById('hrs-' + k + '-open');
+               const close = document.getElementById('hrs-' + k + '-close');
+               if (cb && cb.checked && open && open.value && close && close.value) {
+                 weekly[k] = { open: open.value, close: close.value };
+               } else {
+                 weekly[k] = null;
+               }
+             });
+             return weekly;
+          }
+          function formatTime12(t) {
+             if (!t) return '';
+             const [h, m] = t.split(':').map(Number);
+             const period = h >= 12 ? 'PM' : 'AM';
+             const h12 = (h % 12) || 12;
+             return h12 + ':' + String(m).padStart(2,'0') + ' ' + period;
+          }
+          function buildHoursDisplay(weekly) {
+             const order = ['mon','tue','wed','thu','fri','sat','sun'];
+             const shortMap = { mon:'Mon', tue:'Tue', wed:'Wed', thu:'Thu', fri:'Fri', sat:'Sat', sun:'Sun' };
+             const lines = [];
+             let i = 0;
+             while (i < order.length) {
+               const k = order[i];
+               const v = weekly[k];
+               if (!v) {
+                 lines.push(shortMap[k] + ': Closed');
+                 i++;
+                 continue;
+               }
+               // Find consecutive run with identical hours.
+               let j = i;
+               while (j + 1 < order.length) {
+                 const next = weekly[order[j + 1]];
+                 if (next && next.open === v.open && next.close === v.close) j++;
+                 else break;
+               }
+               const range = (i === j) ? shortMap[k] : (shortMap[order[i]] + '-' + shortMap[order[j]]);
+               lines.push(range + ': ' + formatTime12(v.open) + ' - ' + formatTime12(v.close));
+               i = j + 1;
+             }
+             return lines.join('\n');
           }
 
           window.saveB2BProfile = async function(btn) {
              const originalText = btn.textContent;
              btn.textContent = 'Saving...';
              btn.disabled = true;
+
+             const weekly = readDealerHoursWeekly();
+             const display = buildHoursDisplay(weekly);
 
              const payload = {
                 customerId,
@@ -293,7 +441,7 @@
                 state: document.getElementById('b2b-state').value,
                 zip: document.getElementById('b2b-zip').value,
                 country: document.getElementById('b2b-country').value,
-                hours: { display: document.getElementById('b2b-hours').value }
+                hours: { display: display, weekly: weekly }
              };
 
              try {
