@@ -472,20 +472,30 @@
 </script>
 
 <style>
-  /* HUD Category Navigation — dark to match racing/tech aesthetic */
+  /* Category Navigation — adopts the header's surface so it reads as a
+     continuation of the bar above instead of a separate slab.
+     Default colours target the transparent/dark homepage header; the
+     `header-precision.scrolled #category-nav` overrides below switch to
+     a white surface for collection / inner pages. */
   #category-nav {
     scrollbar-width: none;
     -ms-overflow-style: none;
-    background: linear-gradient(180deg, rgba(10, 10, 10, 0.96) 0%, rgba(5, 5, 5, 0.96) 100%);
+    background: rgba(0, 0, 0, 0.35);
     backdrop-filter: blur(10px) saturate(140%);
     -webkit-backdrop-filter: blur(10px) saturate(140%);
-    border-bottom: 1px solid rgba(204, 0, 0, 0.35);
-    box-shadow:
-      0 4px 20px rgba(0, 0, 0, 0.5),
-      inset 0 -1px 0 rgba(204, 0, 0, 0.15),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: none;
     font-family: 'JetBrains Mono', ui-monospace, monospace;
-    transition: all 0.3s ease-in-out;
+    transition: background 0.3s ease, border-color 0.3s ease, height 0.3s ease, opacity 0.3s ease;
+  }
+
+  /* On scrolled (white) header: nav matches the header's white surface
+     with a hairline divider, so the strip looks like a sub-row of the
+     header, not a separate UI element. */
+  header-precision.scrolled #category-nav {
+    background: rgba(255, 255, 255, 0.96);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
   }
 
   /* Start hidden state */
@@ -498,35 +508,40 @@
     border: none;
   }
 
-  /* Visible state */
+  /* Visible state — slightly shorter, less heavy */
   #category-nav.nav-visible {
-    height: 40px; /* Matched to h-10 from tailwind */
+    height: 36px;
     opacity: 1;
     visibility: visible;
   }
-  #category-nav::-webkit-scrollbar {
-    display: none;
-  }
+  #category-nav::-webkit-scrollbar { display: none; }
 
-  /* Vehicle Badge - HUD Style */
+  /* Vehicle Badge — default (dark/transparent header) */
   #vehicle-badge > span:first-child {
-    background: linear-gradient(135deg, rgba(204, 0, 0, 0.18) 0%, rgba(204, 0, 0, 0.08) 100%);
-    border: 1px solid rgba(204, 0, 0, 0.55);
-    color: #ff5252;
-    text-shadow: 0 0 12px rgba(204, 0, 0, 0.4);
-    box-shadow:
-      0 0 12px rgba(204, 0, 0, 0.25),
-      inset 0 0 12px rgba(204, 0, 0, 0.05);
-    backdrop-filter: blur(10px);
-    animation: vehiclePulse 2s ease-in-out infinite;
+    background: rgba(204, 0, 0, 0.14);
+    border: 1px solid rgba(204, 0, 0, 0.45);
+    color: #ff6b6b;
+    text-shadow: 0 0 10px rgba(204, 0, 0, 0.3);
+    box-shadow: 0 0 10px rgba(204, 0, 0, 0.18);
+    backdrop-filter: blur(8px);
+    animation: vehiclePulse 2.5s ease-in-out infinite;
     font-family: inherit;
     letter-spacing: 0.04em;
   }
+  /* Vehicle Badge — on scrolled (white header) */
+  header-precision.scrolled #vehicle-badge > span:first-child {
+    background: rgba(204, 0, 0, 0.08);
+    border-color: rgba(204, 0, 0, 0.35);
+    color: #CC0000;
+    text-shadow: none;
+    box-shadow: none;
+  }
   @keyframes vehiclePulse {
-    0%, 100% { box-shadow: 0 0 12px rgba(204, 0, 0, 0.25), inset 0 0 12px rgba(204, 0, 0, 0.05); }
-    50%      { box-shadow: 0 0 22px rgba(204, 0, 0, 0.45), inset 0 0 12px rgba(204, 0, 0, 0.05); }
+    0%, 100% { box-shadow: 0 0 10px rgba(204, 0, 0, 0.18); }
+    50%      { box-shadow: 0 0 18px rgba(204, 0, 0, 0.35); }
   }
 
+  /* Clear button — default */
   #btn-clear-vehicle {
     color: rgba(255, 255, 255, 0.45);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -536,25 +551,37 @@
     background: rgba(204, 0, 0, 0.2);
     transform: rotate(90deg);
   }
+  /* Clear button — on scrolled */
+  header-precision.scrolled #btn-clear-vehicle {
+    color: rgba(0, 0, 0, 0.45);
+  }
+  header-precision.scrolled #btn-clear-vehicle:hover {
+    color: #CC0000;
+    background: rgba(204, 0, 0, 0.08);
+  }
 
-  /* Category Links - HUD Style */
+  /* Category Links — default (dark/transparent header) */
   .category-link {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 14px;
+    padding: 6px 14px;
     font-family: inherit;
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.12em;
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.65);
     white-space: nowrap;
     text-decoration: none;
     border-radius: 2px;
     position: relative;
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  /* Category Links — on scrolled (white header) */
+  header-precision.scrolled .category-link {
+    color: rgba(17, 17, 17, 0.65);
   }
   
   /* Animated underline effect */
@@ -571,24 +598,32 @@
   }
   
   .category-link:hover {
-    color: #ff5252;
-    background: linear-gradient(180deg, rgba(204, 0, 0, 0.18) 0%, rgba(204, 0, 0, 0.06) 100%);
+    color: #ff6b6b;
+    background: rgba(204, 0, 0, 0.1);
+  }
+  header-precision.scrolled .category-link:hover {
+    color: #CC0000;
+    background: rgba(204, 0, 0, 0.06);
   }
   .category-link:hover::after {
     width: 80%;
   }
 
-  /* Active State - Racing Red */
+  /* Active State */
   .category-link.active {
-    color: #ff5252;
-    background: linear-gradient(180deg, rgba(204, 0, 0, 0.22) 0%, rgba(204, 0, 0, 0.08) 100%);
+    color: #ff6b6b;
+    background: rgba(204, 0, 0, 0.14);
     font-weight: 700;
-    text-shadow: 0 0 8px rgba(204, 0, 0, 0.45);
+  }
+  header-precision.scrolled .category-link.active {
+    color: #CC0000;
+    background: rgba(204, 0, 0, 0.08);
+    text-shadow: none;
   }
   .category-link.active::after {
     width: 60%;
     background: #CC0000;
-    box-shadow: 0 0 8px rgba(204, 0, 0, 0.7);
+    box-shadow: 0 0 6px rgba(204, 0, 0, 0.5);
   }
 
   /* Count Badge */
@@ -608,16 +643,23 @@
     color: rgba(255, 255, 255, 0.4);
     animation: loadingPulse 1.5s ease-in-out infinite;
   }
+  header-precision.scrolled #category-links span:only-child {
+    color: rgba(17, 17, 17, 0.45);
+  }
   @keyframes loadingPulse {
     0%, 100% { opacity: 0.4; }
     50% { opacity: 0.85; }
   }
 
-  /* "No parts for vehicle" pill — make readable on dark bg */
+  /* "No parts for vehicle" pill */
   #category-links span.no-parts-pulse {
     background: rgba(204, 0, 0, 0.15) !important;
     border-color: rgba(204, 0, 0, 0.5) !important;
     color: #ff7070 !important;
+  }
+  header-precision.scrolled #category-links span.no-parts-pulse {
+    color: #CC0000 !important;
+    background: rgba(204, 0, 0, 0.08) !important;
   }
   
   /* Responsive */
