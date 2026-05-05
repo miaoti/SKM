@@ -1035,13 +1035,19 @@
     {%- comment -%}
       ===== Refund-request state =====
       Reads the custom.refund_request metafield set by the worker.
-      Shows banner if there's a pending request; controls the visibility
-      of the "Request Refund" button in the support row below.
+      Renders the right banner for the LATEST request based on status:
+        - pending      → orange "pending review" banner with Cancel
+        - rejected     → red "request declined" banner with admin note
+        - approved     → green "refund issued" banner
+        - cancelled    → grey "request cancelled" banner (small)
+      Anything older than the latest gets summarised in a history strip
+      below so the customer always has a paper trail.
     {%- endcomment -%}
     {%- liquid
       assign refund_requests_value = order.metafields.custom.refund_request.value
       assign pending_refund_request = nil
       assign last_refund_request = nil
+      assign request_history = ''
       if refund_requests_value
         for req in refund_requests_value
           if last_refund_request == nil
@@ -1051,6 +1057,11 @@
             assign pending_refund_request = req
           endif
         endfor
+      endif
+
+      assign last_status = ''
+      if last_refund_request
+        assign last_status = last_refund_request.status
       endif
 
       assign payment_status_lc = order.financial_status | downcase
@@ -1131,7 +1142,7 @@
           });
         })();
       </script>
-    {% elsif last_refund_request and last_refund_request.status == 'rejected' %}
+    {% elsif last_status == 'rejected' %}
       <div class="refund-banner refund-banner--rejected mb-6">
         <div class="refund-banner__icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
@@ -1139,10 +1150,80 @@
         <div class="refund-banner__body">
           <div class="refund-banner__title mono">REFUND REQUEST DECLINED</div>
           <div class="refund-banner__sub">
-            {% if last_refund_request.adminNote != blank %}{{ last_refund_request.adminNote }}{% else %}Please contact support if you need to discuss this decision.{% endif %}
+            Reason on file: {{ last_refund_request.reason | replace: '_', ' ' | upcase }}
+            {% if last_refund_request.reviewedAt %} · Reviewed {{ last_refund_request.reviewedAt | date: "%Y-%m-%d %H:%M UTC" }}{% endif %}
+          </div>
+          <div class="refund-banner__sub" style="margin-top: 4px;">
+            {% if last_refund_request.adminNote != blank %}<strong>Note from our team:</strong> {{ last_refund_request.adminNote }}{% else %}Please contact support if you need to discuss this decision.{% endif %}
           </div>
         </div>
       </div>
+    {% elsif last_status == 'approved' or last_status == 'completed' %}
+      <div class="refund-banner refund-banner--approved mb-6">
+        <div class="refund-banner__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div class="refund-banner__body">
+          <div class="refund-banner__title mono">REFUND APPROVED</div>
+          <div class="refund-banner__sub">
+            Your refund request has been approved
+            {% if last_refund_request.reviewedAt %} on {{ last_refund_request.reviewedAt | date: "%Y-%m-%d" }}{% endif %}.
+            Funds typically post to the original payment method within 5–10 business days.
+          </div>
+          {% if last_refund_request.adminNote != blank %}
+            <div class="refund-banner__sub" style="margin-top: 4px;"><strong>Note from our team:</strong> {{ last_refund_request.adminNote }}</div>
+          {% endif %}
+        </div>
+      </div>
+    {% elsif last_status == 'cancelled' %}
+      <div class="refund-banner refund-banner--cancelled mb-6">
+        <div class="refund-banner__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div class="refund-banner__body">
+          <div class="refund-banner__title mono">REFUND REQUEST CANCELLED</div>
+          <div class="refund-banner__sub">
+            You cancelled this request{% if last_refund_request.cancelledAt %} on {{ last_refund_request.cancelledAt | date: "%Y-%m-%d %H:%M UTC" }}{% endif %}. You can submit a new one any time.
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    {%- comment -%}
+      ===== Refund history =====
+      Always render past requests (status != latest) so the customer
+      has visibility regardless of the active banner.
+    {%- endcomment -%}
+    {% if refund_requests_value and refund_requests_value.size > 1 %}
+      <details class="refund-history mb-6">
+        <summary class="refund-history__summary mono">
+          Refund request history ({{ refund_requests_value.size }})
+        </summary>
+        <div class="refund-history__list">
+          {% for req in refund_requests_value %}
+            {%- liquid
+              assign req_status = req.status | default: 'unknown'
+              assign req_pill_class = 'is-pending'
+              if req_status == 'rejected'
+                assign req_pill_class = 'is-rejected'
+              elsif req_status == 'approved' or req_status == 'completed'
+                assign req_pill_class = 'is-approved'
+              elsif req_status == 'cancelled'
+                assign req_pill_class = 'is-cancelled'
+              endif
+            -%}
+            <div class="refund-history__item">
+              <span class="refund-history__pill {{ req_pill_class }} mono">{{ req_status | upcase }}</span>
+              <span class="refund-history__meta mono">
+                {{ req.requestedAt | date: "%Y-%m-%d %H:%M" }}
+                · {{ req.reason | replace: '_', ' ' | upcase }}
+                {% if req.reviewedAt %} · reviewed {{ req.reviewedAt | date: "%Y-%m-%d" }}{% endif %}
+                {% if req.cancelledAt %} · cancelled {{ req.cancelledAt | date: "%Y-%m-%d" }}{% endif %}
+              </span>
+            </div>
+          {% endfor %}
+        </div>
+      </details>
     {% endif %}
 
     {%- comment -%} ===== Support / actions row ===== {%- endcomment -%}
@@ -1365,17 +1446,80 @@
     border-left-width: 3px;
     background: #fff;
   }
-  .refund-banner--pending  { border-left-color: var(--signal-amber); background: #fffbeb; }
-  .refund-banner--rejected { border-left-color: var(--racing-red); background: #fef2f2; }
+  .refund-banner--pending   { border-left-color: var(--signal-amber); background: #fffbeb; }
+  .refund-banner--rejected  { border-left-color: var(--racing-red); background: #fef2f2; }
+  .refund-banner--approved  { border-left-color: var(--signal-green); background: #f0fdf4; }
+  .refund-banner--cancelled { border-left-color: #9ca3af; background: #f9fafb; }
   .refund-banner__icon { flex-shrink: 0; color: var(--signal-amber); padding-top: 1px; }
-  .refund-banner--rejected .refund-banner__icon { color: var(--racing-red); }
+  .refund-banner--rejected  .refund-banner__icon { color: var(--racing-red); }
+  .refund-banner--approved  .refund-banner__icon { color: var(--signal-green); }
+  .refund-banner--cancelled .refund-banner__icon { color: #6b7280; }
   .refund-banner__title {
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.14em;
     color: #92400e;
   }
-  .refund-banner--rejected .refund-banner__title { color: #991b1b; }
+  .refund-banner--rejected  .refund-banner__title { color: #991b1b; }
+  .refund-banner--approved  .refund-banner__title { color: #14532d; }
+  .refund-banner--cancelled .refund-banner__title { color: #374151; }
+
+  /* Refund history */
+  .refund-history {
+    border: 1px solid var(--border-color);
+    background: #fff;
+  }
+  .refund-history__summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 12px 16px;
+    font-size: 11px;
+    color: var(--data-grey);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    user-select: none;
+  }
+  .refund-history__summary::-webkit-details-marker { display: none; }
+  .refund-history__summary::before {
+    content: '▸';
+    margin-right: 8px;
+    color: var(--racing-red);
+    transition: transform 0.15s ease;
+    display: inline-block;
+  }
+  .refund-history[open] .refund-history__summary::before {
+    transform: rotate(90deg);
+  }
+  .refund-history__list {
+    border-top: 1px solid var(--border-color);
+    padding: 8px 16px 12px;
+  }
+  .refund-history__item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--border-color);
+    font-size: 12px;
+  }
+  .refund-history__item:last-child { border-bottom: none; }
+  .refund-history__pill {
+    display: inline-block;
+    padding: 3px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .refund-history__pill.is-pending   { background: #fef3c7; color: #92400e; }
+  .refund-history__pill.is-rejected  { background: #fee2e2; color: #991b1b; }
+  .refund-history__pill.is-approved  { background: #dcfce7; color: #14532d; }
+  .refund-history__pill.is-cancelled { background: #f3f4f6; color: #374151; }
+  .refund-history__meta {
+    color: var(--data-grey);
+    font-size: 11px;
+  }
   .refund-banner__sub {
     font-size: 12px;
     color: #4b5563;
