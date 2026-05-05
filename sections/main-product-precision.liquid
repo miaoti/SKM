@@ -154,13 +154,6 @@
     letter-spacing: 0.1em;
   }
   
-  .tcc-badge-delta {
-    font-family: 'JetBrains Mono', 'Consolas', monospace;
-    font-size: 12px;
-    color: #16a34a;
-    font-weight: 600;
-  }
-  
   /* Availability */
   .tcc-availability {
     font-family: 'JetBrains Mono', 'Consolas', monospace;
@@ -409,8 +402,6 @@
           <span class="tcc-price-main" data-product-price>{{ display_price | money }}</span>
           {%- if is_wholesale -%}
             <span class="tcc-badge-wholesale">WHOLESALE</span>
-          {%- elsif percent_off > 0 -%}
-            <span class="tcc-badge-delta">Δ -{{ percent_off }}%</span>
           {%- endif -%}
         </div>
 
