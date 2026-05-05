@@ -319,8 +319,12 @@ class PredictiveSearchComponent extends Component {
 
         this.#resetScrollPositions();
 
-        // Filter by vehicle if selected
-        this.#filterResultsByVehicle().catch(console.error);
+        // Filter by vehicle if selected. Pass the abort signal so a fast typist
+        // doesn't get a stale reorder layered onto the latest results.
+        this.#filterResultsByVehicle(abortController.signal).catch((err) => {
+          if (err && err.name === 'AbortError') return;
+          console.error(err);
+        });
       })
       .catch((error) => {
         if (abortController.signal.aborted) return;
@@ -330,8 +334,10 @@ class PredictiveSearchComponent extends Component {
 
   /**
    * Filter and reorder results based on selected vehicle
+   * @param {AbortSignal} [signal] Aborts the fitment fetch if the underlying
+   *   search query is superseded.
    */
-  async #filterResultsByVehicle() {
+  async #filterResultsByVehicle(signal) {
     // 1. Check if vehicle is selected
     const VEHICLE_KEY = 'skm_garage_vehicle';
     let vehicle = null;
@@ -355,8 +361,10 @@ class PredictiveSearchComponent extends Component {
 
     // 3. Call API to check fitment
     try {
-      const response = await fetch(`https://skm-inventory-api.miaotingshuo.workers.dev/products/check-vehicle-fit?vehicleId=${vehicle.id}&productIds=${productIds.join(',')}`);
+      const response = await fetch(`https://skm-inventory-api.miaotingshuo.workers.dev/products/check-vehicle-fit?vehicleId=${vehicle.id}&productIds=${productIds.join(',')}`, { signal });
+      if (signal && signal.aborted) return;
       const data = await response.json();
+      if (signal && signal.aborted) return;
 
       const { fits, notFits } = data;
 

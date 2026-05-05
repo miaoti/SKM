@@ -1316,10 +1316,10 @@
         const parentTransactionId = parentTransaction?.id || null;
         const gateway = parentTransaction?.gateway || 'manual';
 
-        console.log('[Refund] Transactions:', S.selectedOrderFull.transactions);
-        console.log('[Refund] Parent transaction:', parentTransaction);
-        console.log('[Refund] Parent ID:', parentTransactionId, 'Gateway:', gateway);
-
+        // console.log('[Refund] Transactions:', S.selectedOrderFull.transactions);
+        // console.log('[Refund] Parent transaction:', parentTransaction);
+        // console.log('[Refund] Parent ID:', parentTransactionId, 'Gateway:', gateway);
+// 
         // Get restock type from selector
         const restockType = $('refund-restock-type').value.toUpperCase();
 
@@ -1340,8 +1340,8 @@
         // Use the refund-amount input field if items total is 0 (fallback)
         const manualRefundAmount = parseFloat($('refund-amount').value) || 0;
         const totalRefundAmount = itemsTotal > 0 ? (itemsTotal + shippingRefund) : (manualRefundAmount + shippingRefund);
-
-        console.log('[Refund] Items total:', itemsTotal, 'Manual amount:', manualRefundAmount, 'Total:', totalRefundAmount);
+// 
+        // console.log('[Refund] Items total:', itemsTotal, 'Manual amount:', manualRefundAmount, 'Total:', totalRefundAmount);
 
         const response = await fetch(`${API_BASE}/orders/${numericId}/refund`, {
           method: 'POST',

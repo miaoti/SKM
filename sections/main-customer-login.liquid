@@ -26,24 +26,27 @@
       </div>
 
       <!-- Error Handling (Red Alert Box) -->
-      {%- if form.errors -%}
-        <div class="mb-6 bg-[#CC0000] p-4 text-white text-sm font-medium flex items-start gap-3">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 mt-0.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-          </svg>
-          <div>
-            <p class="uppercase tracking-wide font-bold mb-1">Access Denied</p>
-            {{ form.errors | default_errors }}
-            <p class="mt-2 text-xs opacity-80 border-t border-white/20 pt-2">
-              If you just registered, ensure you have activated your account via the email we sent you.
-            </p>
-          </div>
-        </div>
-      {%- endif -%}
+
 
       {% form 'customer_login' %}
         <!-- Redirect to Account Dashboard after login -->
         <input type="hidden" name="return_to" value="{{ routes.account_url }}">
+
+        <!-- Error Handling (Red Alert Box) -->
+        {%- if form.errors -%}
+          <div class="mb-6 bg-[#CC0000] p-4 text-white text-sm font-medium flex items-start gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 mt-0.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            <div>
+              <p class="uppercase tracking-wide font-bold mb-1">Access Denied</p>
+              {{ form.errors | default_errors }}
+              <p class="mt-2 text-xs opacity-80 border-t border-white/20 pt-2">
+                If you just registered, ensure you have activated your account via the email we sent you.
+              </p>
+            </div>
+          </div>
+        {%- endif -%}
 
         <div class="space-y-6">
           

@@ -37,6 +37,7 @@ const initYmm = (root) => {
   const destCollection = config.collectionHandle || 'all';
 
   const cacheKey = 'vehicles_index_v3';
+  const cacheTtlMs = 24 * 60 * 60 * 1000;
   const index = {
     all: [],
     byYear: new Map(),
@@ -139,59 +140,67 @@ const initYmm = (root) => {
     });
   };
 
-  const loadVehicles = async () => {
+  const readCache = () => {
     try {
-      // setStatus('Loading vehicles...');
-      // Clear cache for debugging
-      localStorage.removeItem(cacheKey);
-      
-      let after = null;
-      let nodes = [];
-      let fetchType = "custom.vehicle";
-      
-      // Helper to fetch pages
+      const raw = localStorage.getItem(cacheKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.savedAt || !Array.isArray(parsed.nodes)) return null;
+      if (Date.now() - parsed.savedAt > cacheTtlMs) return null;
+      return parsed.nodes;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const writeCache = (nodes) => {
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify({ savedAt: Date.now(), nodes: nodes }));
+    } catch (e) { /* quota; ignore */ }
+  };
+
+  // Shared fetch promise across all YMM instances on the page so two widgets
+  // (e.g., hero + modal) don't both fire the GraphQL pagination loop.
+  const fetchVehicleNodes = () => {
+    if (window.__skmYmmVehiclesPromise) return window.__skmYmmVehiclesPromise;
+    window.__skmYmmVehiclesPromise = (async () => {
       const fetchPages = async (type) => {
         let currentAfter = null;
         let collected = [];
         for (let i = 0; i < 50; i++) {
-          // Dynamic query to support fallback type
           const dynamicQuery = vehiclesQuery.replace('$type', JSON.stringify(type));
           const data = await gql(dynamicQuery, { first: 250, after: currentAfter });
           if (!data.metaobjects) break;
-          
           collected = collected.concat(data.metaobjects.nodes);
           if (!data.metaobjects.pageInfo.hasNextPage) break;
           currentAfter = data.metaobjects.pageInfo.endCursor;
         }
         return collected;
       };
+      let nodes = await fetchPages("vehicle");
+      if (nodes.length === 0) nodes = await fetchPages("custom.vehicle");
+      return nodes;
+    })();
+    return window.__skmYmmVehiclesPromise;
+  };
 
-      // Try fetching with "vehicle" type first (this is what the admin API creates)
-      console.log('YMM: Fetching vehicles with type "vehicle"...');
-      nodes = await fetchPages("vehicle");
-      console.log('YMM: Found', nodes.length, 'vehicles with type "vehicle"');
-
-      // Fallback: Try "custom.vehicle" if no results
-      if (nodes.length === 0) {
-        console.log('YMM: No results for vehicle, trying custom.vehicle...');
-        nodes = await fetchPages("custom.vehicle");
-        console.log('YMM: Found', nodes.length, 'vehicles with type "custom.vehicle"');
+  const loadVehicles = async () => {
+    try {
+      const cached = readCache();
+      if (cached && cached.length) {
+        buildIndex(cached);
+        return;
       }
 
+      const nodes = await fetchVehicleNodes();
       if (nodes.length === 0) {
         setStatus('No vehicles found. Check Metaobject definitions & Storefront visibility.');
         console.error('YMM: No vehicles found with either type. Check Storefront API access on metaobject definition.');
         return;
       }
-
-      console.log('YMM: Total vehicles loaded:', nodes.length);
-      console.log('YMM: Sample vehicle:', nodes[0]);
-      
       buildIndex(nodes);
-      
-      // Auto-hide success message after 3s
+      writeCache(nodes);
       setTimeout(() => setStatus(''), 3000);
-
     } catch (e) {
       console.error(e);
       setStatus(`Error: ${e.message}`);

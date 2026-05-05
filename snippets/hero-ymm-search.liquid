@@ -11,29 +11,53 @@
     font-family: 'JetBrains Mono', monospace;
   }
   
+  /* Mobile: stacked layout */
   .modal-ymm-grid {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 1.5rem;
-    align-items: end;
-  }
-  
-  @media (max-width: 768px) {
-    .modal-ymm-grid {
-      grid-template-columns: 1fr;
-    }
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
   }
   
   .modal-ymm-fields {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 1rem;
-    align-items: flex-end;
   }
   
   .modal-ymm-field {
-    flex: 1;
-    min-width: 140px;
+    min-width: 0;
+  }
+  
+  .modal-ymm-button-container {
+    width: 100%;
+  }
+  
+  /* Desktop: fields left, button always right */
+  @media (min-width: 769px) {
+    .modal-ymm-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 1.5rem;
+      align-items: end;
+    }
+    
+    .modal-ymm-fields {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 1rem;
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .modal-ymm-field {
+      flex: 1;
+      min-width: 120px;
+    }
+    
+    .modal-ymm-button-container {
+      width: auto;
+      flex-shrink: 0;
+    }
   }
   
   .modal-ymm-label {
@@ -146,9 +170,9 @@
       </div>
     </div>
 
-    {%- comment -%} SEARCH BUTTON {%- endcomment -%}
-    <div>
-      <button type="button" data-role="ymm-submit" class="modal-ymm-button">
+    {%- comment -%} SEARCH BUTTON - Always on right on desktop {%- endcomment -%}
+    <div class="modal-ymm-button-container">
+      <button type="button" data-role="ymm-submit" class="modal-ymm-button w-full">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/>
           <path d="M21 21l-4.35-4.35"/>

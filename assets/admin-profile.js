@@ -52,7 +52,7 @@
                 favicon.href = data.logo;
             }
         } catch (e) {
-            console.log('Favicon load skipped:', e.message);
+            // console.log('Favicon load skipped:', e.message);
         }
     }
 

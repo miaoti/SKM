@@ -96,12 +96,15 @@
   }
 </style>
 
-<div class="w-full bg-black min-h-screen text-white overflow-x-hidden font-tech-mono selection:bg-[#CC0000] selection:text-white" style="width: 100vw; margin-left: calc(50% - 50vw);">
+<div class="w-full bg-black min-h-screen text-white overflow-x-hidden font-tech-mono selection:bg-[#CC0000] selection:text-white" style="width: 100vw; position: relative; left: 50%; transform: translateX(-50%);">
 
   <!-- =========================================
        1. HERO SECTION: "The Proving Ground"
   ========================================== -->
-  <div class="relative w-full h-[60vh] flex items-center justify-center overflow-hidden bg-carbon-fiber">
+  <!-- =========================================
+       1. HERO SECTION: "The Proving Ground"
+  ========================================== -->
+  <div class="relative w-full min-h-[450px] h-auto flex items-center justify-center overflow-hidden bg-carbon-fiber">
     <!-- Dark Gradient Overlay -->
     <div class="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black z-10 pointer-events-none"></div>
 
@@ -110,7 +113,7 @@
         Systems Support<br>& Engineering
       </h1>
       
-      <p class="text-[#CC0000] text-xs md:text-sm tracking-[0.3em] font-bold mt-4 mb-8">
+      <p class="text-[#CC0000] text-xs md:text-sm tracking-[0.3em] font-bold mt-4 mb-6">
         PRECISION ENGINEERING • GLOBAL LOGISTICS • TECHNICAL SUPPORT
       </p>
 
@@ -319,7 +322,7 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         <!-- Card 1: Logistics -->
-        <a href="/policies/shipping-policy" class="tech-card group block bg-[#111] h-64 relative overflow-hidden flex flex-col justify-between p-8 border border-white/5 no-underline">
+        <a href="/pages/logistics-protocol" class="tech-card group block bg-[#111] h-64 relative overflow-hidden flex flex-col justify-between p-8 border border-white/5 no-underline">
           <div class="absolute top-0 left-0 w-0 h-[2px] bg-[#CC0000] laser-line transition-all duration-300"></div>
           
           <div class="flex justify-between items-start">
@@ -349,7 +352,7 @@
         </a>
 
         <!-- Card 3: Fitment -->
-        <a href="#" class="tech-card group block bg-[#111] h-64 relative overflow-hidden flex flex-col justify-between p-8 border border-white/5 no-underline">
+        <a href="/pages/fitment-database" class="tech-card group block bg-[#111] h-64 relative overflow-hidden flex flex-col justify-between p-8 border border-white/5 no-underline">
           <div class="absolute top-0 left-0 w-0 h-[2px] bg-[#CC0000] laser-line transition-all duration-300"></div>
           
           <div class="flex justify-between items-start">

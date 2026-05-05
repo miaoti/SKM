@@ -47,52 +47,74 @@
 
     <script>
       (function() {
-        const updateLogo = async () => {
+        const CACHE_KEY = 'skm_shop_profile_v1';
+        const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+        const readCache = () => {
+          try {
+            const raw = localStorage.getItem(CACHE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || !parsed.savedAt || !parsed.profile) return null;
+            if (Date.now() - parsed.savedAt > CACHE_TTL_MS) return null;
+            return parsed.profile;
+          } catch (e) { return null; }
+        };
+
+        const writeCache = (profile) => {
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), profile: profile }));
+          } catch (e) { /* quota; ignore */ }
+        };
+
+        const applyLogo = (logoUrl) => {
+          if (!logoUrl) return;
+          const logoLink = document.getElementById('header-logo-link');
+          if (logoLink) {
+            const existingImg = logoLink.querySelector('img');
+            if (!existingImg || existingImg.src !== logoUrl) {
+              const img = document.createElement('img');
+              img.src = logoUrl;
+              img.alt = '{{ shop.name }}';
+              img.style.height = '36px';
+              img.style.width = 'auto';
+              img.style.objectFit = 'contain';
+              logoLink.innerHTML = '';
+              logoLink.appendChild(img);
+            }
+          }
+
+          let favicon = document.querySelector('link[rel="icon"]') || document.querySelector('link[rel="shortcut icon"]');
+          if (!favicon) {
+            favicon = document.createElement('link');
+            favicon.rel = 'icon';
+            document.head.appendChild(favicon);
+          }
+          if (favicon.href !== logoUrl) favicon.href = logoUrl;
+
+          const appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]');
+          if (appleTouchIcon && appleTouchIcon.href !== logoUrl) appleTouchIcon.href = logoUrl;
+        };
+
+        // Apply cached logo synchronously — no flicker on repeat visits.
+        const cached = readCache();
+        if (cached && cached.logo) applyLogo(cached.logo);
+
+        // Refresh in the background; update only if the URL changed.
+        const refresh = async () => {
           try {
             const res = await fetch('https://skm-inventory-api.miaotingshuo.workers.dev/shop/profile');
             if (!res.ok) return;
             const data = await res.json();
-            
-            if (data.logo && data.logo.trim() !== '') {
-              // Update header logo
-              const logoLink = document.getElementById('header-logo-link');
-              if (logoLink) {
-                const img = document.createElement('img');
-                img.src = data.logo;
-                img.alt = '{{ shop.name }}';
-                img.style.height = '36px';
-                img.style.width = 'auto';
-                img.style.objectFit = 'contain';
-                
-                logoLink.innerHTML = '';
-                logoLink.appendChild(img);
-              }
-              
-              // Update favicon (browser tab icon)
-              let favicon = document.querySelector('link[rel="icon"]') || document.querySelector('link[rel="shortcut icon"]');
-              if (!favicon) {
-                favicon = document.createElement('link');
-                favicon.rel = 'icon';
-                document.head.appendChild(favicon);
-              }
-              favicon.href = data.logo;
-              
-              // Also update apple-touch-icon if exists
-              const appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]');
-              if (appleTouchIcon) {
-                appleTouchIcon.href = data.logo;
-              }
+            writeCache(data);
+            if (data.logo && data.logo.trim() !== '' && (!cached || cached.logo !== data.logo)) {
+              applyLogo(data.logo);
             }
           } catch (e) {
             console.error('Logo update failed:', e);
           }
         };
-
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', updateLogo);
-        } else {
-          updateLogo();
-        }
+        refresh();
       })();
     </script>
 
@@ -155,7 +177,6 @@
       {% if customer %}
         <!-- DEBUG TAGS: {{ customer.tags | join: ',' }} -->
         <script>
-          console.log("Customer Tags:", {{ customer.tags | json }});
         </script>
         
         {% assign is_b2b = false %}
@@ -190,7 +211,7 @@
               </div>
               <a href="/account" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#CC0000] rounded-sm">My Profile</a>
               <a href="/account/addresses" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#CC0000] rounded-sm">Addresses</a>
-              <a href="{{ routes.account_logout_url }}?return_url={{ routes.account_login_url }}?logged_out=true" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#CC0000] border-t border-gray-50 mt-2 pt-2 rounded-sm">Sign out</a>
+              <a href="{{ routes.account_logout_url }}?return_url={{ routes.account_login_url | append: '?logged_out=true' | url_encode }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#CC0000] border-t border-gray-50 mt-2 pt-2 rounded-sm">Sign out</a>
           </div>
         </details>
       {% else %}
@@ -278,92 +299,116 @@
     window.location.href = '/collections/all';
   };
   
-  const loadCategories = async () => {
+  const CATEGORIES_TTL_MS = 24 * 60 * 60 * 1000;
+  const cacheKeyFor = (vehicleId) => `skm_categories_v1_${vehicleId || 'none'}`;
+
+  const readCategoriesCache = (vehicleId) => {
     try {
-      const vehicle = getVehicle();
-      const vehicleBadge = document.getElementById('vehicle-badge');
-      const vehicleName = document.getElementById('vehicle-name');
-      const clearBtn = document.getElementById('btn-clear-vehicle');
-      const isCollectionPage = window.location.pathname.includes('/collections/');
-      
-      // Show/hide vehicle badge (BUT hide on collection pages where we have the HUD bar)
-      if (vehicle && vehicleBadge) {
-        if (!isCollectionPage) {
-           vehicleBadge.classList.remove('hidden');
-           vehicleBadge.classList.add('flex');
-        } else {
-           vehicleBadge.classList.add('hidden');
-           vehicleBadge.classList.remove('flex');
-        }
-        
-        if (vehicleName) vehicleName.textContent = getVehicleName(vehicle);
-        if (clearBtn) clearBtn.addEventListener('click', clearVehicle);
+      const raw = localStorage.getItem(cacheKeyFor(vehicleId));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.savedAt || !parsed.data) return null;
+      if (Date.now() - parsed.savedAt > CATEGORIES_TTL_MS) return null;
+      return parsed.data;
+    } catch (e) { return null; }
+  };
+
+  const writeCategoriesCache = (vehicleId, data) => {
+    try {
+      localStorage.setItem(cacheKeyFor(vehicleId), JSON.stringify({ savedAt: Date.now(), data: data }));
+    } catch (e) { /* quota; ignore */ }
+  };
+
+  const renderCategories = (data, vehicle) => {
+    const container = document.getElementById('category-links');
+    if (!container) return;
+
+    if (!data || !data.data || data.data.length === 0) {
+      container.innerHTML = vehicle
+        ? '<span class="text-xs font-semibold text-[#CC0000] bg-red-500/10 px-3 py-1 rounded-full border border-red-500/30 no-parts-pulse">⚠ No category parts for this vehicle</span>'
+        : '<a href="/collections/all" class="category-link">All Products</a>';
+      return;
+    }
+
+    let html = '';
+    if (vehicle && vehicle.id) {
+      const vehicleFilter = `filter.p.m.custom.fits_vehicles=${encodeURIComponent(vehicle.id)}`;
+      html += `<a href="/collections/all?${vehicleFilter}" class="category-link active">All</a>`;
+      data.data.forEach(cat => {
+        const url = `/collections/all?${vehicleFilter}&type=${encodeURIComponent(cat.name)}`;
+        html += `<a href="${url}" class="category-link" data-type="${cat.name}">${cat.name} <span class="text-[9px] opacity-60">(${cat.count})</span></a>`;
+      });
+    } else {
+      html += '<a href="/collections/all" class="category-link active">All</a>';
+      data.data.forEach(cat => {
+        const url = `/collections/all?type=${encodeURIComponent(cat.name)}`;
+        html += `<a href="${url}" class="category-link" data-type="${cat.name}">${cat.name} <span class="text-[9px] opacity-60">(${cat.count})</span></a>`;
+      });
+    }
+
+    container.innerHTML = html;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const activeType = urlParams.get('type');
+    if (activeType) {
+      container.querySelectorAll('.category-link').forEach(link => {
+        link.classList.remove('active');
+        if (link.dataset.type === activeType) link.classList.add('active');
+      });
+    }
+  };
+
+  const updateVehicleBadge = (vehicle) => {
+    const vehicleBadge = document.getElementById('vehicle-badge');
+    const vehicleName = document.getElementById('vehicle-name');
+    const clearBtn = document.getElementById('btn-clear-vehicle');
+    const isCollectionPage = window.location.pathname.includes('/collections/');
+
+    if (vehicle && vehicleBadge) {
+      if (!isCollectionPage) {
+        vehicleBadge.classList.remove('hidden');
+        vehicleBadge.classList.add('flex');
+      } else {
+        vehicleBadge.classList.add('hidden');
+        vehicleBadge.classList.remove('flex');
       }
-      
-      // Build API URL with optional vehicleId
+      if (vehicleName) vehicleName.textContent = getVehicleName(vehicle);
+      if (clearBtn) clearBtn.addEventListener('click', clearVehicle);
+    }
+  };
+
+  const loadCategories = async () => {
+    const vehicle = getVehicle();
+    const vehicleId = vehicle && vehicle.id ? vehicle.id : '';
+
+    updateVehicleBadge(vehicle);
+
+    // 1. Render synchronously from cache if fresh — no "Loading…" placeholder.
+    const cached = readCategoriesCache(vehicleId);
+    if (cached) renderCategories(cached, vehicle);
+
+    // 2. Fetch fresh in the background. Re-render only if the payload differs
+    //    so we don't churn DOM on every visit when nothing changed.
+    try {
       let apiUrl = `${API_BASE}/categories`;
-      if (vehicle && vehicle.id) {
-        apiUrl += `?vehicleId=${encodeURIComponent(vehicle.id)}`;
-      }
-      
+      if (vehicleId) apiUrl += `?vehicleId=${encodeURIComponent(vehicleId)}`;
       const res = await fetch(apiUrl);
       if (!res.ok) return;
       const data = await res.json();
-      
-      const container = document.getElementById('category-links');
-      if (!container) return;
-      
-      if (!data.data || data.data.length === 0) {
-        container.innerHTML = vehicle 
-          ? '<span class="text-xs font-semibold text-[#CC0000] bg-red-500/10 px-3 py-1 rounded-full border border-red-500/30 no-parts-pulse">⚠ No category parts for this vehicle</span>'
-          : '<a href="/collections/all" class="category-link">All Products</a>';
-        return;
-      }
-      
-      // Build category links - use clean ?type= parameter for client-side filtering
-      let html = '';
-      
-      if (vehicle && vehicle.id) {
-        // With vehicle: combine vehicle filter AND type parameter
-        const vehicleFilter = `filter.p.m.custom.fits_vehicles=${encodeURIComponent(vehicle.id)}`;
-        html += `<a href="/collections/all?${vehicleFilter}" class="category-link active">All</a>`;
-        data.data.forEach(cat => {
-          // Combine vehicle filter with type parameter
-          const url = `/collections/all?${vehicleFilter}&type=${encodeURIComponent(cat.name)}`;
-          html += `<a href="${url}" class="category-link" data-type="${cat.name}">${cat.name} <span class="text-[9px] opacity-60">(${cat.count})</span></a>`;
-        });
-      } else {
-        // Without vehicle: just filter by type
-        html += '<a href="/collections/all" class="category-link active">All</a>';
-        data.data.forEach(cat => {
-          const url = `/collections/all?type=${encodeURIComponent(cat.name)}`;
-          html += `<a href="${url}" class="category-link" data-type="${cat.name}">${cat.name} <span class="text-[9px] opacity-60">(${cat.count})</span></a>`;
-        });
-      }
-      
-      container.innerHTML = html;
-      
-      // Highlight active category based on ?type= parameter
-      const urlParams = new URLSearchParams(window.location.search);
-      const activeType = urlParams.get('type');
-      if (activeType) {
-        container.querySelectorAll('.category-link').forEach(link => {
-          link.classList.remove('active');
-          if (link.dataset.type === activeType) {
-            link.classList.add('active');
-          }
-        });
+      writeCategoriesCache(vehicleId, data);
+      if (!cached || JSON.stringify(cached) !== JSON.stringify(data)) {
+        renderCategories(data, vehicle);
       }
     } catch (e) {
       console.error('Failed to load categories:', e);
     }
   };
 
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', loadCategories);
-    } else {
-      loadCategories();
-    }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadCategories);
+  } else {
+    loadCategories();
+  }
   })();
 
   // Catalog Hover Logic for Category Nav
@@ -570,6 +615,325 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
   }
+
+  /* ========================================
+     SEARCH DRAWER (HUD command palette)
+     ======================================== */
+  .search-drawer {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    color: #fff;
+    overflow: visible;
+  }
+
+  .search-drawer::backdrop {
+    background: rgba(5, 5, 5, 0.78);
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
+  }
+
+  .search-drawer[open] {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: clamp(12px, 8vh, 96px) 16px 16px;
+  }
+
+  .search-drawer__panel {
+    position: relative;
+    width: 100%;
+    max-width: 720px;
+    background: linear-gradient(180deg, #0d0d0d 0%, #050505 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 30px 80px -20px rgba(0, 0, 0, 0.9),
+      0 0 0 1px rgba(204, 0, 0, 0.06) inset,
+      0 0 60px -10px rgba(204, 0, 0, 0.2);
+    animation: searchDrawerIn 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  @keyframes searchDrawerIn {
+    from { opacity: 0; transform: translateY(-12px) scale(0.985); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* Corner brackets */
+  .search-drawer__corner {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    pointer-events: none;
+  }
+  .search-drawer__corner--tl { top: -1px; left: -1px; border-top: 1.5px solid #CC0000; border-left: 1.5px solid #CC0000; }
+  .search-drawer__corner--tr { top: -1px; right: -1px; border-top: 1.5px solid #CC0000; border-right: 1.5px solid #CC0000; }
+  .search-drawer__corner--bl { bottom: -1px; left: -1px; border-bottom: 1.5px solid #CC0000; border-left: 1.5px solid #CC0000; }
+  .search-drawer__corner--br { bottom: -1px; right: -1px; border-bottom: 1.5px solid #CC0000; border-right: 1.5px solid #CC0000; }
+
+  /* Header strip */
+  .search-drawer__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
+  }
+
+  .search-drawer__header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .search-drawer__indicator {
+    width: 7px;
+    height: 7px;
+    background: #CC0000;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(204, 0, 0, 0.7);
+    animation: pulse 1.6s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+
+  .search-drawer__heading {
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .search-drawer__heading-meta {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.35);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 540px) {
+    .search-drawer__heading-meta { display: none; }
+  }
+
+  .search-drawer__close {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.6);
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all 160ms ease;
+    font-family: inherit;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+  .search-drawer__close:hover {
+    color: #fff;
+    border-color: #CC0000;
+    background: rgba(204, 0, 0, 0.12);
+  }
+
+  .search-drawer__close-kbd {
+    font-family: inherit;
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.45);
+    letter-spacing: 0.1em;
+  }
+  .search-drawer__close:hover .search-drawer__close-kbd { color: #fff; }
+
+  /* Predictive-search wrapper just collapses to its children — keep layout clean. */
+  .search-drawer__predictive {
+    display: block;
+  }
+  .search-drawer__form {
+    display: block;
+  }
+
+  /* Input row */
+  .search-drawer__input-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    transition: border-color 200ms ease;
+  }
+  .search-drawer__input-row:focus-within {
+    border-bottom-color: rgba(204, 0, 0, 0.6);
+  }
+
+  .search-drawer__lens {
+    width: 18px;
+    height: 18px;
+    color: #CC0000;
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+
+  .search-drawer__input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #fff;
+    font-family: inherit;
+    font-size: 17px;
+    letter-spacing: 0.01em;
+    padding: 4px 0;
+    min-width: 0;
+  }
+  .search-drawer__input::placeholder {
+    color: rgba(255, 255, 255, 0.28);
+    font-weight: 400;
+  }
+  .search-drawer__input::-webkit-search-cancel-button { display: none; }
+
+  .search-drawer__clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 160ms ease;
+  }
+  .search-drawer__clear:hover {
+    color: #fff;
+    background: rgba(204, 0, 0, 0.18);
+    border-color: rgba(204, 0, 0, 0.5);
+  }
+
+  /* Suggestion chips */
+  .search-drawer__chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .search-drawer__chips[hidden] { display: none; }
+
+  .search-drawer__chip-label {
+    font-size: 9px;
+    color: #CC0000;
+    letter-spacing: 0.18em;
+    margin-right: 4px;
+    font-weight: 600;
+  }
+
+  .search-drawer__chip {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.78);
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding: 5px 11px;
+    cursor: pointer;
+    transition: all 160ms ease;
+  }
+  .search-drawer__chip:hover {
+    color: #fff;
+    background: rgba(204, 0, 0, 0.12);
+    border-color: rgba(204, 0, 0, 0.5);
+    transform: translateY(-1px);
+  }
+
+  /* Predictive results container — Shopify renders into this. */
+  .search-drawer__results {
+    max-height: min(60vh, 540px);
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.01);
+  }
+  .search-drawer__results:empty {
+    display: none;
+  }
+  .search-drawer__results::-webkit-scrollbar { width: 8px; }
+  .search-drawer__results::-webkit-scrollbar-track { background: transparent; }
+  .search-drawer__results::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+  }
+  .search-drawer__results::-webkit-scrollbar-thumb:hover {
+    background: rgba(204, 0, 0, 0.4);
+  }
+
+  /* Soft-style overrides so Shopify's predictive-search markup blends in */
+  .search-drawer__results a,
+  .search-drawer__results [role="option"] {
+    color: rgba(255, 255, 255, 0.85);
+  }
+  .search-drawer__results a:hover,
+  .search-drawer__results [role="option"]:hover,
+  .search-drawer__results [aria-selected="true"] {
+    background: rgba(204, 0, 0, 0.08);
+    color: #fff;
+  }
+
+  /* Status line */
+  .search-drawer__status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.4);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+  }
+  .search-drawer__status-dot {
+    width: 6px;
+    height: 6px;
+    background: #22c55e;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+  }
+  .search-drawer__status-text { color: rgba(255, 255, 255, 0.7); }
+  .search-drawer__status-spacer { flex: 1; }
+  .search-drawer__status-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(255, 255, 255, 0.45);
+    text-transform: none;
+    letter-spacing: 0.04em;
+  }
+  .search-drawer__status-hint kbd {
+    font-family: inherit;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  @media (max-width: 540px) {
+    .search-drawer__input { font-size: 16px; } /* avoid iOS zoom */
+    .search-drawer__chips { padding: 12px 16px; }
+    .search-drawer__input-row { padding: 14px 16px; }
+    .search-drawer__status-hint { display: none; }
+  }
 </style>
 
 <!-- Mobile Menu Drawer -->
@@ -638,7 +1002,7 @@
           <a href="/account" class="flex items-center justify-center w-full h-14 bg-[#111111] text-white font-bold uppercase tracking-widest hover:bg-[#CC0000] transition-colors shadow-lg mb-3">
             My Garage
           </a>
-          <a href="{{ routes.account_logout_url }}?return_url={{ routes.account_login_url }}?logged_out=true" class="flex items-center justify-center w-full h-12 border border-gray-200 text-gray-500 font-bold uppercase tracking-widest hover:text-[#111111] hover:border-[#111111] transition-colors">
+          <a href="{{ routes.account_logout_url }}?return_url={{ routes.account_login_url | append: '?logged_out=true' | url_encode }}" class="flex items-center justify-center w-full h-12 border border-gray-200 text-gray-500 font-bold uppercase tracking-widest hover:text-[#111111] hover:border-[#111111] transition-colors">
             Sign Out
           </a>
         {% else %}
@@ -651,41 +1015,150 @@
   </div>
 </dialog>
 
-<!-- Search Drawer -->
-<dialog id="search-drawer" class="fixed inset-0 w-[100vw] bg-transparent z-[3000] p-0 m-0 backdrop:bg-black/60 open:animate-slide-down overflow-hidden">
-  <div class="fixed top-0 left-0 right-0 w-[100vw] bg-white px-0 py-6 shadow-md">
-     <div class="w-[100vw] box-border flex items-center justify-between gap-4 border-b-2 border-gray-200 focus-within:border-[#CC0000] transition-colors pb-4">
-       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-gray-400">
-         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-       </svg>
-       <predictive-search class="flex-1">
-          <form action="{{ routes.search_url }}" method="get" role="search">
-             <input 
-               id="Search-In-Modal"
-               type="search"
-               name="q"
-               value=""
-               placeholder="SEARCH PARTS (e.g. Mustang GT Exhaust)"
-               class="w-full text-2xl font-bold uppercase tracking-wide placeholder-gray-300 outline-none text-[#111111]"
-               role="combobox"
-               aria-expanded="false"
-               aria-owns="predictive-search-results"
-               aria-controls="predictive-search-results"
-               aria-haspopup="listbox"
-               aria-autocomplete="list"
-            >
-            <input name="options[prefix]" type="hidden" value="last">
-            <div id="predictive-search" tabindex="-1"></div>
-          </form>
-       </predictive-search>
-       <button onclick="document.getElementById('search-drawer').close()" class="text-gray-400 hover:text-[#CC0000]">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+<!-- Search Drawer (HUD-styled command palette) -->
+<dialog id="search-drawer" class="search-drawer" aria-label="Search">
+  <div class="search-drawer__panel">
+    <!-- Corner brackets — match VEHICLE IDENTIFICATION SYSTEM modal -->
+    <span class="search-drawer__corner search-drawer__corner--tl" aria-hidden="true"></span>
+    <span class="search-drawer__corner search-drawer__corner--tr" aria-hidden="true"></span>
+    <span class="search-drawer__corner search-drawer__corner--bl" aria-hidden="true"></span>
+    <span class="search-drawer__corner search-drawer__corner--br" aria-hidden="true"></span>
+
+    <!-- Header strip -->
+    <div class="search-drawer__header">
+      <div class="search-drawer__header-left">
+        <span class="search-drawer__indicator" aria-hidden="true"></span>
+        <span class="search-drawer__heading">SEARCH SYSTEM</span>
+        <span class="search-drawer__heading-meta">// COMPONENT LOOKUP</span>
+      </div>
+      <button type="button" class="search-drawer__close" onclick="document.getElementById('search-drawer').close()" aria-label="Close search">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        <span class="search-drawer__close-kbd">ESC</span>
+      </button>
+    </div>
+
+    <!-- Input row -->
+    <predictive-search class="search-drawer__predictive">
+      <form action="{{ routes.search_url }}" method="get" role="search" class="search-drawer__form">
+        <div class="search-drawer__input-row">
+          <svg class="search-drawer__lens" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"></circle>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"></path>
           </svg>
-        </button>
-     </div>
+          <input
+            id="Search-In-Modal"
+            type="search"
+            name="q"
+            value=""
+            placeholder="Search parts, vehicles, or part numbers..."
+            class="search-drawer__input"
+            autocomplete="off"
+            spellcheck="false"
+            role="combobox"
+            aria-expanded="false"
+            aria-owns="predictive-search-results"
+            aria-controls="predictive-search-results"
+            aria-haspopup="listbox"
+            aria-autocomplete="list"
+          >
+          <button type="reset" class="search-drawer__clear" aria-label="Clear search" hidden>
+            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <input name="options[prefix]" type="hidden" value="last">
+
+        <!-- Suggestion chips (visible until the user types) -->
+        <div class="search-drawer__chips" data-search-suggestions>
+          <span class="search-drawer__chip-label">TRY</span>
+          <button type="button" class="search-drawer__chip" data-suggest="exhaust">Exhaust</button>
+          <button type="button" class="search-drawer__chip" data-suggest="intake">Intake</button>
+          <button type="button" class="search-drawer__chip" data-suggest="brake kit">Brake kit</button>
+          <button type="button" class="search-drawer__chip" data-suggest="suspension">Suspension</button>
+          <button type="button" class="search-drawer__chip" data-suggest="turbo">Turbo</button>
+        </div>
+
+        <!-- Predictive results land here -->
+        <div id="predictive-search" tabindex="-1" class="search-drawer__results"></div>
+
+        <!-- Status line -->
+        <div class="search-drawer__status">
+          <span class="search-drawer__status-dot"></span>
+          <span class="search-drawer__status-text">READY</span>
+          <span class="search-drawer__status-spacer"></span>
+          <span class="search-drawer__status-hint"><kbd>↵</kbd> to view all results</span>
+        </div>
+      </form>
+    </predictive-search>
   </div>
 </dialog>
+
+<script>
+  (function () {
+    const dialog = document.getElementById('search-drawer');
+    if (!dialog) return;
+    const input = dialog.querySelector('#Search-In-Modal');
+    const clearBtn = dialog.querySelector('.search-drawer__clear');
+    const chipsContainer = dialog.querySelector('[data-search-suggestions]');
+    const statusText = dialog.querySelector('.search-drawer__status-text');
+
+    const setEmptyState = (isEmpty) => {
+      if (chipsContainer) chipsContainer.hidden = !isEmpty;
+      if (clearBtn) clearBtn.hidden = isEmpty;
+      if (statusText) statusText.textContent = isEmpty ? 'READY' : 'SEARCHING';
+    };
+
+    // <dialog> has no "open" event, so observe the open attribute.
+    new MutationObserver(() => {
+      if (!dialog.open) return;
+      if (input) {
+        requestAnimationFrame(() => {
+          input.focus();
+          input.select();
+        });
+        setEmptyState(!input.value);
+      }
+    }).observe(dialog, { attributes: true, attributeFilter: ['open'] });
+
+    // Track input state to swap chips/clear button.
+    if (input) {
+      input.addEventListener('input', () => setEmptyState(!input.value));
+    }
+
+    // Reset state when the dialog closes (so re-opening shows chips again).
+    dialog.addEventListener('close', () => {
+      if (input && !input.value) setEmptyState(true);
+    });
+
+    // Clear button resets and refocuses.
+    if (clearBtn && input) {
+      clearBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        input.value = '';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.focus();
+      });
+    }
+
+    // Suggestion chips populate the input and trigger predictive search.
+    if (chipsContainer && input) {
+      chipsContainer.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-suggest]');
+        if (!target) return;
+        e.preventDefault();
+        input.value = target.dataset.suggest;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.focus();
+      });
+    }
+
+    // Set initial empty state on first paint.
+    setEmptyState(true);
+  })();
+</script>
 
 {% schema %}
 {

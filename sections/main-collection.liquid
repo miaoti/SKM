@@ -48,33 +48,34 @@
 </div>
 
 <script>
-  // Display current vehicle from localStorage and handle clear button
+  // The auto-filter redirect lives in theme.liquid <head> so it runs before paint.
+  // This block only handles the visible UI: showing the selected vehicle in the HUD bar
+  // and wiring up the clear button.
   document.addEventListener('DOMContentLoaded', function() {
     const VEHICLE_KEY = 'skm_garage_vehicle';
     const vehicleData = localStorage.getItem(VEHICLE_KEY);
     const display = document.getElementById('current-vehicle-display');
     const clearBtn = document.getElementById('btn-clear-vehicle-collection');
-    
+
     if (vehicleData) {
       try {
         const v = JSON.parse(vehicleData);
         if (display && v.year && v.make && v.model) {
           display.textContent = `${v.year} ${v.make} ${v.model}${v.submodel ? ' ' + v.submodel : ''}`;
           display.classList.add('collection-hud-vehicle--active');
-          
-          // Show the clear button
-          if (clearBtn) {
-            clearBtn.classList.remove('hidden');
-          }
+          if (clearBtn) clearBtn.classList.remove('hidden');
         }
-      } catch(e) {}
+      } catch (e) {
+        console.error('[YMM] Error parsing vehicle data:', e);
+      }
     }
-    
-    // Clear vehicle button handler
+
     if (clearBtn) {
       clearBtn.addEventListener('click', function() {
         localStorage.removeItem(VEHICLE_KEY);
-        window.location.href = '/collections/all';
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('filter.p.m.custom.fits_vehicles');
+        window.location.href = newUrl.toString();
       });
     }
   });
@@ -183,6 +184,11 @@
           const hasYmmParam = urlParams.has('filter.p.m.custom.fits_vehicles');
           const isActive = document.getElementById('ymm-filter-status').dataset.active === 'true';
           const productCount = parseInt(document.getElementById('ymm-filter-status').dataset.count || '0');
+          
+          console.log('[YMM Debug] URL Params:', window.location.search);
+          console.log('[YMM Debug] Has YMM Param:', hasYmmParam);
+          console.log('[YMM Debug] Filter Is Active (Liquid):', isActive);
+          console.log('[YMM Debug] Product Count:', productCount);
           
           // Product Type Filtering
           const typeParam = urlParams.get('type');

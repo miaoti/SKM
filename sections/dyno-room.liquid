@@ -192,9 +192,7 @@
 
   function enableFallbackMode() {
       if (isFallbackMode) return;
-      isFallbackMode = true;
-      console.log("Enabling audio fallback mode (Visualizer simulated)");
-      
+      isFallbackMode = true;      
       const audioPlayer = document.getElementById('audio-player-' + sectionId);
       if (audioPlayer) {
           // Remove crossorigin to allow non-CORS playback

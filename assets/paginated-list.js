@@ -310,46 +310,57 @@ export default class PaginatedList extends Component {
     this.#resolveNextPagePromise = null;
     this.#resolvePreviousPagePromise = null;
 
-    // Store the current lastPage value to detect when it changes
+    // Disconnect any prior pending filter-update observer so rapid filter
+    // changes don't leak observers.
+    if (this.#filterUpdateObserver) {
+      this.#filterUpdateObserver.disconnect();
+      this.#filterUpdateObserver = null;
+    }
+    if (this.#filterUpdateTimeout) {
+      clearTimeout(this.#filterUpdateTimeout);
+      this.#filterUpdateTimeout = null;
+    }
+
     const currentLastPage = this.refs.grid?.dataset.lastPage;
 
-    // We need to wait for the DOM to be updated with the new filtered content
-    // Using mutation observer to detect when the grid actually updates
-    const observer = new MutationObserver(() => {
-      // Check if data-last-page changed
-      const newLastPage = this.refs.grid?.dataset.lastPage;
-
-      if (newLastPage !== currentLastPage) {
-        observer.disconnect();
-
-        // Check if component is still connected
-        if (!this.isConnected) {
-          return;
-        }
-
-        // Now the DOM has been updated with the new filtered content
-        this.#observeViewMore();
-
-        // Fetch the next page
-        this.#fetchPage('next');
+    const finalize = () => {
+      if (this.#filterUpdateObserver) {
+        this.#filterUpdateObserver.disconnect();
+        this.#filterUpdateObserver = null;
       }
+      if (this.#filterUpdateTimeout) {
+        clearTimeout(this.#filterUpdateTimeout);
+        this.#filterUpdateTimeout = null;
+      }
+      if (!this.isConnected) return;
+      // Re-establish view-more observation. If data hasn't actually changed
+      // (timeout fallback), this is a no-op for the user; if it did, we now
+      // pick up the new last-page boundary.
+      this.#observeViewMore();
+      this.#fetchPage('next');
+    };
+
+    this.#filterUpdateObserver = new MutationObserver(() => {
+      const newLastPage = this.refs.grid?.dataset.lastPage;
+      if (newLastPage !== currentLastPage) finalize();
     });
 
-    // Observe the grid for changes
     const { grid } = this.refs;
     if (grid) {
-      observer.observe(grid, {
+      this.#filterUpdateObserver.observe(grid, {
         attributes: true,
         attributeFilter: ['data-last-page'],
-        childList: true, // Also watch for child changes in case the whole grid is replaced
+        childList: true,
       });
 
-      // Set a timeout as a fallback in case the mutation never fires
-      setTimeout(() => {
-        if (observer) {
-          observer.disconnect();
-        }
-      }, 3000);
+      // Fallback: re-establish pagination even if the mutation never fires
+      // (slow filter response, empty result set, etc.). 10s is generous;
+      // the previous 3s + silent disconnect was the bug that stranded
+      // infinite-scroll after filter changes.
+      this.#filterUpdateTimeout = setTimeout(finalize, 10000);
     }
   };
+
+  #filterUpdateObserver = null;
+  #filterUpdateTimeout = null;
 }

@@ -135,10 +135,6 @@
       
       if (result.success && result.data.checkoutUrl) {
         // Log debug info
-        console.log('[B2B Checkout] Draft order created:', result.data);
-        console.log('[B2B Checkout] Price debug:', result.data.priceDebug);
-        console.log('[B2B Checkout] Line items:', result.data.lineItems);
-        console.log('[B2B Checkout] Total:', result.data.total);
         
         // Clear the cart before redirecting
         await fetch('/cart/clear.js', { method: 'POST' });
@@ -147,7 +143,6 @@
         const customerId = {{ customer.id | json }};
         if (customerId) {
           localStorage.removeItem('skm_customer_cart_' + customerId);
-          console.log('[B2B Checkout] Cleared saved cart from localStorage');
         }
         
         // Set a flag to indicate checkout was initiated (for post-checkout cleanup)

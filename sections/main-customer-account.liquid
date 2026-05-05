@@ -11,7 +11,7 @@
       </p>
     </div>
     <div class="mt-4 md:mt-0 flex gap-4">
-      <a href="{{ routes.account_logout_url }}?return_url={{ routes.account_login_url }}?logged_out=true" class="h-10 px-6 border border-gray-200 flex items-center justify-center text-xs font-bold uppercase tracking-wider hover:border-[#CC0000] hover:text-[#CC0000] transition-colors">
+      <a href="{{ routes.account_logout_url }}?return_url={{ routes.account_login_url | append: '?logged_out=true' | url_encode }}" class="h-10 px-6 border border-gray-200 flex items-center justify-center text-xs font-bold uppercase tracking-wider hover:border-[#CC0000] hover:text-[#CC0000] transition-colors">
         Log Out
       </a>
     </div>
@@ -33,15 +33,13 @@
         <div class="space-y-4 mb-6">
             <div>
               <p class="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Identity</p>
-              <p class="text-lg font-bold text-[#111111] tracking-tight">{{ customer.name }}</p>
+              <p class="text-lg font-bold text-[#111111] tracking-tight" data-profile-name>{{ customer.name }}</p>
             </div>
-            
+
             <div>
                <p class="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Communication</p>
-               <p class="text-sm font-mono text-gray-600">{{ customer.email }}</p>
-               {% if customer.phone %}
-                 <p class="text-sm font-mono text-gray-600 mt-1">{{ customer.phone }}</p>
-               {% endif %}
+               <p class="text-sm font-mono text-gray-600" data-profile-email>{{ customer.email }}</p>
+               <p class="text-sm font-mono text-gray-600 mt-1{% unless customer.phone %} hidden{% endunless %}" data-profile-phone>{{ customer.phone }}</p>
             </div>
 
             <div>
@@ -697,13 +695,44 @@
         throw new Error(errorData.error || 'Calibration Failed');
       }
 
-      // Success
+      // Success — patch visible fields in place rather than reloading.
       btn.textContent = 'SUCCESS';
       btn.classList.replace('bg-[#111111]', 'bg-green-600');
-      
+
+      const fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim();
+      const nameEl = document.querySelector('[data-profile-name]');
+      if (nameEl && fullName) nameEl.textContent = fullName;
+
+      const emailEl = document.querySelector('[data-profile-email]');
+      if (emailEl && data.email) emailEl.textContent = data.email;
+
+      const phoneEl = document.querySelector('[data-profile-phone]');
+      if (phoneEl) {
+        if (data.phone) {
+          phoneEl.textContent = data.phone;
+          phoneEl.classList.remove('hidden');
+        } else {
+          phoneEl.textContent = '';
+          phoneEl.classList.add('hidden');
+        }
+      }
+
+      // Update form defaults so a re-open shows the new values
+      const fnInput = form.querySelector('input[name="first_name"]');
+      const lnInput = form.querySelector('input[name="last_name"]');
+      const emInput = form.querySelector('input[name="email"]');
+      const phInput = form.querySelector('input[name="phone"]');
+      if (fnInput) fnInput.defaultValue = data.firstName || '';
+      if (lnInput) lnInput.defaultValue = data.lastName || '';
+      if (emInput) emInput.defaultValue = data.email || '';
+      if (phInput) phInput.defaultValue = data.phone || '';
+
       setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+        closeEditProfile();
+        btn.disabled = false;
+        btn.textContent = 'UPDATE PROFILE';
+        btn.classList.replace('bg-green-600', 'bg-[#111111]');
+      }, 800);
       
     } catch (err) {
       console.error(err);

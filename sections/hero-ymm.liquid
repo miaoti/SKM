@@ -1,5 +1,64 @@
 {{ 'ymm.css' | asset_url | stylesheet_tag }}
 
+<style>
+  /* YMM Hero Grid Layout - Button always on right (desktop only) */
+  .ymm-hero-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+  }
+  
+  .ymm-hero-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    width: 100%;
+  }
+  
+  .ymm-hero-field {
+    min-width: 0; /* Prevent grid blowout */
+  }
+  
+  .ymm-hero-button {
+    width: 100%;
+  }
+  
+  /* Desktop: Fields on left, Button always on right */
+  @media (min-width: 768px) {
+    .ymm-hero-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 1.5rem;
+      align-items: end;
+    }
+    
+    .ymm-hero-fields {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 1rem;
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .ymm-hero-field {
+      flex: 1;
+      min-width: 120px;
+    }
+    
+    .ymm-hero-field--submodel {
+      /* Submodel field doesn't affect layout when hidden */
+      flex: 1;
+      min-width: 120px;
+    }
+    
+    .ymm-hero-button {
+      width: auto;
+      flex-shrink: 0;
+    }
+  }
+</style>
+
 <div class="hero-ymm-section relative h-screen w-full overflow-hidden" data-section-id="{{ section.id }}">
   {%- comment -%} BACKDROP: Video or Image from Shopify settings {%- endcomment -%}
   {%- if section.settings.video != blank -%}
@@ -60,15 +119,14 @@
           </div>
         </div>
 
-        {%- comment -%} YMM Input Grid - Using inline CSS Grid for button on right {%- endcomment -%}
-        <div class="ymm-search-grid w-full" style="display: grid; grid-template-columns: 1fr auto; gap: 1.5rem; align-items: end;">
+        {%- comment -%} YMM Input Grid - Desktop: Fields + Button on right | Mobile: Stacked {%- endcomment -%}
+        <div class="ymm-hero-grid">
           
-          
-          {%- comment -%} LEFT: Input Fields Group - flex:1 for auto-sizing {%- endcomment -%}
-          <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; flex: 1;">
+          {%- comment -%} Input Fields Container {%- endcomment -%}
+          <div class="ymm-hero-fields">
             
             {%- comment -%} YEAR {%- endcomment -%}
-            <div class="ymm-search-field" style="flex: 1; min-width: 120px;">
+            <div class="ymm-hero-field">
               <label class="hud-mono text-[10px] text-gray-500 block mb-2 tracking-widest">YEAR:</label>
               <div class="relative">
                 <select id="ymm-year-{{ unique_id }}" data-role="ymm-year" class="diagnostic-select w-full">
@@ -78,7 +136,7 @@
             </div>
 
             {%- comment -%} MAKE {%- endcomment -%}
-            <div class="ymm-search-field" style="flex: 1; min-width: 130px;">
+            <div class="ymm-hero-field">
               <label class="hud-mono text-[10px] text-gray-500 block mb-2 tracking-widest">MAKE:</label>
               <div class="relative">
                 <select id="ymm-make-{{ unique_id }}" data-role="ymm-make" disabled class="diagnostic-select w-full">
@@ -88,7 +146,7 @@
             </div>
 
             {%- comment -%} MODEL {%- endcomment -%}
-            <div class="ymm-search-field" style="flex: 1; min-width: 150px;">
+            <div class="ymm-hero-field">
               <label class="hud-mono text-[10px] text-gray-500 block mb-2 tracking-widest">MODEL:</label>
               <div class="relative">
                 <select id="ymm-model-{{ unique_id }}" data-role="ymm-model" disabled class="diagnostic-select w-full">
@@ -98,7 +156,7 @@
             </div>
 
             {%- comment -%} SUBMODEL (Controlled by ymm.js) {%- endcomment -%}
-            <div class="ymm-search-field" data-role="ymm-submodel-container" id="submodel-container-{{ unique_id }}" style="flex: 1; min-width: 130px; display: none;">
+            <div class="ymm-hero-field ymm-hero-field--submodel" data-role="ymm-submodel-container" id="submodel-container-{{ unique_id }}" style="display: none;">
               <label class="hud-mono text-[10px] text-gray-500 block mb-2 tracking-widest">SUBMODEL:</label>
               <div class="relative">
                 <select id="ymm-submodel-{{ unique_id }}" data-role="ymm-submodel" disabled class="diagnostic-select w-full">
@@ -108,9 +166,9 @@
             </div>
           </div>
 
-          {%- comment -%} RIGHT: Search Button (always on right via grid) {%- endcomment -%}
-          <div class="ymm-search-field w-full md:w-auto md:justify-self-end">
-            <button type="button" data-role="ymm-submit" class="group w-full md:w-auto px-8 h-[46px] bg-transparent border-2 border-white/50 text-white font-bold uppercase tracking-widest text-xs hover:bg-[#CC0000] hover:border-[#CC0000] transition-all duration-300 flex items-center justify-center gap-3">
+          {%- comment -%} Search Button - Always on the right on desktop {%- endcomment -%}
+          <div class="ymm-hero-button">
+            <button type="button" data-role="ymm-submit" class="group w-full px-8 h-[46px] bg-transparent border-2 border-white/50 text-white font-bold uppercase tracking-widest text-xs hover:bg-[#CC0000] hover:border-[#CC0000] transition-all duration-300 flex items-center justify-center gap-3">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="opacity-70 group-hover:opacity-100">
                 <circle cx="11" cy="11" r="8"/>
                 <path d="M21 21l-4.35-4.35"/>

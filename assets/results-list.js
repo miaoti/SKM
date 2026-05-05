@@ -10,7 +10,10 @@ export default class ResultsList extends PaginatedList {
 
     mediaQueryLarge.addEventListener('change', this.#handleMediaQueryChange);
     this.setAttribute('initialized', '');
-    this.filterResultsByVehicle();
+    // Vehicle fitment filtering is applied server-side via the
+    // `?filter.p.m.custom.fits_vehicles=...` URL param set by the pre-paint
+    // redirect in theme.liquid <head>. Doing it again client-side caused a
+    // visible reorder jump after products had already rendered.
   }
 
   disconnectedCallback() {
@@ -72,84 +75,6 @@ export default class ResultsList extends PaginatedList {
     targetElement.checked = true;
     this.#setLayout('default');
   };
-
-  /**
-   * Filter and reorder results based on selected vehicle
-   */
-  async filterResultsByVehicle() {
-    // 1. Check if vehicle is selected
-    const VEHICLE_KEY = 'skm_garage_vehicle';
-    let vehicle = null;
-    try {
-      vehicle = JSON.parse(localStorage.getItem(VEHICLE_KEY) || 'null');
-    } catch { }
-
-    const notice = this.querySelector('#vehicle-filter-notice');
-    const noticeMessage = this.querySelector('#vehicle-filter-message');
-
-    // Reset notice
-    if (notice) notice.classList.add('hidden');
-
-    if (!vehicle || !vehicle.id) return;
-
-    // 2. Get all displayed products (target only the direct grid items)
-    const productItems = Array.from(this.querySelectorAll('.product-grid__item[data-product-id]'));
-    if (productItems.length === 0) return;
-
-    const productIds = productItems.map(item => item.dataset.productId).filter(Boolean);
-
-    // 3. Call API to check fitment
-    try {
-      const response = await fetch(`https://skm-inventory-api.miaotingshuo.workers.dev/products/check-vehicle-fit?vehicleId=${vehicle.id}&productIds=${productIds.join(',')}`);
-
-      if (!response.ok) {
-        console.warn('Vehicle fitment check failed:', response.status);
-        return;
-      }
-
-      const data = await response.json();
-
-      // Ensure data has the expected structure
-      const fits = data && Array.isArray(data.fits) ? data.fits : [];
-      // const notFits = data && Array.isArray(data.notFits) ? data.notFits : [];
-
-      // 4. Handle results
-      if (fits.length === 0) {
-        // CASE: No matches for vehicle
-        if (notice && noticeMessage) {
-          const vehicleName = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
-          noticeMessage.textContent = `No matching results for your ${vehicleName}, showing all related products.`;
-          notice.classList.remove('hidden');
-        }
-      } else {
-        // CASE: Some matches - Reorder DOM
-        const fitItems = [];
-        const notFitItems = [];
-
-        productItems.forEach(item => {
-          const pid = item.dataset.productId;
-          if (fits.includes(pid)) {
-            fitItems.push(item);
-            item.style.order = '-1';
-          } else {
-            notFitItems.push(item);
-            item.style.order = '0';
-          }
-        });
-
-        // Ensure parent is flex/grid to support order property or re-append
-        const parent = productItems[0].parentElement;
-        if (parent) {
-          // For grid layout, 'order' property works if the direct children are the items
-          // If not, we might need to physically re-sort DOM nodes
-          fitItems.forEach(item => parent.insertBefore(item, parent.firstChild));
-        }
-      }
-
-    } catch (e) {
-      console.error('Failed to check vehicle fitment:', e);
-    }
-  }
 }
 
 if (!customElements.get('results-list')) {

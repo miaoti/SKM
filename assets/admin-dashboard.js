@@ -497,7 +497,7 @@
         }
       });
 
-      console.log('[YMM Filter] Matching vehicles:', matchingVehicleIds.size);
+      // console.log('[YMM Filter] Matching vehicles:', matchingVehicleIds.size);
 
       // Filter products that have any of the matching vehicle IDs in their fitments
       S.products = S.allProducts.filter(p => {
@@ -524,7 +524,7 @@
         });
       });
 
-      console.log('[YMM Filter] Filtered products:', S.products.length);
+      // console.log('[YMM Filter] Filtered products:', S.products.length);
       updateYmmFilterBadge(true);
     }
 
@@ -751,8 +751,8 @@
         variantId: S.selected.variants?.[0]?.id
       });
 
-      console.log('[Remove Discount] API response:', result);
-      console.log('[Remove Discount] Metafield debug:', result.metafieldDebug);
+      // console.log('[Remove Discount] API response:', result);
+      // console.log('[Remove Discount] Metafield debug:', result.metafieldDebug);
 
       // Update UI immediately
       $('edit-price').value = originalPrice;
@@ -862,7 +862,7 @@
           // Extract just the numeric ID from the full GID
           const mediaIdFull = btn.dataset.id;
           const mediaIdNum = mediaIdFull.split('/').pop();
-          console.log('Deleting media:', { pid, mediaIdFull, mediaIdNum });
+          // console.log('Deleting media:', { pid, mediaIdFull, mediaIdNum });
           await api.del(`/products/${pid}/media/${mediaIdNum}`);
           toast('Media deleted', 'success');
           await selectProduct(S.selected.id);
@@ -1056,10 +1056,10 @@
       const newQty = $('edit-inventory').value;
       const currentQty = S.selected.inventory || 0;
       if (newQty !== '' && parseInt(newQty) !== currentQty) {
-        console.log('[Save Changes] Updating inventory from', currentQty, 'to', newQty);
+        // console.log('[Save Changes] Updating inventory from', currentQty, 'to', newQty);
         try {
           const invResult = await api.put(`/products/${pid}/inventory`, { quantity: parseInt(newQty) });
-          console.log('[Save Changes] Inventory result:', invResult);
+          // console.log('[Save Changes] Inventory result:', invResult);
           S.selected.inventory = parseInt(newQty);
           toast('Product & inventory saved', 'success');
         } catch (invErr) {
@@ -1150,7 +1150,7 @@
   // UPDATE INVENTORY
   // ==========================================
   $('btn-update-inventory').addEventListener('click', async () => {
-    console.log('[Inventory Button] Clicked');
+    // console.log('[Inventory Button] Clicked');
     if (!S.selected) {
       toast('No product selected', 'error');
       return;
@@ -1164,10 +1164,10 @@
     try {
       const pid = S.selected.id.split('/').pop();
       const qty = parseInt($('edit-inventory').value) || 0;
-      console.log('[Inventory Button] Updating product', pid, 'to quantity', qty);
+      // console.log('[Inventory Button] Updating product', pid, 'to quantity', qty);
 
       const result = await api.put(`/products/${pid}/inventory`, { quantity: qty });
-      console.log('[Inventory Button] Result:', result);
+      // console.log('[Inventory Button] Result:', result);
 
       toast('Inventory updated to ' + qty, 'success');
 
@@ -2133,8 +2133,8 @@
 
       // Step 4: Create variants if options defined (non-addon options only)
       const variantOptions = newProductPending.options.filter(o => o.name && o.values.length > 0 && !o.isAddOn);
-      console.log('[CreateProduct] Variant options:', variantOptions);
-      console.log('[CreateProduct] Pending variants:', newProductPending.variants);
+      // console.log('[CreateProduct] Variant options:', variantOptions);
+      // console.log('[CreateProduct] Pending variants:', newProductPending.variants);
 
       if (variantOptions.length > 0 && newProductPending.variants.length > 0) {
         toast(`Creating ${newProductPending.variants.length} variant(s)...`, 'info');
@@ -2159,16 +2159,16 @@
             options: variantOptions.map(o => ({ name: o.name, values: o.values })),
             variants: variantData
           };
-          console.log('[CreateProduct] Sending variant payload:', variantPayload);
+          // console.log('[CreateProduct] Sending variant payload:', variantPayload);
 
           const variantResult = await api.post(`/products/${newProductId}/variants`, variantPayload);
-          console.log('[CreateProduct] Variant creation result:', variantResult);
+          // console.log('[CreateProduct] Variant creation result:', variantResult);
         } catch (varErr) {
           console.error('Variant creation error:', varErr);
           toast('Warning: Some variants may not have been created - ' + varErr.message, 'warning');
         }
       } else {
-        console.log('[CreateProduct] Skipping variant creation - no valid options or variants');
+        // console.log('[CreateProduct] Skipping variant creation - no valid options or variants');
       }
 
       // Step 5: Save add-on options if any
@@ -3089,17 +3089,17 @@
   // Load packages from API
   async function loadPackages() {
     try {
-      console.log('[loadPackages] Fetching packages...');
+      // console.log('[loadPackages] Fetching packages...');
       const result = await api.get('/shipping/packages');
-      console.log('[loadPackages] Got result:', result);
+      // console.log('[loadPackages] Got result:', result);
       shippingState.packages.custom = result.customPackages || [];
       shippingState.packages.carrier = result.carrierPackages || [];
       shippingState.defaultPackageId = result.defaultPackageId;
-      console.log('[loadPackages] Custom packages:', shippingState.packages.custom.length);
+      // console.log('[loadPackages] Custom packages:', shippingState.packages.custom.length);
       populatePackageDropdowns();
       renderPackageLists();
     } catch (e) {
-      console.error('[loadPackages] Failed to load packages:', e);
+      // console.error('[loadPackages] Failed to load packages:', e);
       // Still populate with empty state
       populatePackageDropdowns();
       renderPackageLists();
@@ -3852,10 +3852,10 @@
       }
 
       // Step 4: Save add-on options as product metafield (always call API to handle deletions)
-      console.log('[Save Variants] Saving add-on options:', JSON.stringify(addOnOptions));
+      // console.log('[Save Variants] Saving add-on options:', JSON.stringify(addOnOptions));
       toast(`Saving ${addOnOptions.length} add-on options...`, 'info');
       const addonsResult = await api.put(`/products/${pid}/addons`, { addOnOptions });
-      console.log('[Save Variants] Add-ons result:', JSON.stringify(addonsResult));
+      // console.log('[Save Variants] Add-ons result:', JSON.stringify(addonsResult));
 
       toast('Variants saved successfully!', 'success');
 

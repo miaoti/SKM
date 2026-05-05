@@ -646,9 +646,9 @@ async function createVehicle(env, data) {
   let publishError = null;
 
   try {
-    console.log('[CreateVehicle] Attempting to publish metaobject:', metaobject.id);
+    // console.log('[CreateVehicle] Attempting to publish metaobject:', metaobject.id);
     publishResult = await publishMetaobjectToOnlineStore(env, metaobject.id);
-    console.log('[CreateVehicle] Publish result:', JSON.stringify(publishResult));
+    // console.log('[CreateVehicle] Publish result:', JSON.stringify(publishResult));
   } catch (pubErr) {
     publishError = pubErr.message;
     console.error('[CreateVehicle] Failed to publish:', pubErr.message);
@@ -1556,7 +1556,7 @@ async function getProduct(env, productId) {
   const p = result.product;
 
   // Debug logging for metafields
-  console.log("Product b2bPrice metafield:", p.b2bPrice);
+  // console.log("Product b2bPrice metafield:", p.b2bPrice);
 
   const fitments = p.metafield?.references?.edges.map(({ node }) => {
     const v = { id: node.id, handle: node.handle };
@@ -1783,7 +1783,7 @@ async function createProduct(env, data) {
   if (data.inventory !== undefined && inventoryItemId) {
     try {
       const qty = parseInt(data.inventory) || 0;
-      console.log('[CreateProduct] Setting inventory to:', qty, 'for item:', inventoryItemId);
+      // console.log('[CreateProduct] Setting inventory to:', qty, 'for item:', inventoryItemId);
       await setInventoryQuantity(env, inventoryItemId, qty);
     } catch (invErr) {
       console.error('[CreateProduct] Failed to set inventory:', invErr.message);
@@ -1792,22 +1792,22 @@ async function createProduct(env, data) {
 
   // Step 4: Publish product to Online Store sales channel (if status is ACTIVE)
   const statusUpper = (data.status || "").toUpperCase();
-  console.log('[CreateProduct] Status check:', data.status, '-> uppercase:', statusUpper);
+  // console.log('[CreateProduct] Status check:', data.status, '-> uppercase:', statusUpper);
 
   let publishResult = null;
   let publishError = null;
 
   if (statusUpper === "ACTIVE") {
     try {
-      console.log('[CreateProduct] Attempting to publish product:', product.id);
+      // console.log('[CreateProduct] Attempting to publish product:', product.id);
       publishResult = await publishProductToOnlineStore(env, product.id);
-      console.log('[CreateProduct] Published to Online Store successfully');
+      // console.log('[CreateProduct] Published to Online Store successfully');
     } catch (pubErr) {
       publishError = pubErr.message;
       console.error('[CreateProduct] Failed to publish to Online Store:', pubErr.message, pubErr.stack);
     }
   } else {
-    console.log('[CreateProduct] Skipping publish - status is not ACTIVE:', statusUpper);
+    // console.log('[CreateProduct] Skipping publish - status is not ACTIVE:', statusUpper);
   }
 
   return {
@@ -1823,8 +1823,8 @@ async function createProduct(env, data) {
 async function publishProductToOnlineStore(env, productId) {
   const gid = productId.startsWith("gid://") ? productId : `gid://shopify/Product/${productId}`;
   const numericId = gid.split("/").pop();
-
-  console.log('[Publish] Starting publish for product:', gid, 'numericId:', numericId);
+  // 
+  // console.log('[Publish] Starting publish for product:', gid, 'numericId:', numericId);
 
   // Get all available publications/sales channels
   const pubQuery = `
@@ -1843,10 +1843,10 @@ async function publishProductToOnlineStore(env, productId) {
   const pubResult = await shopifyGraphQL(env, pubQuery, {});
   const publications = pubResult.publications?.edges || [];
 
-  console.log('[Publish] Available publications:', JSON.stringify(publications.map(e => ({ id: e.node.id, name: e.node.name }))));
+  // console.log('[Publish] Available publications:', JSON.stringify(publications.map(e => ({ id: e.node.id, name: e.node.name }))));
 
   if (publications.length === 0) {
-    console.log('[Publish] No publications found, using REST API');
+    // console.log('[Publish] No publications found, using REST API');
     return await publishProductViaREST(env, numericId);
   }
 
@@ -1856,7 +1856,7 @@ async function publishProductToOnlineStore(env, productId) {
 
   for (const { node } of publications) {
     try {
-      console.log('[Publish] Publishing to channel:', node.name, node.id);
+      // console.log('[Publish] Publishing to channel:', node.name, node.id);
 
       const publishQuery = `
         mutation PublishToChannel($id: ID!, $input: [PublicationInput!]!) {
@@ -1884,7 +1884,7 @@ async function publishProductToOnlineStore(env, productId) {
         console.error('[Publish] Error for', node.name, ':', errMsg);
         errors.push({ channel: node.name, error: errMsg });
       } else {
-        console.log('[Publish] Success for', node.name);
+        // console.log('[Publish] Success for', node.name);
         successCount++;
       }
     } catch (err) {
@@ -1893,11 +1893,11 @@ async function publishProductToOnlineStore(env, productId) {
     }
   }
 
-  console.log('[Publish] Published to', successCount, 'of', publications.length, 'channels');
+  // console.log('[Publish] Published to', successCount, 'of', publications.length, 'channels');
 
   // If no channels succeeded, try REST API as fallback
   if (successCount === 0) {
-    console.log('[Publish] All GraphQL attempts failed, using REST API fallback');
+    // console.log('[Publish] All GraphQL attempts failed, using REST API fallback');
     return await publishProductViaREST(env, numericId);
   }
 
@@ -1913,8 +1913,8 @@ async function publishProductToOnlineStore(env, productId) {
 async function publishProductViaREST(env, productId) {
   const numericId = productId.includes("/") ? productId.split("/").pop() : productId;
 
-  console.log('[Publish REST] Attempting to publish product:', numericId);
-  console.log('[Publish REST] Using domain:', env.SHOPIFY_DOMAIN);
+  // console.log('[Publish REST] Attempting to publish product:', numericId);
+  // console.log('[Publish REST] Using domain:', env.SHOPIFY_DOMAIN);
 
   // First, get the product to ensure it exists
   const getResponse = await fetch(
@@ -1935,7 +1935,7 @@ async function publishProductViaREST(env, productId) {
   }
 
   const productData = await getResponse.json();
-  console.log('[Publish REST] Current product status:', productData.product?.status);
+  // console.log('[Publish REST] Current product status:', productData.product?.status);
 
   // Update product with published_at to current time (this publishes it)
   const response = await fetch(
@@ -1963,7 +1963,7 @@ async function publishProductViaREST(env, productId) {
   }
 
   const result = await response.json();
-  console.log('[Publish REST] Updated product:', result.product?.id, 'published_at:', result.product?.published_at);
+  // console.log('[Publish REST] Updated product:', result.product?.id, 'published_at:', result.product?.published_at);
   return result.product;
 }
 
@@ -1971,12 +1971,12 @@ async function publishProductViaREST(env, productId) {
 async function publishMetaobjectToOnlineStore(env, metaobjectId) {
   const gid = metaobjectId.startsWith("gid://") ? metaobjectId : `gid://shopify/Metaobject/${metaobjectId}`;
 
-  console.log('[PublishMetaobject] Starting publish for:', gid);
+  // console.log('[PublishMetaobject] Starting publish for:', gid);
 
   // First ensure definition has storefront access
   try {
     const accessResult = await ensureMetaobjectDefinitionAccess(env, "vehicle");
-    console.log('[PublishMetaobject] Definition access:', JSON.stringify(accessResult));
+    // console.log('[PublishMetaobject] Definition access:', JSON.stringify(accessResult));
   } catch (defErr) {
     console.error('[PublishMetaobject] Definition access error:', defErr.message);
   }
@@ -2007,7 +2007,7 @@ async function publishMetaobjectToOnlineStore(env, metaobjectId) {
   try {
     const result = await shopifyGraphQL(env, updateQuery, { id: gid });
 
-    console.log('[PublishMetaobject] Update result:', JSON.stringify(result));
+    // console.log('[PublishMetaobject] Update result:', JSON.stringify(result));
 
     if (result.metaobjectUpdate?.userErrors?.length > 0) {
       const errors = result.metaobjectUpdate.userErrors;
@@ -2019,7 +2019,7 @@ async function publishMetaobjectToOnlineStore(env, metaobjectId) {
       };
     }
 
-    console.log('[PublishMetaobject] Successfully set status to ACTIVE');
+    // console.log('[PublishMetaobject] Successfully set status to ACTIVE');
     return {
       id: gid,
       success: true,
@@ -2061,19 +2061,19 @@ async function ensureMetaobjectDefinitionAccess(env, type) {
   const definition = defResult.metaobjectDefinitionByType;
 
   if (!definition) {
-    console.log('[MetaobjectDef] Definition not found for type:', type);
+    // console.log('[MetaobjectDef] Definition not found for type:', type);
     throw new Error(`Metaobject definition not found for type: ${type}`);
   }
 
-  console.log('[MetaobjectDef] Definition:', JSON.stringify(definition));
+  // console.log('[MetaobjectDef] Definition:', JSON.stringify(definition));
 
   // Check current storefront access
   const currentAccess = definition.access?.storefront;
-  console.log('[MetaobjectDef] Current storefront access:', currentAccess);
+  // console.log('[MetaobjectDef] Current storefront access:', currentAccess);
 
   // If storefront access is not PUBLIC_READ, update it
   if (currentAccess !== 'PUBLIC_READ') {
-    console.log('[MetaobjectDef] Enabling Storefront API access for:', type);
+    // console.log('[MetaobjectDef] Enabling Storefront API access for:', type);
 
     const updateQuery = `
       mutation UpdateMetaobjectDefinition($id: ID!, $definition: MetaobjectDefinitionUpdateInput!) {
@@ -2101,7 +2101,7 @@ async function ensureMetaobjectDefinitionAccess(env, type) {
       }
     });
 
-    console.log('[MetaobjectDef] Update result:', JSON.stringify(updateResult));
+    // console.log('[MetaobjectDef] Update result:', JSON.stringify(updateResult));
 
     if (updateResult.metaobjectDefinitionUpdate?.userErrors?.length > 0) {
       const errors = updateResult.metaobjectDefinitionUpdate.userErrors;
@@ -2169,15 +2169,15 @@ async function setInventoryQuantity(env, inventoryItemId, quantity) {
   const locationName = inventoryLevel.location.name;
   const currentQty = inventoryLevel.quantities?.[0]?.quantity || 0;
 
-  console.log('[Inventory] Item:', itemGid, 'Location:', locationId, '(' + locationName + ')', 'Current:', currentQty);
+  // console.log('[Inventory] Item:', itemGid, 'Location:', locationId, '(' + locationName + ')', 'Current:', currentQty);
 
   const targetQty = parseInt(quantity);
   const delta = targetQty - currentQty;
 
-  console.log('[Inventory] Target:', targetQty, 'Delta:', delta);
+  // console.log('[Inventory] Target:', targetQty, 'Delta:', delta);
 
   if (delta === 0) {
-    console.log('[Inventory] No change needed');
+    // console.log('[Inventory] No change needed');
     return { success: true, message: 'No change needed', quantity: currentQty };
   }
 
@@ -2210,7 +2210,7 @@ async function setInventoryQuantity(env, inventoryItemId, quantity) {
     }
   });
 
-  console.log('[Inventory] Adjust result:', JSON.stringify(adjustResult));
+  // console.log('[Inventory] Adjust result:', JSON.stringify(adjustResult));
 
   if (adjustResult.inventoryAdjustQuantities?.userErrors?.length > 0) {
     const errors = adjustResult.inventoryAdjustQuantities.userErrors;
@@ -2219,7 +2219,7 @@ async function setInventoryQuantity(env, inventoryItemId, quantity) {
   }
 
   const finalQty = adjustResult.inventoryAdjustQuantities?.inventoryAdjustmentGroup?.changes?.[0]?.quantityAfterChange;
-  console.log('[Inventory] Final quantity:', finalQty);
+  // console.log('[Inventory] Final quantity:', finalQty);
 
   return { success: true, quantity: finalQty, result: adjustResult.inventoryAdjustQuantities?.inventoryAdjustmentGroup };
 }
@@ -2289,7 +2289,7 @@ async function updateProduct(env, productId, data) {
     } else {
       // Mark for deletion after product update
       shouldDeleteDiscountMetafield = true;
-      console.log(`[Pricing] Will delete discount_price metafield for product ${gid}`);
+      // console.log(`[Pricing] Will delete discount_price metafield for product ${gid}`);
     }
   }
 
@@ -2315,7 +2315,7 @@ async function updateProduct(env, productId, data) {
         : (originalPrice && originalPrice > discountPrice ? originalPrice : null);
 
       await updateVariantPrice(env, gid, data.variantId, discountPrice, newCompareAt);
-      console.log(`[Pricing] Set variant price to discount: $${discountPrice}, compare_at: $${newCompareAt}`);
+      // console.log(`[Pricing] Set variant price to discount: $${discountPrice}, compare_at: $${newCompareAt}`);
     } else if (originalPrice !== null) {
       // No discount price - use normal pricing
       await updateVariantPrice(env, gid, data.variantId, originalPrice, compareAtPrice);
@@ -2324,7 +2324,7 @@ async function updateProduct(env, productId, data) {
     // Update SKU if provided
     if (data.sku !== undefined) {
       await updateVariantSku(env, gid, data.variantId, data.sku);
-      console.log(`[UpdateProduct] Updated SKU to: ${data.sku}`);
+      // console.log(`[UpdateProduct] Updated SKU to: ${data.sku}`);
     }
   }
 
@@ -2358,7 +2358,7 @@ async function updateProduct(env, productId, data) {
   if (data.status === "ACTIVE") {
     try {
       await publishProductToOnlineStore(env, gid);
-      console.log('[UpdateProduct] Published to Online Store');
+      // console.log('[UpdateProduct] Published to Online Store');
     } catch (pubErr) {
       console.error('[UpdateProduct] Failed to publish to Online Store:', pubErr.message);
     }
@@ -2744,7 +2744,7 @@ async function deleteProductMedia(env, productId, mediaId) {
     }
   `;
 
-  console.log("Deleting media:", { productGid, mediaGid });
+  // console.log("Deleting media:", { productGid, mediaGid });
 
   const result = await shopifyGraphQL(env, query, { productId: productGid, mediaIds: [mediaGid] });
 
@@ -2793,8 +2793,8 @@ async function updateInventory(env, productId, data) {
   }
 
   const newQty = parseInt(data.quantity, 10);
-  console.log('[UpdateInventory] Setting inventory to:', newQty, 'for product:', productId);
-
+  // console.log('[UpdateInventory] Setting inventory to:', newQty, 'for product:', productId);
+  // 
   // Use the same setInventoryQuantity function which handles activation
   const result = await setInventoryQuantity(env, inventoryItemId, newQty);
 
@@ -2868,7 +2868,7 @@ async function enableInventoryTracking(env, productId) {
     throw new Error(result.inventoryItemUpdate.userErrors.map(e => e.message).join(", "));
   }
 
-  console.log('[EnableTracking] Enabled for product:', productId);
+  // console.log('[EnableTracking] Enabled for product:', productId);
   return { success: true, message: "Inventory tracking enabled" };
 }
 
@@ -2998,7 +2998,7 @@ async function createB2BCheckout(env, data) {
       discountPrice,
       productTitle: variant.product.title
     };
-    console.log('[B2B Checkout] Price data for variant:', JSON.stringify(priceDebug));
+    // console.log('[B2B Checkout] Price data for variant:', JSON.stringify(priceDebug));
 
     // B2B pricing logic:
     // 1. If B2B price exists, use it (it's always lower than retail)
@@ -3028,7 +3028,7 @@ async function createB2BCheckout(env, data) {
     // Add addon price to effective price (addons increase the price)
     const finalPrice = effectivePrice + addonPrice;
 
-    console.log('[B2B Checkout] Effective price:', effectivePrice, 'Addon:', addonPrice, 'Final:', finalPrice, 'Reason:', priceReason);
+    // console.log('[B2B Checkout] Effective price:', effectivePrice, 'Addon:', addonPrice, 'Final:', finalPrice, 'Reason:', priceReason);
 
     // Calculate the discount amount (difference between variant price and final price)
     // Note: If addon price is added, discount will be less (or negative if addon > discount)
@@ -3074,7 +3074,7 @@ async function createB2BCheckout(env, data) {
       // Draft orders don't support price increases, so we'll add a custom line item for the addon
       // For now, just note it in attributes - the addon will be shown but not charged extra
       // TODO: Add a separate custom line item for addon charges if needed
-      console.log('[B2B Checkout] Warning: Addon price exceeds discount, addon charge may not be applied');
+      // console.log('[B2B Checkout] Warning: Addon price exceeds discount, addon charge may not be applied');
     }
 
     lineItemsWithPrices.push(lineItem);
@@ -3444,7 +3444,7 @@ async function createCheckoutWithAddons(env, data) {
     // Calculate discount from variant price to final price
     const discountAmount = variantPrice - finalPrice;
 
-    console.log(`[Checkout] Variant: ${variant.title}, Base: ${variantPrice}, Effective: ${effectivePrice}, Addon: ${addonPrice}, Final: ${finalPrice}, Discount: ${discountAmount}`);
+    // console.log(`[Checkout] Variant: ${variant.title}, Base: ${variantPrice}, Effective: ${effectivePrice}, Addon: ${addonPrice}, Final: ${finalPrice}, Discount: ${discountAmount}`);
 
     // Build custom attributes
     const customAttributes = [
@@ -3770,7 +3770,7 @@ async function updateProductOptions(env, productId, data) {
     }
   };
 
-  console.log('[updateProductOptions] Sending payload:', JSON.stringify(updatePayload, null, 2));
+  // console.log('[updateProductOptions] Sending payload:', JSON.stringify(updatePayload, null, 2));
 
   const updateResponse = await fetch(
     `https://${env.SHOPIFY_DOMAIN}/admin/api/2024-01/products/${numericId}.json`,
@@ -3791,7 +3791,7 @@ async function updateProductOptions(env, productId, data) {
   }
 
   const updatedData = await updateResponse.json();
-  console.log('[updateProductOptions] Success:', updatedData.product?.id);
+  // console.log('[updateProductOptions] Success:', updatedData.product?.id);
 
   // Step 5: Return updated product options and variants via GraphQL for consistency
   return await getProductOptionsAndVariants(env, `gid://shopify/Product/${numericId}`);
@@ -3898,9 +3898,9 @@ async function createProductVariants(env, productId, data) {
   const numericId = productId.startsWith("gid://") ? productId.split('/').pop() : productId;
   const { options, variants } = data;
 
-  console.log('[CreateVariants] Starting for product:', numericId);
-  console.log('[CreateVariants] Options:', JSON.stringify(options));
-  console.log('[CreateVariants] Variants count:', variants?.length);
+  // console.log('[CreateVariants] Starting for product:', numericId);
+  // console.log('[CreateVariants] Options:', JSON.stringify(options));
+  // console.log('[CreateVariants] Variants count:', variants?.length);
 
   if (!options || options.length === 0) {
     throw new Error("At least one option is required");
@@ -3933,7 +3933,7 @@ async function createProductVariants(env, productId, data) {
     }
   };
 
-  console.log('[CreateVariants] Sending to REST API:', JSON.stringify(productData));
+  // console.log('[CreateVariants] Sending to REST API:', JSON.stringify(productData));
 
   const response = await fetch(
     `https://${env.SHOPIFY_DOMAIN}/admin/api/2024-01/products/${numericId}.json`,
@@ -3954,7 +3954,7 @@ async function createProductVariants(env, productId, data) {
   }
 
   const result = await response.json();
-  console.log('[CreateVariants] Success, variants created:', result.product?.variants?.length);
+  // console.log('[CreateVariants] Success, variants created:', result.product?.variants?.length);
 
   // Set inventory and B2B price for each variant if needed
   if (result.product?.variants) {
@@ -3967,7 +3967,7 @@ async function createProductVariants(env, productId, data) {
         try {
           const inventoryItemGid = `gid://shopify/InventoryItem/${variant.inventory_item_id}`;
           await setInventoryQuantity(env, inventoryItemGid, variantData.inventory);
-          console.log(`[CreateVariants] Set inventory for variant ${variant.id}: ${variantData.inventory}`);
+          // console.log(`[CreateVariants] Set inventory for variant ${variant.id}: ${variantData.inventory}`);
         } catch (invErr) {
           console.error(`[CreateVariants] Failed to set inventory for variant ${variant.id}:`, invErr.message);
         }
@@ -3978,7 +3978,7 @@ async function createProductVariants(env, productId, data) {
         try {
           const variantGid = `gid://shopify/ProductVariant/${variant.id}`;
           await setVariantB2BPrice(env, variantGid, variantData.b2bPrice);
-          console.log(`[CreateVariants] Set B2B price for variant ${variant.id}: ${variantData.b2bPrice}`);
+          // console.log(`[CreateVariants] Set B2B price for variant ${variant.id}: ${variantData.b2bPrice}`);
         } catch (b2bErr) {
           console.error(`[CreateVariants] Failed to set B2B price for variant ${variant.id}:`, b2bErr.message);
         }
@@ -3990,7 +3990,7 @@ async function createProductVariants(env, productId, data) {
     try {
       const cheapestVariantPrice = Math.min(...result.product.variants.map(v => parseFloat(v.price) || Infinity));
       if (cheapestVariantPrice !== Infinity && cheapestVariantPrice > 0) {
-        console.log(`[CreateVariants] Setting product base price to cheapest variant: ${cheapestVariantPrice}`);
+        // console.log(`[CreateVariants] Setting product base price to cheapest variant: ${cheapestVariantPrice}`);
         // The first variant's price is used by Shopify for product.price_min
         // No additional action needed - Shopify automatically calculates price_min from variants
       }
@@ -4024,7 +4024,7 @@ async function createProductVariants(env, productId, data) {
             }]
           });
 
-          console.log(`[CreateVariants] Set product B2B price to lowest variant B2B: ${lowestB2bPrice}`);
+          // console.log(`[CreateVariants] Set product B2B price to lowest variant B2B: ${lowestB2bPrice}`);
         } catch (e) {
           console.error('[CreateVariants] Failed to update product B2B price:', e.message);
         }
@@ -4056,7 +4056,7 @@ async function createProductVariants(env, productId, data) {
             }]
           });
 
-          console.log(`[CreateVariants] Set product discount price to lowest variant discount: ${lowestDiscountPrice}`);
+          // console.log(`[CreateVariants] Set product discount price to lowest variant discount: ${lowestDiscountPrice}`);
         } catch (e) {
           console.error('[CreateVariants] Failed to update product discount price:', e.message);
         }
@@ -4230,7 +4230,7 @@ async function updateProductVariants(env, productId, data) {
         });
 
         productB2bPriceUpdate = { success: true, lowestB2bPrice };
-        console.log(`[UpdateVariants] Set product B2B price to lowest variant B2B: ${lowestB2bPrice}`);
+        // console.log(`[UpdateVariants] Set product B2B price to lowest variant B2B: ${lowestB2bPrice}`);
       } catch (e) {
         productB2bPriceUpdate = { success: false, error: e.message };
         console.error('[UpdateVariants] Failed to update product B2B price:', e.message);
@@ -4265,7 +4265,7 @@ async function updateProductVariants(env, productId, data) {
         });
 
         productDiscountPriceUpdate = { success: true, lowestDiscountPrice };
-        console.log(`[UpdateVariants] Set product discount price to lowest variant discount: ${lowestDiscountPrice}`);
+        // console.log(`[UpdateVariants] Set product discount price to lowest variant discount: ${lowestDiscountPrice}`);
       } catch (e) {
         productDiscountPriceUpdate = { success: false, error: e.message };
         console.error('[UpdateVariants] Failed to update product discount price:', e.message);
@@ -4321,7 +4321,7 @@ async function ensureVariantB2bPriceDefinition(env) {
   );
 
   if (existing) {
-    console.log(`[ensureVariantB2bPriceDefinition] Definition exists, storefront access: ${existing.node.access?.storefront}`);
+    // console.log(`[ensureVariantB2bPriceDefinition] Definition exists, storefront access: ${existing.node.access?.storefront}`);
     variantB2bPriceDefinitionEnsured = true;
     return { exists: true, id: existing.node.id };
   }
@@ -4354,9 +4354,9 @@ async function ensureVariantB2bPriceDefinition(env) {
   });
 
   if (createResult.metafieldDefinitionCreate?.userErrors?.length > 0) {
-    console.log("Variant B2B price definition error:", createResult.metafieldDefinitionCreate.userErrors);
+    // console.log("Variant B2B price definition error:", createResult.metafieldDefinitionCreate.userErrors);
   } else {
-    console.log("[ensureVariantB2bPriceDefinition] Created new definition");
+    // console.log("[ensureVariantB2bPriceDefinition] Created new definition");
   }
 
   variantB2bPriceDefinitionEnsured = true;
@@ -4446,7 +4446,7 @@ async function ensureVariantDiscountPriceDefinition(env) {
   );
 
   if (existing) {
-    console.log(`[ensureVariantDiscountPriceDefinition] Definition exists, storefront access: ${existing.node.access?.storefront}`);
+    // console.log(`[ensureVariantDiscountPriceDefinition] Definition exists, storefront access: ${existing.node.access?.storefront}`);
     variantDiscountPriceDefinitionEnsured = true;
     return { exists: true, id: existing.node.id };
   }
@@ -4479,10 +4479,10 @@ async function ensureVariantDiscountPriceDefinition(env) {
   });
 
   if (createResult.metafieldDefinitionCreate?.userErrors?.length > 0) {
-    console.log("Variant discount price definition error:", createResult.metafieldDefinitionCreate.userErrors);
+    // console.log("Variant discount price definition error:", createResult.metafieldDefinitionCreate.userErrors);
     // Don't throw - definition might already exist with different settings
   } else {
-    console.log("[ensureVariantDiscountPriceDefinition] Created new definition");
+    // console.log("[ensureVariantDiscountPriceDefinition] Created new definition");
   }
 
   variantDiscountPriceDefinitionEnsured = true;
@@ -4571,11 +4571,11 @@ async function ensureAddonOptionsDefinition(env) {
   if (existing) {
     // Check if storefront access is enabled
     const hasStorefrontAccess = existing.node.access?.storefront === "PUBLIC_READ";
-    console.log(`[ensureAddonOptionsDefinition] Definition exists, storefront access: ${existing.node.access?.storefront}`);
+    // console.log(`[ensureAddonOptionsDefinition] Definition exists, storefront access: ${existing.node.access?.storefront}`);
 
     if (!hasStorefrontAccess) {
       // Update the definition to enable storefront access
-      console.log("[ensureAddonOptionsDefinition] Updating definition to enable storefront access");
+      // console.log("[ensureAddonOptionsDefinition] Updating definition to enable storefront access");
       const updateQuery = `
         mutation UpdateMetafieldDefinition($definition: MetafieldDefinitionUpdateInput!) {
           metafieldDefinitionUpdate(definition: $definition) {
@@ -4600,9 +4600,9 @@ async function ensureAddonOptionsDefinition(env) {
       });
 
       if (updateResult.metafieldDefinitionUpdate?.userErrors?.length > 0) {
-        console.log("Metafield definition update error:", updateResult.metafieldDefinitionUpdate.userErrors);
+        // console.log("Metafield definition update error:", updateResult.metafieldDefinitionUpdate.userErrors);
       } else {
-        console.log("[ensureAddonOptionsDefinition] Storefront access enabled");
+        // console.log("[ensureAddonOptionsDefinition] Storefront access enabled");
       }
     }
 
@@ -4637,7 +4637,7 @@ async function ensureAddonOptionsDefinition(env) {
   });
 
   if (createResult.metafieldDefinitionCreate?.userErrors?.length > 0) {
-    console.log("Metafield definition error:", createResult.metafieldDefinitionCreate.userErrors);
+    // console.log("Metafield definition error:", createResult.metafieldDefinitionCreate.userErrors);
     // Don't throw - definition might already exist with different settings
   }
 
@@ -4652,23 +4652,23 @@ async function ensureAddonOptionsDefinition(env) {
 async function saveProductAddOns(env, productId, addOnOptions) {
   const gid = productId.startsWith("gid://") ? productId : `gid://shopify/Product/${productId}`;
 
-  console.log(`[saveProductAddOns] productId=${productId}, addOnOptions count=${addOnOptions?.length || 0}`);
+  // console.log(`[saveProductAddOns] productId=${productId}, addOnOptions count=${addOnOptions?.length || 0}`);
 
   // Ensure the metafield definition exists (required for storefront access)
   try {
     await ensureAddonOptionsDefinition(env);
   } catch (e) {
-    console.log("Could not ensure metafield definition:", e.message);
+    // console.log("Could not ensure metafield definition:", e.message);
   }
 
   if (!addOnOptions || addOnOptions.length === 0) {
     // Delete the metafield if no add-ons
-    console.log(`[saveProductAddOns] Deleting metafield for ${gid}`);
+    // console.log(`[saveProductAddOns] Deleting metafield for ${gid}`);
     try {
       const deleteResult = await deleteMetafield(env, gid, "custom", "add_on_options");
-      console.log(`[saveProductAddOns] Delete result:`, JSON.stringify(deleteResult));
+      // console.log(`[saveProductAddOns] Delete result:`, JSON.stringify(deleteResult));
     } catch (e) {
-      console.log(`[saveProductAddOns] Delete error (may be ok if not exists):`, e.message);
+      // console.log(`[saveProductAddOns] Delete error (may be ok if not exists):`, e.message);
     }
     return { success: true, deleted: true };
   }
@@ -4944,7 +4944,7 @@ async function getCarrierPackages(env) {
     );
 
     if (!response.ok) {
-      console.log('[GetCarrierPackages] No carrier services available');
+      // console.log('[GetCarrierPackages] No carrier services available');
       return getDefaultCarrierPackages();
     }
 
@@ -6772,15 +6772,15 @@ async function uploadShopLogo(env, formData) {
     // Only accept Shopify CDN URLs, not staged URLs
     if (fetchedUrl && fetchedUrl.includes('cdn.shopify.com')) {
       logoUrl = fetchedUrl;
-      console.log('Got final CDN URL:', logoUrl);
+      // console.log('Got final CDN URL:', logoUrl);
     } else {
-      console.log('File still processing, attempt', attempts, 'URL:', fetchedUrl);
+      // console.log('File still processing, attempt', attempts, 'URL:', fetchedUrl);
     }
   }
 
   if (!logoUrl) {
     logoUrl = target.resourceUrl;
-    console.log('Using staged URL as fallback:', logoUrl);
+    // console.log('Using staged URL as fallback:', logoUrl);
   }
 
   // 4. Try to update theme settings with the CDN URL
@@ -6831,7 +6831,7 @@ async function updateThemeLogo(env, logoUrl, fileId) {
 
     // 3. Upload as theme asset
     const assetKey = 'assets/custom-logo.png';
-    console.log('Uploading image as theme asset:', assetKey);
+    // console.log('Uploading image as theme asset:', assetKey);
 
     const uploadAssetRes = await fetch(`https://${env.SHOPIFY_DOMAIN}/admin/api/2024-01/themes/${mainTheme.id}/assets.json`, {
       method: 'PUT',
@@ -6853,7 +6853,7 @@ async function updateThemeLogo(env, logoUrl, fileId) {
     }
 
     const uploadedAsset = await uploadAssetRes.json();
-    console.log('Theme asset uploaded:', uploadedAsset.asset?.public_url);
+    // console.log('Theme asset uploaded:', uploadedAsset.asset?.public_url);
 
     // 4. Get current settings
     const assetRes = await fetch(`https://${env.SHOPIFY_DOMAIN}/admin/api/2024-01/themes/${mainTheme.id}/assets.json?asset[key]=config/settings_data.json`, {
@@ -6872,7 +6872,7 @@ async function updateThemeLogo(env, logoUrl, fileId) {
     // 5. Set the logo using shopify://shop_images/ format with uploaded asset
     // Theme assets use format: shopify://shop_images/custom-logo.png
     const imageRef = 'shopify://shop_images/custom-logo.png';
-    console.log('Setting logo with reference:', imageRef);
+    // console.log('Setting logo with reference:', imageRef);
 
     current.logo = imageRef;
     current.logo_inverse = imageRef;
@@ -6897,7 +6897,7 @@ async function updateThemeLogo(env, logoUrl, fileId) {
     if (!updateRes.ok) {
       console.error('Theme update failed:', await updateRes.text());
     } else {
-      console.log('Theme settings updated successfully');
+      // console.log('Theme settings updated successfully');
     }
   } catch (e) {
     console.error('updateThemeLogo error:', e);
@@ -7015,7 +7015,7 @@ async function calculateRefund(env, orderId, data) {
     };
   });
 
-  console.log('[Calculate Refund] Order:', numericOrderId, 'Line Items:', JSON.stringify(refundLineItems));
+  // console.log('[Calculate Refund] Order:', numericOrderId, 'Line Items:', JSON.stringify(refundLineItems));
 
   // Build shipping refund
   const shipping = data.shipping || {};
@@ -7129,7 +7129,7 @@ async function executeRefund(env, orderId, data) {
     };
   });
 
-  console.log('[Execute Refund] Restock type:', data.restockType, 'Line items:', JSON.stringify(refundLineItems));
+  // console.log('[Execute Refund] Restock type:', data.restockType, 'Line items:', JSON.stringify(refundLineItems));
 
   // Build shipping refund
   const shipping = data.shipping || {};
@@ -7156,7 +7156,7 @@ async function executeRefund(env, orderId, data) {
     refundAmount += parseFloat(data.shipping?.amount || 0);
   }
 
-  console.log('[Execute Refund] Calculated refund amount:', refundAmount);
+  // console.log('[Execute Refund] Calculated refund amount:', refundAmount);
 
   // Build transactions array - required for actual monetary refund
   // Note: For Shopify GraphQL refundCreate, transactions require orderId (required) and parentId (optional)
@@ -7177,7 +7177,7 @@ async function executeRefund(env, orderId, data) {
     transactions.push(transaction);
   }
 
-  console.log('[Execute Refund] Transactions:', JSON.stringify(transactions));
+  // console.log('[Execute Refund] Transactions:', JSON.stringify(transactions));
 
   const refundInput = {
     orderId: gid,
@@ -7189,11 +7189,11 @@ async function executeRefund(env, orderId, data) {
     ...(transactions.length > 0 ? { transactions } : {})
   };
 
-  console.log('[Execute Refund] Input:', JSON.stringify(refundInput, null, 2));
+  // console.log('[Execute Refund] Input:', JSON.stringify(refundInput, null, 2));
 
   const result = await shopifyGraphQL(env, query, { input: refundInput });
 
-  console.log('[Execute Refund] Result:', JSON.stringify(result, null, 2));
+  // console.log('[Execute Refund] Result:', JSON.stringify(result, null, 2));
 
   if (result.refundCreate.userErrors?.length > 0) {
     const errors = result.refundCreate.userErrors;
@@ -7404,7 +7404,7 @@ async function sendOrderReceipt(env, orderId) {
   try {
     const result = await shopifyGraphQL(env, mutation, { id: gid });
 
-    console.log('[sendOrderReceipt] Response:', JSON.stringify(result));
+    // console.log('[sendOrderReceipt] Response:', JSON.stringify(result));
 
     if (result.orderInvoiceSend?.userErrors?.length > 0) {
       const errorMessages = result.orderInvoiceSend.userErrors.map(e => e.message).join(', ');
@@ -8051,10 +8051,10 @@ async function getDealer(env, id) {
 
   const result = await shopifyGraphQL(env, query, { id: gid });
 
-  console.log('[getDealer] Input ID:', id);
-  console.log('[getDealer] GID used:', gid);
-  console.log('[getDealer] GraphQL result:', JSON.stringify(result));
-
+  // console.log('[getDealer] Input ID:', id);
+  // console.log('[getDealer] GID used:', gid);
+  // console.log('[getDealer] GraphQL result:', JSON.stringify(result));
+  // 
   if (!result.metaobject) {
     return { success: false, error: "Dealer not found" };
   }
@@ -8154,13 +8154,13 @@ async function updateDealer(env, id, data) {
   if (data.accountSwitch) {
     const { oldCustomerId, newCustomerId } = data.accountSwitch;
 
-    console.log('[updateDealer] Account switch detected:', data.accountSwitch);
+    // console.log('[updateDealer] Account switch detected:', data.accountSwitch);
 
     try {
       // Remove b2b and dealer tags from old customer
       // NOTE: This only removes b2b/dealer, any other tags (like 'admin') are preserved
       if (oldCustomerId) {
-        console.log('[updateDealer] Removing b2b/dealer tags from old customer:', oldCustomerId);
+        // console.log('[updateDealer] Removing b2b/dealer tags from old customer:', oldCustomerId);
         await removeCustomerTags(env, oldCustomerId, ['b2b', 'dealer']);
       }
 
@@ -8168,7 +8168,7 @@ async function updateDealer(env, id, data) {
       // NOTE: tagsAdd only adds tags, it does NOT remove existing tags
       // If the new customer already has 'admin' or other tags, they will be preserved
       if (newCustomerId) {
-        console.log('[updateDealer] Adding b2b/dealer tags to new customer:', newCustomerId);
+        // console.log('[updateDealer] Adding b2b/dealer tags to new customer:', newCustomerId);
         await addCustomerTags(env, newCustomerId, ['b2b', 'dealer']);
 
         // Update the customer_id field in dealer metaobject
@@ -8400,7 +8400,7 @@ async function applyForDealer(env, data) {
 
   // Delete ALL old pending applications from this customer
   if (existingApps.length > 0) {
-    console.log(`[applyForDealer] Deleting ${existingApps.length} old applications from customer ${data.customer_id}`);
+    // console.log(`[applyForDealer] Deleting ${existingApps.length} old applications from customer ${data.customer_id}`);
 
     const deleteMutation = `
       mutation DeleteDealerApplication($id: ID!) {
@@ -8456,7 +8456,7 @@ async function applyForDealer(env, data) {
       }
     `;
 
-  console.log('[applyForDealer] Creating application with fields:', JSON.stringify(fields));
+  // console.log('[applyForDealer] Creating application with fields:', JSON.stringify(fields));
 
   const result = await shopifyGraphQL(env, createMutation, {
     metaobject: {
@@ -8465,7 +8465,7 @@ async function applyForDealer(env, data) {
     }
   });
 
-  console.log('[applyForDealer] Shopify result:', JSON.stringify(result));
+  // console.log('[applyForDealer] Shopify result:', JSON.stringify(result));
 
   if (result.metaobjectCreate?.userErrors?.length > 0) {
     console.error('[applyForDealer] User errors:', result.metaobjectCreate.userErrors);
@@ -8629,8 +8629,8 @@ async function listDealerApplications(env, statusFilter = "") {
 
   const result = await shopifyGraphQL(env, query, { first: 250 });
 
-  console.log('[listDealerApplications] Query result:', JSON.stringify(result));
-  console.log('[listDealerApplications] Status filter:', statusFilter);
+  // console.log('[listDealerApplications] Query result:', JSON.stringify(result));
+  // console.log('[listDealerApplications] Status filter:', statusFilter);
 
   const applications = result.metaobjects?.edges?.map(edge => {
     const fields = {};

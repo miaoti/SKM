@@ -34,7 +34,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
  */
 function requestUserLocation() {
   if (!navigator.geolocation) {
-    console.log('Geolocation not supported');
+    // console.log('Geolocation not supported');
     return;
   }
 
@@ -44,7 +44,7 @@ function requestUserLocation() {
         lat: position.coords.latitude,
         lng: position.coords.longitude
       };
-      console.log('User location obtained:', userLocation);
+      // console.log('User location obtained:', userLocation);
 
       // Re-render dealer list with distances and sorting
       if (dealers.length > 0) {
@@ -57,7 +57,7 @@ function requestUserLocation() {
       }
     },
     (error) => {
-      console.log('Location access denied or error:', error.message);
+      // console.log('Location access denied or error:', error.message);
       // Continue without location - dealers will show without distance
     },
     {

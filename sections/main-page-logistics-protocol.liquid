@@ -1,0 +1,261 @@
+{% comment %}
+  "Logistics Protocol" - High-Tech Shipping Info Page
+  - Matching "Proving Ground" aesthetic
+  - Technical / Data-heavy layout
+{% endcomment %}
+
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Oswald:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --racing-red: #CC0000;
+  }
+  .font-tech-header { font-family: 'Oswald', sans-serif; }
+  .font-tech-mono { font-family: 'JetBrains Mono', monospace; }
+  .bg-carbon-fiber {
+    background-color: #050505;
+    background-image: url('https://github.com/miaoti/SKM/blob/main/Pictures/Contact/background_texture.png?raw=true');
+    background-size: cover;
+    background-position: center;
+  }
+  .tech-border {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Force full-width layout - break out of theme constraints */
+  .logistics-protocol-section {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin-left: calc(-50vw + 50%) !important;
+    margin-right: calc(-50vw + 50%) !important;
+    box-sizing: border-box !important;
+  }
+  
+  .logistics-content-grid {
+    display: grid !important;
+    grid-template-columns: repeat(1, 1fr) !important;
+    gap: 3rem !important;
+    width: 100% !important;
+  }
+  
+  @media (min-width: 1024px) {
+    .logistics-content-grid {
+      grid-template-columns: repeat(3, 1fr) !important;
+    }
+  }
+  
+  .logistics-column {
+    min-width: 0;
+    width: 100%;
+  }
+</style>
+
+<div class="logistics-protocol-section w-full min-h-screen bg-white text-[#111] font-tech-mono" data-section-id="{{ section.id }}">
+
+  <!-- HERO HEADER -->
+  <div class="relative w-full min-h-[400px] h-auto flex items-end pb-12 sm:pb-24 justify-center overflow-hidden bg-white border-b border-gray-200">
+    <!-- Light Grid Background -->
+    <div class="absolute inset-0 pointer-events-none" 
+         style="background-image: linear-gradient(#e5e7eb 1px, transparent 1px), linear-gradient(90deg, #e5e7eb 1px, transparent 1px); background-size: 40px 40px;">
+    </div>
+    
+    <div class="relative z-20 text-center px-4 max-w-4xl mx-auto">
+      <div class="inline-flex items-center gap-2 mb-4">
+        <span class="w-2 h-2 bg-[#CC0000]"></span>
+        <span class="text-xs font-bold tracking-[0.2em] text-gray-500 uppercase">System Status: Active</span>
+      </div>
+      
+      <h1 class="font-tech-header text-6xl md:text-8xl font-bold uppercase tracking-tighter text-black mb-4 leading-none">
+        Logistics<br>Protocol
+      </h1>
+      
+      <div class="flex items-center justify-center gap-4 mt-6">
+        <div class="h-[1px] w-12 bg-gray-300"></div>
+        <p class="text-[#CC0000] text-xs md:text-sm tracking-[0.25em] font-bold uppercase">
+          Global Manifest Tracking
+        </p>
+        <div class="h-[1px] w-12 bg-gray-300"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT GRID -->
+  <div class="w-full relative z-20 py-16 md:py-24">
+    <div class="w-full max-w-[1800px] mx-auto px-6 md:px-16">
+      
+      <div class="logistics-content-grid items-stretch">
+        
+        <!-- COLUMN 1: STANDARDS -->
+        <div class="logistics-column flex flex-col gap-6">
+          <div class="text-center">
+            <h2 class="font-tech-header text-3xl uppercase text-black inline-block border-b-2 border-[#CC0000] pb-2">Deployment<br>Standards</h2>
+          </div>
+          
+          <div class="bg-gray-50 border border-gray-200 p-8 flex-1 group hover:border-gray-300 transition-colors shadow-sm">
+             <div class="flex justify-between items-start mb-6">
+               <span class="text-xs font-bold text-gray-400 font-tech-mono">DOC_REF: 77-A</span>
+               <span class="text-[#CC0000] text-[10px] tracking-widest border border-[#CC0000] px-2 py-1">PRIORITY 1</span>
+             </div>
+             
+             <p class="text-gray-600 text-sm leading-relaxed mb-8">
+               All components utilize reinforced packaging protocols to ensure structural integrity. Deployment is executed via secure logistics channels with real-time telemetry.
+             </p>
+
+             <ul class="space-y-4 text-xs font-bold text-gray-800">
+                <li class="flex items-center gap-3 py-3 border-b border-gray-200">
+                  <span class="w-1.5 h-1.5 bg-[#CC0000]"></span>
+                  Processing cutoff: 14:00 EST
+                </li>
+                <li class="flex items-center gap-3 py-3 border-b border-gray-200">
+                  <span class="w-1.5 h-1.5 bg-black"></span>
+                  Double-walled Corrugate
+                </li>
+                <li class="flex items-center gap-3 py-3 border-b border-gray-200">
+                  <span class="w-1.5 h-1.5 bg-black"></span>
+                  Signature Confirmation
+                </li>
+             </ul>
+          </div>
+        </div>
+
+        <!-- COLUMN 2: CARRIERS -->
+        <div class="logistics-column flex flex-col gap-6">
+          <div class="text-center">
+            <h2 class="font-tech-header text-3xl uppercase text-black inline-block border-b-2 border-gray-200 pb-2">Carrier<br>Network</h2>
+          </div>
+          
+          <!-- Stacked Carriers -->
+          <div class="flex flex-col gap-3 h-full">
+            
+            <div class="bg-white border border-gray-200 p-5 flex items-center justify-between shadow-sm hover:shadow-md transition-all group">
+               <div>
+                 <div class="text-[#CC0000] font-bold text-lg">
+                   <a href="https://www.ups.com" target="_blank" class="hover:underline">UPS</a> / 
+                   <a href="https://www.fedex.com" target="_blank" class="hover:underline">FEDEX</a>
+                 </div>
+                 <div class="text-[10px] text-gray-400 uppercase tracking-widest">Domestic Ground</div>
+               </div>
+               <div class="h-2 w-2 rounded-full bg-green-500"></div>
+            </div>
+
+            <a href="https://www.dhl.com" target="_blank" class="bg-white border border-gray-200 p-5 flex items-center justify-between shadow-sm hover:shadow-md transition-all group">
+               <div>
+                 <div class="text-black font-bold text-lg group-hover:text-[#CC0000] transition-colors">DHL Express</div>
+                 <div class="text-[10px] text-gray-400 uppercase tracking-widest">International Priority</div>
+               </div>
+               <div class="h-2 w-2 rounded-full bg-green-500"></div>
+            </a>
+
+            <a href="https://www.usps.com" target="_blank" class="bg-white border border-gray-200 p-5 flex items-center justify-between shadow-sm hover:shadow-md transition-all group">
+               <div>
+                 <div class="text-black font-bold text-lg group-hover:text-[#CC0000] transition-colors">USPS</div>
+                 <div class="text-[10px] text-gray-400 uppercase tracking-widest">Small Packet</div>
+               </div>
+               <div class="h-2 w-2 rounded-full bg-yellow-500"></div>
+            </a>
+
+            <a href="/pages/contact" class="bg-white border border-gray-200 p-5 flex items-center justify-between shadow-sm hover:shadow-md transition-all group">
+               <div>
+                 <div class="text-black font-bold text-lg group-hover:text-[#CC0000] transition-colors">Freight</div>
+                 <div class="text-[10px] text-gray-400 uppercase tracking-widest">Bulk / Oversize</div>
+               </div>
+               <div class="h-2 w-2 rounded-full bg-blue-500"></div>
+            </a>
+
+          </div>
+        </div>
+
+        <!-- COLUMN 3: INTERNATIONAL -->
+        <div class="logistics-column flex flex-col gap-6">
+          <div class="text-center">
+            <h2 class="font-tech-header text-3xl uppercase text-black inline-block border-b-2 border-gray-200 pb-2">Global<br>Protocols</h2>
+          </div>
+          
+           <div class="bg-gray-900 text-white p-8 flex-1 flex flex-col justify-between relative overflow-hidden shadow-xl">
+             <!-- Abstract Map Graphic -->
+             <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(circle, #333 1px, transparent 1px); background-size: 20px 20px;"></div>
+
+             <div>
+               <div class="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center mb-6 mx-auto">
+                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/></svg>
+               </div>
+               
+               <h3 class="font-bold text-lg uppercase mb-2 text-center">Import Duties & Taxes</h3>
+               <p class="text-gray-400 text-xs leading-relaxed mb-6 text-center">
+                  International shipments may be subject to VAT/Duties upon arrival. Responsibility lies with the receiver. Check local regulations.
+               </p>
+             </div>
+
+             <div class="pt-6 border-t border-white/10">
+                <div class="flex justify-between items-center text-xs">
+                   <span class="text-gray-500">COVERAGE</span>
+                   <span class="font-bold">190+ COUNTRIES</span>
+                </div>
+             </div>
+           </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+<script>
+  (function() {
+    const DEBUG_PREFIX = '⚡ SKM_LAYOUT_ENGINE_V2:';
+    
+    function forceFullWidthLayout() {
+      // 1. Unbox the Body
+      const body = document.body;
+      if (body.classList.contains('page-width-narrow') || body.classList.contains('page-width')) {
+        body.classList.remove('page-width-narrow', 'page-width');
+        body.style.maxWidth = '100%';
+        body.style.padding = '0';
+      }
+      
+      // 2. Fix Main Content (The likely culprit)
+      const main = document.getElementById('MainContent');
+      if (main) {
+        // Force block display to kill any flex-row constraints causing left alignment
+        main.style.cssText = `
+          display: block !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          flex-grow: 1;
+        `;
+      }
+      
+      // 3. Ensure Section Wrapper is fluid
+      const el = document.querySelector('[data-section-id="{{ section.id }}"]');
+      if (el && el.parentElement) {
+        const wrapper = el.parentElement;
+        wrapper.style.cssText = `
+          width: 100% !important;
+          max-width: 100% !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          box-sizing: border-box !important;
+        `;
+      }
+      
+      // 4. Force Grid Expansion
+      const grid = document.querySelector('.logistics-content-grid');
+      if (grid) {
+        grid.style.width = '100% !important';
+        grid.style.maxWidth = '1800px !important';
+      }
+    }
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', forceFullWidthLayout, { once: true });
+    } else {
+      forceFullWidthLayout();
+    }
+    window.addEventListener('load', forceFullWidthLayout, { once: true });
+    window.addEventListener('resize', forceFullWidthLayout);
+  })();
+</script>

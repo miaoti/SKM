@@ -442,12 +442,10 @@
   // Add-on options are now rendered via Liquid, just need to bind events
   function initAddonOptions() {
     var addonInputs = document.querySelectorAll('#addon-options-container .addon-input');
-    console.log('[Add-on] Found', addonInputs.length, 'addon inputs');
     if (addonInputs.length === 0) return;
     
     addonInputs.forEach(function(inp) {
       inp.addEventListener('change', function() { 
-        console.log('[Add-on] Selection changed:', this.value, 'Price mod:', this.dataset.priceModifier);
         updatePriceWithAddons(); 
         updateAddonProperties(); 
       });
@@ -644,10 +642,5 @@
   updateVariant();
   
   // Debug logging for variant prices
-  console.log('[Pricing Debug] isB2BUser:', isB2BUser);
-  console.log('[Pricing Debug] productB2bPrice:', productB2bPrice);
-  console.log('[Pricing Debug] productDiscountPrice:', productDiscountPrice);
-  console.log('[Pricing Debug] variantB2bPrices:', variantB2bPrices);
-  console.log('[Pricing Debug] variantDiscountPrices:', variantDiscountPrices);
 })();
 </script>

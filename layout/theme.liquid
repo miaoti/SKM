@@ -4,6 +4,59 @@
   lang="{{ request.locale.iso_code }}"
 >
   <head>
+    {%- comment -%}
+      Vehicle-filter pre-paint redirect.
+      Why: if a vehicle is in localStorage but the URL has no fits_vehicles filter, we redirect
+      so Shopify renders the filtered collection on the first paint. Running here (synchronous,
+      before stylesheets/tailwind/scripts fetch) prevents the visible render-then-reload flicker
+      the late DOMContentLoaded version caused.
+      How to apply: only collection routes; bypass via ?skip_vehicle_filter=1.
+    {%- endcomment -%}
+    <script>
+      (function () {
+        if (!location.pathname.startsWith('/collections/')) return;
+        var params = new URLSearchParams(location.search);
+        if (params.has('filter.p.m.custom.fits_vehicles')) return;
+        if (params.has('skip_vehicle_filter')) return;
+        try {
+          var v = JSON.parse(localStorage.getItem('skm_garage_vehicle') || 'null');
+          if (v && v.id) {
+            var url = new URL(location.href);
+            url.searchParams.set('filter.p.m.custom.fits_vehicles', v.id);
+            location.replace(url.toString());
+          }
+        } catch (e) {}
+      })();
+    </script>
+
+    {%- comment -%}
+      Cart-restore pending flag.
+      Why: a logged-in customer with saved items in localStorage but an empty
+      server-side session cart will see the bubble show "0" then jump to the
+      restored count. Setting this attribute synchronously lets the CSS hide
+      the bubble until customerCartPersistence resolves; we clear it once the
+      restore completes (or once we determine none is needed).
+    {%- endcomment -%}
+    {%- if customer -%}
+      <script>
+        (function () {
+          try {
+            var saved = JSON.parse(localStorage.getItem('skm_customer_cart_{{ customer.id }}') || 'null');
+            var serverCount = {{ cart.item_count | default: 0 }};
+            if (saved && saved.items && saved.items.length > 0 && serverCount === 0) {
+              document.documentElement.setAttribute('data-cart-restore-pending', 'true');
+            }
+          } catch (e) {}
+        })();
+      </script>
+      <style>
+        html[data-cart-restore-pending="true"] #precision-cart-count,
+        html[data-cart-restore-pending="true"] cart-icon [ref="cartBubble"] {
+          visibility: hidden;
+        }
+      </style>
+    {%- endif -%}
+
     {%- if settings.favicon != blank -%}
       <link
         rel="icon"
@@ -39,7 +92,7 @@
     {{ content_for_header }}
   </head>
 
-  <body class="w-full min-h-screen flex flex-col page-width-{{ settings.page_width }} card-hover-effect-{{ settings.card_hover_effect }}">
+  <body class="w-full min-h-screen flex flex-col {% unless template.suffix == 'logistics-protocol' or template.suffix == 'fitment-database' %}page-width-{{ settings.page_width }}{% endunless %} card-hover-effect-{{ settings.card_hover_effect }}">
     <div class="sonic-loader"></div>
     {% render 'skip-to-content-link', href: '#MainContent', text: 'accessibility.skip_to_text' %}
     <div id="header-group">
@@ -150,34 +203,56 @@
         // Check if checkout was initiated and clear cart to prevent restoration
         const checkoutInitiated = sessionStorage.getItem('skm_checkout_initiated');
         if (checkoutInitiated === 'true') {
-          console.log('[Cart Persistence] Checkout was initiated. Ensuring cart is cleared...');
-          
+
           // Clear the flag
           sessionStorage.removeItem('skm_checkout_initiated');
-          
+
           // Clear session cart
           fetch(window.Shopify.routes.root + 'cart/clear.js', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
           })
           .then(() => {
-            console.log('[Cart Persistence] Cart cleared after checkout.');
             updateCartUI(0);
           })
           .catch(err => console.error('[Cart Persistence] Error clearing cart after checkout:', err));
-          
+
           // Clear localStorage saved cart for this customer
           if (customerId) {
             localStorage.removeItem(CART_STORAGE_KEY + customerId);
-            console.log('[Cart Persistence] Cleared saved cart from localStorage after checkout.');
           }
-          
+
+          // No restore will run, so reveal the bubble immediately.
+          document.documentElement.removeAttribute('data-cart-restore-pending');
           return; // Don't restore cart
         }
         
+        // === UTILITY: Clear all saved cart data (for debugging) ===
+        // Users can call window.clearSavedCart() from console if they have stuck items
+        window.clearSavedCart = function() {
+          // Clear for current customer
+          if (customerId) {
+            localStorage.removeItem(CART_STORAGE_KEY + customerId);
+          }
+          // Clear all cart storage keys (for any customer)
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith(CART_STORAGE_KEY)) {
+              localStorage.removeItem(key);
+            }
+          });
+          // Clear Shopify session cart too
+          fetch(window.Shopify.routes.root + 'cart/clear.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          }).then(() => {
+            updateCartUI(0);
+            console.log('[Cart Persistence] All saved carts cleared. Refresh the page.');
+            window.location.reload();
+          });
+        };
+        
         // === SCENARIO 1: User just logged out (is now guest) ===
         if (!isLoggedIn && hasLoggedOutFlag) {
-          console.log('[Cart Persistence] User logged out. Clearing session cart...');
           
           // Clear the session cart
           fetch(window.Shopify.routes.root + 'cart/clear.js', {
@@ -190,7 +265,6 @@
             updateCartUI(0);
             // Clean URL
             window.history.replaceState({}, document.title, window.location.pathname);
-            console.log('[Cart Persistence] Session cart cleared. Customer cart preserved in storage.');
           })
           .catch(err => console.error('[Cart Persistence] Error clearing cart:', err));
           
@@ -199,13 +273,31 @@
         
         // === SCENARIO 2: User is logged in ===
         if (isLoggedIn && customerId) {
+          // Strip the just_logged_in marker added by account-login-actions.js
+          // so it doesn't linger in the address bar.
+          if (hasJustLoggedIn) {
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('just_logged_in');
+            window.history.replaceState({}, document.title, cleanUrl.toString());
+          }
+
           // Check if we need to restore cart from localStorage
           restoreCartIfNeeded(customerId);
           
+          // Debounced save to prevent race conditions during rapid cart updates
+          let saveTimeout = null;
+          const debouncedSave = () => {
+            if (saveTimeout) clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+              saveCartToStorage(customerId);
+            }, 500); // 500ms debounce
+          };
+          
           // Set up cart sync - save to localStorage on every cart update
-          document.addEventListener('cart:update', () => {
-            saveCartToStorage(customerId);
-          });
+          document.addEventListener('cart:update', debouncedSave);
+          
+          // Also listen for the theme's CartUpdateEvent class
+          document.addEventListener('theme:cart:update', debouncedSave);
           
           // Also save current cart state now
           saveCartToStorage(customerId);
@@ -215,6 +307,7 @@
         
         /**
          * Save current cart to localStorage for this customer
+         * If cart is empty, remove the saved cart to prevent ghost items
          */
         async function saveCartToStorage(custId) {
           try {
@@ -231,7 +324,9 @@
                 savedAt: Date.now()
               };
               localStorage.setItem(CART_STORAGE_KEY + custId, JSON.stringify(cartData));
-              console.log('[Cart Persistence] Cart saved for customer:', custId, cartData.items.length, 'items');
+            } else {
+              // Cart is empty - clear localStorage to prevent deleted items from coming back
+              localStorage.removeItem(CART_STORAGE_KEY + custId);
             }
           } catch (err) {
             console.error('[Cart Persistence] Error saving cart:', err);
@@ -239,7 +334,17 @@
         }
         
         /**
+         * Reveal the cart bubble that was hidden by the head-script flag
+         * once we know the final cart state — call from every exit path of
+         * restoreCartIfNeeded so the bubble doesn't stay hidden.
+         */
+        function clearCartRestorePending() {
+          document.documentElement.removeAttribute('data-cart-restore-pending');
+        }
+
+        /**
          * Restore cart from localStorage if current cart is empty
+         * Also syncs localStorage with Shopify cart to prevent ghost items
          */
         async function restoreCartIfNeeded(custId) {
           try {
@@ -247,17 +352,25 @@
             const response = await fetch(window.Shopify.routes.root + 'cart.js');
             const currentCart = await response.json();
             
-            // If cart already has items, just update storage and return
+            // If cart already has items, sync localStorage to match Shopify cart and return
             if (currentCart.items && currentCart.items.length > 0) {
-              console.log('[Cart Persistence] Cart already has items, saving to storage.');
-              saveCartToStorage(custId);
+              // Always sync localStorage with Shopify's actual cart state
+              // This ensures deleted items don't come back
+              const cartData = {
+                items: currentCart.items.map(item => ({
+                  variant_id: item.variant_id,
+                  quantity: item.quantity,
+                  properties: item.properties
+                })),
+                savedAt: Date.now()
+              };
+              localStorage.setItem(CART_STORAGE_KEY + custId, JSON.stringify(cartData));
               return;
             }
             
             // Cart is empty - check if we have saved cart
             const savedData = localStorage.getItem(CART_STORAGE_KEY + custId);
             if (!savedData) {
-              console.log('[Cart Persistence] No saved cart found for customer:', custId);
               return;
             }
             
@@ -266,12 +379,19 @@
             // Check if saved cart has items and isn't too old (7 days max)
             const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
             if (!cartData.items || cartData.items.length === 0 || (Date.now() - cartData.savedAt) > maxAge) {
-              console.log('[Cart Persistence] Saved cart is empty or expired.');
               localStorage.removeItem(CART_STORAGE_KEY + custId);
               return;
             }
             
-            console.log('[Cart Persistence] Restoring cart with', cartData.items.length, 'items...');
+            // Check if this restore was already attempted recently (prevent infinite loops)
+            const lastRestoreAttempt = sessionStorage.getItem('skm_last_cart_restore');
+            const now = Date.now();
+            if (lastRestoreAttempt && (now - parseInt(lastRestoreAttempt)) < 5000) {
+              // Restore attempted within last 5 seconds - don't restore again
+              // This prevents the case where restored items fail and we keep trying
+              return;
+            }
+            sessionStorage.setItem('skm_last_cart_restore', now.toString());
             
             // Restore items to cart
             const addPromises = cartData.items.map(item => {
@@ -283,6 +403,10 @@
                   quantity: item.quantity,
                   properties: item.properties || {}
                 })
+              }).then(res => res.json()).catch(err => {
+                // Item might no longer exist - that's ok
+                console.warn('[Cart Persistence] Could not restore item:', item.variant_id, err);
+                return null;
               });
             });
             
@@ -292,6 +416,22 @@
             const finalResponse = await fetch(window.Shopify.routes.root + 'cart.js');
             const finalCart = await finalResponse.json();
             
+            // Sync localStorage with what was actually added
+            if (finalCart.items && finalCart.items.length > 0) {
+              const newCartData = {
+                items: finalCart.items.map(item => ({
+                  variant_id: item.variant_id,
+                  quantity: item.quantity,
+                  properties: item.properties
+                })),
+                savedAt: Date.now()
+              };
+              localStorage.setItem(CART_STORAGE_KEY + custId, JSON.stringify(newCartData));
+            } else {
+              // Nothing was restored - clear localStorage
+              localStorage.removeItem(CART_STORAGE_KEY + custId);
+            }
+            
             updateCartUI(finalCart.item_count);
             
             // Dispatch event for other components
@@ -300,13 +440,13 @@
               detail: { resource: finalCart, source: 'cart-restore', itemCount: finalCart.item_count }
             }));
             
-            console.log('[Cart Persistence] Cart restored! Total items:', finalCart.item_count);
-            
           } catch (err) {
             console.error('[Cart Persistence] Error restoring cart:', err);
+          } finally {
+            clearCartRestorePending();
           }
         }
-        
+
         /**
          * Update cart count in header UI
          */

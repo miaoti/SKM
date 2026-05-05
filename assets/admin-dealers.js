@@ -153,15 +153,15 @@ document.addEventListener('DOMContentLoaded', () => {
  * Initialize the dealers tab
  */
 async function initDealersTab() {
-  console.log('[Dealers] Initializing dealers tab...');
+  // console.log('[Dealers] Initializing dealers tab...');
   try {
     await Promise.all([
       loadPendingApplications(),
       loadActiveDealers()
     ]);
-    console.log('[Dealers] Tab initialized successfully');
+    // console.log('[Dealers] Tab initialized successfully');
   } catch (err) {
-    console.error('[Dealers] Tab initialization failed:', err);
+    // console.error('[Dealers] Tab initialization failed:', err);
   }
 }
 
@@ -353,9 +353,9 @@ async function loadPendingApplications() {
   const countEl = document.getElementById('pending-app-count');
 
   try {
-    console.log('[Dealers] Loading pending applications...');
+    // console.log('[Dealers] Loading pending applications...');
     const data = await window.AdminDashboard.api.get('/dealer-applications?status=pending');
-    console.log('[Dealers] Applications response:', data);
+    // console.log('[Dealers] Applications response:', data);
 
     // Handle both array response and {success, data} response formats
     const apps = Array.isArray(data) ? data : (data.data || []);

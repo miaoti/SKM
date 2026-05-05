@@ -240,8 +240,8 @@
   }
 </style>
 
-<div class="tcc-page min-h-screen bg-white text-black">
-  <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
+<div class="tcc-page bg-white text-black">
+  <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-0">
     <div class="grid grid-cols-1 lg:grid-cols-[60%_40%] gap-8 lg:gap-12">
       
       <!-- LEFT: MEDIA GALLERY (60%) -->
@@ -440,119 +440,617 @@
       </div>
     {%- endif -%}
 
+    <!-- VEHICLE FITMENT SECTION (Relocated) -->
+    {%- if product.metafields.custom.fits_vehicles.value != blank -%}
+      <div class="tcc-fitment-wrapper border-t border-[var(--tcc-border)] pt-4 mt-6">
+        
+        <!-- Interactive Header -->
+        <button 
+          type="button" 
+          class="tcc-fitment-toggle w-full flex items-baseline justify-between group cursor-pointer focus:outline-none"
+          aria-expanded="false"
+          aria-controls="tcc-fitment-content"
+        >
+          <div class="flex items-baseline gap-4 flex-wrap">
+            <div class="tcc-tech-brief-header mb-0 select-none text-[#CC0000]">[ VEHICLE_FITMENT ]</div>
+            
+            <!-- Integrated Status Status -->
+            <div id="tcc-fitment-status-indicator" class="hidden tcc-status-text font-mono text-[11px] tracking-wider uppercase"></div>
+          </div>
+          
+          <div class="tcc-toggle-icon transform transition-transform duration-300 relative top-[2px]">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>
+            </svg>
+          </div>
+        </button>
+  
+        <!-- Expandable Fitment List -->
+      <div id="tcc-fitment-content" class="hidden overflow-hidden transition-all duration-300">
+        
+        <!-- Manual Checker UI -->
+        <div class="tcc-manual-check-wrapper pt-6 pb-2 px-1 mb-6">
+          <div class="tcc-tech-brief-header mb-3" style="color: black !important;">[ MANUAL_CHECK ]</div>
+          <div id="tcc-manual-grid" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="relative">
+              <select id="tcc-manual-year" class="tcc-select w-full">
+                <option value="">YEAR</option>
+              </select>
+            </div>
+            <div class="relative">
+              <select id="tcc-manual-make" class="tcc-select w-full" disabled>
+                <option value="">MAKE</option>
+              </select>
+            </div>
+            <div class="relative">
+              <select id="tcc-manual-model" class="tcc-select w-full" disabled>
+                <option value="">MODEL</option>
+              </select>
+            </div>
+            <div id="tcc-manual-submodel-wrapper" class="relative hidden">
+              <select id="tcc-manual-submodel" class="tcc-select w-full" disabled>
+                <option value="">SUBMODEL</option>
+              </select>
+            </div>
+            <button id="tcc-manual-submit" type="button" class="tcc-check-btn w-full">
+              VERIFY_FIT
+            </button>
+          </div>
+        </div>
+
+        <div class="tcc-fitment-inner pb-4">
+          {%- comment -%} Group by Make logic {%- endcomment -%}
+          {%- assign makes_string = '' -%}
+          {%- for vehicle in product.metafields.custom.fits_vehicles.value -%}
+            {%- assign make_clean = vehicle.make | strip -%}
+            {%- unless makes_string contains make_clean -%}
+              {%- assign makes_string = makes_string | append: make_clean | append: '|||' -%}
+            {%- endunless -%}
+          {%- endfor -%}
+          {%- assign unique_makes = makes_string | split: '|||' -%}
+    
+          {%- for make in unique_makes -%}
+            {%- if make != blank -%}
+              <div class="tcc-make-section mb-10 pl-2">
+                <h3 class="tcc-make-header">{{ make }}</h3>
+                
+                {%- comment -%} Group by Model logic within Make {%- endcomment -%}
+                {%- assign models_string = '' -%}
+                {%- for vehicle in product.metafields.custom.fits_vehicles.value -%}
+                  {%- if vehicle.make == make -%}
+                    {%- assign model_clean = vehicle.model | strip -%}
+                    {%- unless models_string contains model_clean -%}
+                      {%- assign models_string = models_string | append: model_clean | append: '|||' -%}
+                    {%- endunless -%}
+                  {%- endif -%}
+                {%- endfor -%}
+                {%- assign unique_models = models_string | split: '|||' -%}
+    
+                {%- for model in unique_models -%}
+                  {%- if model != blank -%}
+                    <div class="tcc-model-group mb-8 pl-6 border-l border-gray-100 ml-1">
+                      <h4 class="tcc-model-header">{{ model }}</h4>
+                      <ul class="tcc-vehicle-list">
+                        {%- comment -%} Sort vehicles by Year {%- endcomment -%}
+                        {%- assign sortable_list = '' -%}
+                        {%- for vehicle in product.metafields.custom.fits_vehicles.value -%}
+                          {%- if vehicle.make == make and vehicle.model == model -%}
+                            {%- comment -%} Create sortable string: Year|||Submodel {%- endcomment -%}
+                            {%- assign sub = vehicle['submodel'] | default: '' -%}
+                            {%- assign entry = vehicle.year | append: '|||' | append: sub -%}
+                            {%- assign sortable_list = sortable_list | append: entry | append: '####' -%}
+                          {%- endif -%}
+                        {%- endfor -%}
+                        
+                        {%- assign sorted_vehicles = sortable_list | split: '####' | sort -%}
+                        
+                        {%- for item in sorted_vehicles -%}
+                          {%- if item != blank -%}
+                            {%- assign parts = item | split: '|||' -%}
+                            {%- assign v_year = parts[0] -%}
+                            {%- assign v_submodel = parts[1] -%}
+                            
+                            <li class="tcc-vehicle-item">
+                              {%- if v_submodel != blank -%}
+                                {{ v_year }} {{ model }} {{ v_submodel }}
+                              {%- else -%}
+                                {{ v_year }} {{ model }}
+                              {%- endif -%}
+                            </li>
+                          {%- endif -%}
+                        {%- endfor -%}
+                      </ul>
+                    </div>
+                  {%- endif -%}
+                {%- endfor -%}
+              </div>
+            {%- endif -%}
+          {%- endfor -%}
+        </div>
+      </div>
+    </div>
+    
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // --- Shared Helpers ---
+        const normalize = (str) => (str || '').toString().trim().toUpperCase();
+        
+        // Product's Compatible Keys
+        const compatibleKeys = [
+          {%- for vehicle in product.metafields.custom.fits_vehicles.value -%}
+            "{{ vehicle.year | strip }}::{{ vehicle.make | strip | upcase }}::{{ vehicle.model | strip | upcase }}::{{ vehicle['submodel'] | default: '' | strip | upcase }}",
+          {%- endfor -%}
+        ];
+
+        // Status Updater
+        const updateStatus = (v) => {
+          const statusEl = document.getElementById('tcc-fitment-status-indicator');
+          if (!statusEl || !v || !v.year) return;
+          
+          const myKey = `${normalize(v.year)}::${normalize(v.make)}::${normalize(v.model)}::${normalize(v.submodel)}`;
+          let isCompatible = compatibleKeys.includes(myKey);
+          
+          // Fallback (generic model match)
+          if (!isCompatible) {
+             const genericKey = `${normalize(v.year)}::${normalize(v.make)}::${normalize(v.model)}::`;
+             if (compatibleKeys.includes(genericKey)) isCompatible = true;
+          }
+          
+          if (isCompatible) {
+            statusEl.innerHTML = `[ VERIFIED FIT: ${v.year} ${v.make} ${v.model} ${v.submodel ? v.submodel : ''} ]`;
+            statusEl.className = 'tcc-status-text font-mono text-[11px] tracking-wider uppercase text-white bg-[#16a34a] px-2 py-0.5 ml-2 leading-none inline-block';
+          } else {
+            statusEl.innerHTML = `[ DOES NOT FIT: ${v.year} ${v.make} ${v.model} ${v.submodel ? v.submodel : ''} ]`;
+            statusEl.className = 'tcc-status-text font-mono text-[11px] tracking-wider uppercase text-white bg-[#CC0000] px-2 py-0.5 ml-2 leading-none inline-block';
+          }
+          statusEl.classList.remove('hidden');
+        };
+
+        // --- 1. Init from LocalStorage ---
+        try {
+          const raw = localStorage.getItem('skm_garage_vehicle');
+          if (raw) {
+            const v = JSON.parse(raw);
+            updateStatus(v);
+          }
+        } catch(e) { console.error(e); }
+
+        // --- 2. Manual Checker Logic (Global Fetch) ---
+        const yearEl = document.getElementById('tcc-manual-year');
+        const makeEl = document.getElementById('tcc-manual-make');
+        const modelEl = document.getElementById('tcc-manual-model');
+        const submodelEl = document.getElementById('tcc-manual-submodel');
+        const submodelWrapper = document.getElementById('tcc-manual-submodel-wrapper');
+        const gridEl = document.getElementById('tcc-manual-grid');
+        const checkBtn = document.getElementById('tcc-manual-submit');
+        
+        if (yearEl && makeEl && modelEl && checkBtn) {
+          const index = { byYear: new Map(), byYearMake: new Map(), byYearMakeModel: new Map() };
+          
+          // Fetch Logic (Robust Dual-Type Check)
+          const loadGlobalVehicles = async () => {
+            const token = 'c9e546201d3f991f9c3f576e0d1cf4ee'; // Token from hero-ymm
+            const query = `
+              query getVehicles($type: String!, $first: Int!, $after: String) {
+                metaobjects(type: $type, first: $first, after: $after) {
+                  nodes { fields { key value } }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            `;
+            
+            // Helper to fetch all pages for a type
+            const fetchPages = async (type) => {
+              let collected = [];
+              let after = null;
+              for(let i=0; i<15; i++) { // Safety limit
+                 try {
+                   const res = await fetch(`/api/2025-01/graphql.json`, {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json', 'X-Shopify-Storefront-Access-Token': token },
+                     body: JSON.stringify({ query, variables: { type, first: 250, after } })
+                   });
+                   const json = await res.json();
+                   if(!json.data || !json.data.metaobjects) break;
+                   
+                   collected = collected.concat(json.data.metaobjects.nodes);
+                   if(!json.data.metaobjects.pageInfo.hasNextPage) break;
+                   after = json.data.metaobjects.pageInfo.endCursor;
+                 } catch(e) { console.error(e); break; }
+              }
+              return collected;
+            };
+
+            // 1. Try "vehicle" (Standard)
+            let nodes = await fetchPages("vehicle");
+            
+            // 2. Fallback "custom.vehicle"
+            if (nodes.length === 0) {
+              nodes = await fetchPages("custom.vehicle");
+            }
+            
+
+            // Build Index
+            nodes.forEach(node => {
+              const map = new Map(node.fields.map(f => [f.key, f.value]));
+              const y = map.get('year');
+              const m = map.get('make');
+              const mod = map.get('model');
+              const sub = map.get('submodel') || '';
+              
+              if(y && m && mod) {
+                 if(!index.byYear.has(y)) index.byYear.set(y, new Set());
+                 index.byYear.get(y).add(m);
+                 
+                 const ky = `${y}::${m}`;
+                 if(!index.byYearMake.has(ky)) index.byYearMake.set(ky, new Set());
+                 index.byYearMake.get(ky).add(mod);
+                 
+                 const kym = `${y}::${m}::${mod}`;
+                 if (!index.byYearMakeModel.has(kym)) index.byYearMakeModel.set(kym, new Set());
+                 if (sub) index.byYearMakeModel.get(kym).add(sub);
+              }
+            });
+            
+            // Populate Years
+            yearEl.innerHTML = '<option value="">YEAR</option>';
+            const years = Array.from(index.byYear.keys()).sort().reverse();
+            years.forEach(y => {
+              const opt = document.createElement('option');
+              opt.value = y;
+              opt.textContent = y;
+              yearEl.appendChild(opt);
+            });
+          };
+          
+          // Interactions
+          yearEl.addEventListener('change', () => {
+            makeEl.innerHTML = '<option value="">MAKE</option>';
+            makeEl.disabled = true;
+            modelEl.innerHTML = '<option value="">MODEL</option>';
+            modelEl.disabled = true;
+            // Reset Submodel
+            if(submodelWrapper) submodelWrapper.classList.add('hidden');
+            if(gridEl) { gridEl.classList.remove('md:grid-cols-5'); gridEl.classList.add('md:grid-cols-4'); }
+            if(submodelEl) submodelEl.value = '';
+            
+            const y = yearEl.value;
+            if(y && index.byYear.has(y)) {
+               const makes = Array.from(index.byYear.get(y)).sort();
+               makes.forEach(m => {
+                 const opt = document.createElement('option');
+                 opt.value = m;
+                 opt.textContent = m;
+                 makeEl.appendChild(opt);
+               });
+               makeEl.disabled = false;
+            }
+          });
+          
+          makeEl.addEventListener('change', () => {
+             modelEl.innerHTML = '<option value="">MODEL</option>';
+             modelEl.disabled = true;
+             // Reset Submodel
+             if(submodelWrapper) submodelWrapper.classList.add('hidden');
+             if(gridEl) { gridEl.classList.remove('md:grid-cols-5'); gridEl.classList.add('md:grid-cols-4'); }
+             if(submodelEl) submodelEl.value = '';
+             
+             const y = yearEl.value;
+             const m = makeEl.value;
+             const key = `${y}::${m}`;
+             
+             if(y && m && index.byYearMake.has(key)) {
+               const models = Array.from(index.byYearMake.get(key)).sort();
+               models.forEach(mod => {
+                 const opt = document.createElement('option');
+                 opt.value = mod;
+                 opt.textContent = mod;
+                 modelEl.appendChild(opt);
+               });
+               modelEl.disabled = false;
+             }
+          });
+          
+          modelEl.addEventListener('change', () => {
+             // Submodel Logic
+             const y = yearEl.value;
+             const m = makeEl.value;
+             const mod = modelEl.value;
+             const key = `${y}::${m}::${mod}`;
+             
+             submodelEl.innerHTML = '<option value="">SUBMODEL</option>';
+             
+             if (y && m && mod && index.byYearMakeModel.has(key)) {
+               const submodels = index.byYearMakeModel.get(key);
+               if (submodels.size > 0) {
+                 // Show Submodel Dropdown
+                 if(gridEl) { gridEl.classList.remove('md:grid-cols-4'); gridEl.classList.add('md:grid-cols-5'); }
+                 if(submodelWrapper) submodelWrapper.classList.remove('hidden');
+                 submodelEl.disabled = false;
+                 
+                 const subs = Array.from(submodels).sort();
+                 subs.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s;
+                    opt.textContent = s;
+                    submodelEl.appendChild(opt);
+                 });
+               } else {
+                 // Hide Submodel
+                 if(gridEl) { gridEl.classList.remove('md:grid-cols-5'); gridEl.classList.add('md:grid-cols-4'); }
+                 if(submodelWrapper) submodelWrapper.classList.add('hidden');
+                 submodelEl.disabled = true;
+               }
+             } else {
+                 if(gridEl) { gridEl.classList.remove('md:grid-cols-5'); gridEl.classList.add('md:grid-cols-4'); }
+                 if(submodelWrapper) submodelWrapper.classList.add('hidden');
+                 submodelEl.disabled = true;
+             }
+          });
+          
+          checkBtn.addEventListener('click', () => {
+            const v = {
+              year: yearEl.value,
+              make: makeEl.value,
+              model: modelEl.value,
+              submodel: submodelEl && !submodelWrapper.classList.contains('hidden') ? submodelEl.value : ''
+            };
+            
+            if(v.year && v.make && v.model) {
+              updateStatus(v);
+              // Removed localStorage saving to keep check ephemeral
+            }
+          });
+          
+          // Init Load
+          // Use setTimeout to avoid blocking main thread immediately
+          setTimeout(loadGlobalVehicles, 100);
+        }
+      });
+    </script>
+    
+    <style>
+      /* Manual Checker Styles */
+      .tcc-select {
+        appearance: none;
+        -webkit-appearance: none;
+        background-color: #ffffff;
+        border: 1px solid #e5e5e5;
+        border-radius: 0;
+        padding: 12px 16px;
+        padding-right: 32px; /* For arrow */
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        letter-spacing: 0.05em;
+        color: #111;
+        cursor: pointer;
+        outline: none;
+        transition: all 0.2s ease;
+        text-transform: uppercase;
+        width: 100%;
+        background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23111111' stroke-width='1.5' stroke-linecap='square'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+      }
+      .tcc-select:focus {
+        border-color: #111;
+        box-shadow: 0 0 0 1px #111;
+      }
+      .tcc-select:disabled {
+        background-color: #fafafa;
+        color: #999;
+        cursor: not-allowed;
+        opacity: 0.7;
+        border-color: #f0f0f0;
+        background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23cccccc' stroke-width='1.5' stroke-linecap='square'/%3E%3C/svg%3E");
+      }
+      
+      .tcc-check-btn {
+        background-color: #111; /* Obsidian Base */
+        color: white;
+        border: 1px solid #111;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 12px 16px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .tcc-check-btn:hover {
+        background-color: #CC0000; /* Tech Red Hover */
+        border-color: #CC0000;
+      }
+      .tcc-check-btn:active {
+        background-color: #990000;
+      }
+      
+      /* Existing Styles... */
+      .tcc-make-header {
+          font-family: 'Inter', sans-serif;
+          font-size: 14px;
+          font-weight: 700;
+          color: #111;
+          margin-bottom: 16px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          border-bottom: 1px solid #eee;
+          padding-bottom: 8px;
+        }
+        
+        .tcc-model-header {
+          font-family: 'Inter', sans-serif;
+          font-size: 12px; 
+          font-weight: 600;
+          color: #444;
+          margin-bottom: 8px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        
+        .tcc-vehicle-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px 16px;
+        }
+        
+        .tcc-vehicle-item {
+          font-family: 'Inter', sans-serif;
+          font-size: 13px;
+          color: #666;
+        }
+        
+        .tcc-vehicle-item:after {
+          content: "/";
+          margin-left: 16px;
+          color: #ddd;
+        }
+    
+        .tcc-vehicle-item:last-child:after {
+          content: "";
+          display: none;
+        }
+        
+        .tcc-toggle-icon {
+          color: #666;
+        }
+      </style>
+    {%- endif -%}
+
     <!-- Dynamic Product Sections -->
     {%- if product.metafields.custom.product_sections.value != blank -%}
-      <div class="tcc-dynamic-sections mt-12 pt-8 border-t border-[var(--tcc-border)]">
+      <div class="tcc-dynamic-sections mt-6 border-t border-[var(--tcc-border)]">
         {%- assign sections_data = product.metafields.custom.product_sections.value -%}
         {%- for section_item in sections_data -%}
-          <div class="tcc-dynamic-section mb-12">
-            {%- comment -%} Check for new mixed-content structure vs legacy {%- endcomment -%}
-            {%- if section_item.blocks -%}
-              {%- comment -%} New structure with blocks array {%- endcomment -%}
-              {%- assign layout = section_item.layout | default: 'stacked' -%}
+          <div class="tcc-dynamic-section border-b border-[var(--tcc-border)] last:border-0">
+            
+            <!-- Accordion Header -->
+            <button 
+              type="button" 
+              class="tcc-section-toggle w-full flex items-baseline justify-between group cursor-pointer focus:outline-none py-4"
+              aria-expanded="false"
+              aria-controls="dynamic-section-{{ forloop.index }}"
+            >
+              <div class="tcc-tech-brief-header mb-0 select-none text-[#111] group-hover:text-[#CC0000] transition-colors">
+                [ {{ section_item.name | default: 'DETAILS' }} ]
+              </div>
               
-              {%- if layout == 'stacked' -%}
-                {%- comment -%} Stacked: Full width, blocks in order {%- endcomment -%}
-                {%- if section_item.name != blank -%}
-                  <div class="tcc-tech-brief-header">[ {{ section_item.name }} ]</div>
-                {%- endif -%}
-                <div class="tcc-section-stacked space-y-6">
+              <div class="tcc-toggle-icon transform transition-transform duration-300 relative top-[2px]">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>
+                </svg>
+              </div>
+            </button>
+
+            <!-- Accordion Content -->
+            <div id="dynamic-section-{{ forloop.index }}" class="hidden overflow-hidden transition-all duration-300 pb-8">
+              {%- comment -%} Check for new mixed-content structure vs legacy {%- endcomment -%}
+              {%- if section_item.blocks -%}
+                {%- comment -%} New structure with blocks array {%- endcomment -%}
+                {%- assign layout = section_item.layout | default: 'stacked' -%}
+                
+                {%- if layout == 'stacked' -%}
+                  {%- comment -%} Stacked: Full width, blocks in order {%- endcomment -%}
+                  <div class="tcc-section-stacked space-y-6">
+                    {%- for block in section_item.blocks -%}
+                      {%- if block.type == 'text' -%}
+                        <div class="tcc-content-text font-sans text-sm leading-relaxed text-[#333] whitespace-pre-line">
+                          {{ block.content }}
+                        </div>
+                      {%- elsif block.type == 'media' or block.type == 'image' -%}
+                        {%- if block.url != blank -%}
+                          {%- if block.mimeType contains 'video' or block.mimeType contains 'VIDEO' or block.url contains '.mp4' or block.url contains '.webm' or block.url contains '.mov' -%}
+                            <div class="tcc-content-video aspect-w-16 aspect-h-9 bg-black overflow-hidden rounded-lg">
+                              <video src="{{ block.url }}" controls class="w-full h-full object-cover">
+                                Your browser does not support the video tag.
+                              </video>
+                            </div>
+                          {%- else -%}
+                            <div class="tcc-content-image">
+                              <img src="{{ block.url }}" alt="Product detail" class="w-full h-auto border border-[var(--tcc-border)] rounded-lg" loading="lazy">
+                            </div>
+                          {%- endif -%}
+                        {%- endif -%}
+                      {%- endif -%}
+                    {%- endfor -%}
+                  </div>
+                  
+                {%- elsif layout == 'media_left' or layout == 'media_right' -%}
+                  {%- comment -%} Side-by-side layout {%- endcomment -%}
+                  {%- assign text_blocks = '' -%}
+                  {%- assign media_block = nil -%}
                   {%- for block in section_item.blocks -%}
                     {%- if block.type == 'text' -%}
-                      <div class="tcc-content-text font-sans text-sm leading-relaxed text-[#333] whitespace-pre-line">
-                        {{ block.content }}
-                      </div>
+                      {%- capture text_blocks -%}{{ text_blocks }}<div class="tcc-content-text font-sans text-sm leading-relaxed text-[#333] whitespace-pre-line mb-4">{{ block.content }}</div>{%- endcapture -%}
                     {%- elsif block.type == 'media' or block.type == 'image' -%}
-                      {%- if block.url != blank -%}
-                        {%- if block.mimeType contains 'video' or block.mimeType contains 'VIDEO' or block.url contains '.mp4' or block.url contains '.webm' or block.url contains '.mov' -%}
-                          <div class="tcc-content-video aspect-w-16 aspect-h-9 bg-black overflow-hidden rounded-lg">
-                            <video src="{{ block.url }}" controls class="w-full h-full object-cover">
-                              Your browser does not support the video tag.
-                            </video>
-                          </div>
-                        {%- else -%}
-                          <div class="tcc-content-image">
-                            <img src="{{ block.url }}" alt="Product detail" class="w-full h-auto border border-[var(--tcc-border)] rounded-lg" loading="lazy">
-                          </div>
-                        {%- endif -%}
+                      {%- if media_block == nil and block.url != blank -%}
+                        {%- assign media_block = block -%}
                       {%- endif -%}
                     {%- endif -%}
                   {%- endfor -%}
-                </div>
-                
-              {%- elsif layout == 'media_left' or layout == 'media_right' -%}
-                {%- comment -%} Side-by-side layout: Media on one side, text on other {%- endcomment -%}
-                {%- assign text_blocks = '' -%}
-                {%- assign media_block = nil -%}
-                {%- for block in section_item.blocks -%}
-                  {%- if block.type == 'text' -%}
-                    {%- capture text_blocks -%}{{ text_blocks }}<div class="tcc-content-text font-sans text-sm leading-relaxed text-[#333] whitespace-pre-line mb-4">{{ block.content }}</div>{%- endcapture -%}
-                  {%- elsif block.type == 'media' or block.type == 'image' -%}
-                    {%- if media_block == nil and block.url != blank -%}
-                      {%- assign media_block = block -%}
+                  
+                  <div class="tcc-section-split grid md:grid-cols-2 gap-8 items-start">
+                    {%- if layout == 'media_left' -%}
+                      <div class="tcc-media-column">
+                        {%- if media_block -%}
+                          {%- if media_block.mimeType contains 'video' or media_block.mimeType contains 'VIDEO' or media_block.url contains '.mp4' or media_block.url contains '.webm' -%}
+                            <div class="aspect-w-16 aspect-h-9 bg-black overflow-hidden rounded-lg">
+                              <video src="{{ media_block.url }}" controls class="w-full h-full object-cover"></video>
+                            </div>
+                          {%- else -%}
+                            <img src="{{ media_block.url }}" alt="Product detail" class="w-full h-auto border border-[var(--tcc-border)] rounded-lg" loading="lazy">
+                          {%- endif -%}
+                        {%- endif -%}
+                      </div>
+                      <div class="tcc-text-column">{{ text_blocks }}</div>
+                    {%- else -%}
+                      <div class="tcc-text-column">{{ text_blocks }}</div>
+                      <div class="tcc-media-column">
+                        {%- if media_block -%}
+                          {%- if media_block.mimeType contains 'video' or media_block.mimeType contains 'VIDEO' or media_block.url contains '.mp4' or media_block.url contains '.webm' -%}
+                            <div class="aspect-w-16 aspect-h-9 bg-black overflow-hidden rounded-lg">
+                              <video src="{{ media_block.url }}" controls class="w-full h-full object-cover"></video>
+                            </div>
+                          {%- else -%}
+                            <img src="{{ media_block.url }}" alt="Product detail" class="w-full h-auto border border-[var(--tcc-border)] rounded-lg" loading="lazy">
+                          {%- endif -%}
+                        {%- endif -%}
+                      </div>
                     {%- endif -%}
-                  {%- endif -%}
-                {%- endfor -%}
-                
-                {%- if section_item.name != blank -%}
-                  <div class="tcc-tech-brief-header">[ {{ section_item.name }} ]</div>
-                {%- endif -%}
-                <div class="tcc-section-split grid md:grid-cols-2 gap-8 items-start">
-                  {%- if layout == 'media_left' -%}
-                    {%- comment -%} Media on left {%- endcomment -%}
-                    <div class="tcc-media-column">
-                      {%- if media_block -%}
-                        {%- if media_block.mimeType contains 'video' or media_block.mimeType contains 'VIDEO' or media_block.url contains '.mp4' or media_block.url contains '.webm' -%}
-                          <div class="aspect-w-16 aspect-h-9 bg-black overflow-hidden rounded-lg">
-                            <video src="{{ media_block.url }}" controls class="w-full h-full object-cover"></video>
-                          </div>
-                        {%- else -%}
-                          <img src="{{ media_block.url }}" alt="Product detail" class="w-full h-auto border border-[var(--tcc-border)] rounded-lg" loading="lazy">
-                        {%- endif -%}
-                      {%- endif -%}
-                    </div>
-                    <div class="tcc-text-column">{{ text_blocks }}</div>
-                  {%- else -%}
-                    {%- comment -%} Media on right {%- endcomment -%}
-                    <div class="tcc-text-column">{{ text_blocks }}</div>
-                    <div class="tcc-media-column">
-                      {%- if media_block -%}
-                        {%- if media_block.mimeType contains 'video' or media_block.mimeType contains 'VIDEO' or media_block.url contains '.mp4' or media_block.url contains '.webm' -%}
-                          <div class="aspect-w-16 aspect-h-9 bg-black overflow-hidden rounded-lg">
-                            <video src="{{ media_block.url }}" controls class="w-full h-full object-cover"></video>
-                          </div>
-                        {%- else -%}
-                          <img src="{{ media_block.url }}" alt="Product detail" class="w-full h-auto border border-[var(--tcc-border)] rounded-lg" loading="lazy">
-                        {%- endif -%}
-                      {%- endif -%}
-                    </div>
-                  {%- endif -%}
-                </div>
-              {%- endif -%}
-              
-            {%- else -%}
-              {%- comment -%} Legacy structure fallback {%- endcomment -%}
-              {%- case section_item.type -%}
-                {%- when 'text' -%}
-                  <div class="tcc-content-text font-sans text-sm leading-relaxed text-[#333] whitespace-pre-line">
-                    {{ section_item.content }}
                   </div>
-                {%- when 'image' -%}
-                  {%- if section_item.url != blank -%}
-                    <div class="tcc-content-image my-6">
-                      <img src="{{ section_item.url }}" alt="Product detail" class="w-full h-auto border border-[var(--tcc-border)]" loading="lazy">
+                {%- endif -%}
+                
+              {%- else -%}
+                {%- comment -%} Legacy structure fallback {%- endcomment -%}
+                {%- case section_item.type -%}
+                  {%- when 'text' -%}
+                    <div class="tcc-content-text font-sans text-sm leading-relaxed text-[#333] whitespace-pre-line">
+                      {{ section_item.content }}
                     </div>
-                  {%- endif -%}
-                {%- when 'video' -%}
-                  {%- if section_item.url != blank -%}
-                    <div class="tcc-content-video my-6 aspect-w-16 aspect-h-9 bg-black overflow-hidden">
-                      <video src="{{ section_item.url }}" controls class="w-full h-full object-cover">
-                        Your browser does not support the video tag.
-                      </video>
-                    </div>
-                  {%- endif -%}
-              {%- endcase -%}
-            {%- endif -%}
+                  {%- when 'image' -%}
+                    {%- if section_item.url != blank -%}
+                      <div class="tcc-content-image my-6">
+                        <img src="{{ section_item.url }}" alt="Product detail" class="w-full h-auto border border-[var(--tcc-border)]" loading="lazy">
+                      </div>
+                    {%- endif -%}
+                  {%- when 'video' -%}
+                    {%- if section_item.url != blank -%}
+                      <div class="tcc-content-video my-6 aspect-w-16 aspect-h-9 bg-black overflow-hidden">
+                        <video src="{{ section_item.url }}" controls class="w-full h-full object-cover">
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                    {%- endif -%}
+                {%- endcase -%}
+              {%- endif -%}
+            </div>
           </div>
         {%- endfor -%}
       </div>
@@ -561,10 +1059,40 @@
   </div>
 </div>
 
-<!-- Gallery Interaction + Variant Filter Script -->
+<!-- Gallery Interaction + Variant Filter + Toggle Script -->
 <script>
 (function() {
   document.addEventListener('DOMContentLoaded', function() {
+    // --- 1. Accordion Toggles (Fitment & Dynamic Sections) ---
+    function setupToggle(btn) {
+      if (!btn) return;
+      btn.addEventListener('click', function() {
+        const contentId = btn.getAttribute('aria-controls');
+        const contentDiv = document.getElementById(contentId);
+        const icon = btn.querySelector('.tcc-toggle-icon');
+        const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+        
+        if (!isExpanded) {
+          if(contentDiv) contentDiv.classList.remove('hidden');
+          btn.setAttribute('aria-expanded', 'true');
+          if(icon) icon.style.transform = 'rotate(180deg)';
+        } else {
+          if(contentDiv) contentDiv.classList.add('hidden');
+          btn.setAttribute('aria-expanded', 'false');
+          if(icon) icon.style.transform = 'rotate(0deg)';
+        }
+      });
+    }
+
+    // Fitment Toggle
+    const fitmentToggle = document.querySelector('.tcc-fitment-toggle');
+    if (fitmentToggle) setupToggle(fitmentToggle);
+
+    // Dynamic Section Toggles
+    document.querySelectorAll('.tcc-section-toggle').forEach(setupToggle);
+
+
+    // --- 2. Existing Gallery & Variant Logic ---
     const thumbnails = document.querySelectorAll('[data-thumbnail-btn]');
     const slides = document.querySelectorAll('[data-media-slide]');
     
@@ -603,9 +1131,6 @@
           selectedValues.push(checkedInput.value.toLowerCase().trim());
         }
       });
-      
-      // Also check for addon options but don't filter by them
-      // Only filter by variant options (like Material)
       
       if (selectedValues.length === 0) {
         // No variant selected, show all
@@ -656,21 +1181,12 @@
       }
     }
     
-    // Listen for variant changes
+    // Listen for variant changes (per-radio is enough; bubbling to a form-level
+    // delegate would fire filterMediaByVariant a second time per click).
     document.querySelectorAll('input[type="radio"][name*="option"]').forEach(input => {
       input.addEventListener('change', filterMediaByVariant);
     });
-    
-    // Also listen on the form for any changes
-    const form = document.querySelector('form[action*="/cart/add"]');
-    if (form) {
-      form.addEventListener('change', function(e) {
-        if (e.target.matches('input[type="radio"][name*="option"]')) {
-          filterMediaByVariant();
-        }
-      });
-    }
-    
+
     // Initial filter
     filterMediaByVariant();
   });

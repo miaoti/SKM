@@ -1,0 +1,228 @@
+{% comment %}
+  "Fitment Database" - High-Tech YMM Search Page
+  - Reuses style from Contact Page (Carbon/Tech)
+  - Implements YMM Search logic
+{% endcomment %}
+
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Oswald:wght@400;500;700&display=swap" rel="stylesheet">
+{{ 'ymm.css' | asset_url | stylesheet_tag }}
+
+<style>
+  :root {
+    --racing-red: #CC0000;
+    --carbon-black: #111111;
+  }
+  .font-tech-header { font-family: 'Oswald', sans-serif; }
+  .font-tech-mono { font-family: 'JetBrains Mono', monospace; }
+  .bg-carbon-fiber {
+    background-color: #050505;
+    background-image: url('https://github.com/miaoti/SKM/blob/main/Pictures/Contact/background_texture.png?raw=true');
+    background-size: cover;
+    background-position: center;
+  }
+</style>
+
+<div class="w-full min-h-screen bg-black text-white font-tech-mono" data-section-id="{{ section.id }}">
+  
+  <!-- HERO HEADER -->
+  <div class="relative w-full min-h-[450px] h-auto flex items-center justify-center overflow-hidden bg-carbon-fiber">
+    <div class="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black z-10 pointer-events-none"></div>
+    <div class="relative z-20 text-center px-4">
+      <h1 class="font-tech-header text-5xl md:text-7xl lg:text-8xl font-bold uppercase tracking-tight text-white mb-2 leading-none">
+        Global Fitment<br>Registry
+      </h1>
+      <p class="text-[#CC0000] text-xs md:text-sm tracking-[0.3em] font-bold mt-4 mb-6">
+        COMPATIBILITY DATABASE • LIVE INVENTORY CHECK
+      </p>
+      <div class="h-[2px] bg-[#CC0000] mx-auto" style="width: 100px;"></div>
+    </div>
+  </div>
+
+  <!-- SEARCH INTERFACE -->
+  <div class="w-full relative z-20 -mt-20 pb-24">
+    <div class="max-w-6xl mx-auto px-4">
+      
+      <!-- Glass Panel -->
+      <div class="bg-[#111]/90 backdrop-blur-md border border-white/10 p-8 md:p-12 rounded-sm shadow-2xl relative overflow-hidden">
+        
+        <!-- Decoration -->
+        <div class="absolute top-0 left-0 w-2 h-full bg-[#CC0000]"></div>
+        <div class="absolute top-4 right-4 text-[#CC0000] text-[10px] tracking-widest animate-pulse">
+           ● DATABASE ONLINE
+        </div>
+
+        <h2 class="font-tech-header text-2xl text-white uppercase mb-8 flex items-center gap-3">
+          <svg class="w-6 h-6 text-[#CC0000]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          Select Platform
+        </h2>
+
+        {%- liquid
+          assign sf_token = section.settings.storefront_access_token | default: 'c9e546201d3f991f9c3f576e0d1cf4ee'
+          assign collection_handle = section.settings.collection_handle | default: 'all'
+          assign unique_id = 'fitment-' | append: section.id
+        -%}
+
+        <!-- YMM GRID (Reused from hero-ymm) -->
+        <div class="ymm-search-grid w-full grid !grid-cols-1 md:!grid-cols-[1fr_auto] gap-6 items-end">
+          
+          <!-- Inputs -->
+          <div class="flex flex-wrap gap-4 items-end w-full">
+            
+            {%- comment -%} YEAR {%- endcomment -%}
+            <div class="ymm-search-field flex-1 min-w-[120px] w-full md:w-auto">
+              <label class="font-tech-mono text-[10px] text-gray-500 block mb-2 tracking-widest">YEAR:</label>
+              <div class="relative">
+                <select id="ymm-year-{{ unique_id }}" data-role="ymm-year" class="w-full h-12 bg-[#0a0a0a] border border-gray-800 text-white px-4 focus:border-[#CC0000] focus:ring-1 focus:ring-[#CC0000] outline-none transition-all">
+                  <option value="">Select</option>
+                </select>
+              </div>
+            </div>
+
+            {%- comment -%} MAKE {%- endcomment -%}
+            <div class="ymm-search-field flex-1 min-w-[130px] w-full md:w-auto">
+              <label class="font-tech-mono text-[10px] text-gray-500 block mb-2 tracking-widest">MAKE:</label>
+              <div class="relative">
+                <select id="ymm-make-{{ unique_id }}" data-role="ymm-make" disabled class="w-full h-12 bg-[#0a0a0a] border border-gray-800 text-white px-4 focus:border-[#CC0000] disabled:opacity-50 outline-none transition-all">
+                  <option value="">Select</option>
+                </select>
+              </div>
+            </div>
+
+            {%- comment -%} MODEL {%- endcomment -%}
+            <div class="ymm-search-field flex-1 min-w-[150px] w-full md:w-auto">
+              <label class="font-tech-mono text-[10px] text-gray-500 block mb-2 tracking-widest">MODEL:</label>
+              <div class="relative">
+                <select id="ymm-model-{{ unique_id }}" data-role="ymm-model" disabled class="w-full h-12 bg-[#0a0a0a] border border-gray-800 text-white px-4 focus:border-[#CC0000] disabled:opacity-50 outline-none transition-all">
+                  <option value="">Select</option>
+                </select>
+              </div>
+            </div>
+
+            {%- comment -%} SUBMODEL {%- endcomment -%}
+            <div class="ymm-search-field flex-1 min-w-[130px] w-full md:w-auto" data-role="ymm-submodel-container" id="submodel-container-{{ unique_id }}" style="display: none;">
+              <label class="font-tech-mono text-[10px] text-gray-500 block mb-2 tracking-widest">SUBMODEL:</label>
+              <div class="relative">
+                <select id="ymm-submodel-{{ unique_id }}" data-role="ymm-submodel" disabled class="w-full h-12 bg-[#0a0a0a] border border-gray-800 text-white px-4 focus:border-[#CC0000] disabled:opacity-50 outline-none transition-all">
+                  <option value="">Select</option>
+                </select>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Button -->
+          <div class="ymm-search-field w-full md:w-auto md:justify-self-end">
+            <button type="button" data-role="ymm-submit" class="group w-full md:w-auto px-10 h-12 bg-[#CC0000] text-white font-bold uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all duration-300 flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(204,0,0,0.3)]">
+              <span>View Components</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Status Output -->
+        <div class="ymm-status mt-6 pt-4 border-t border-white/5 font-tech-mono text-[10px] text-gray-500 text-center" aria-live="polite"></div>
+
+      </div>
+
+      <!-- Quick Links or Instructions -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+        <div class="border border-white/10 p-6 bg-[#080808]">
+          <h3 class="text-[#CC0000] text-sm font-bold uppercase mb-2">1. Select Vehicle</h3>
+          <p class="text-gray-500 text-xs">Identify your exact Year, Make, and Model to ensure 100% fitment accuracy.</p>
+        </div>
+        <div class="border border-white/10 p-6 bg-[#080808]">
+          <h3 class="text-[#CC0000] text-sm font-bold uppercase mb-2">2. Verify Specs</h3>
+          <p class="text-gray-500 text-xs">Cross-reference engine codes and submodels if necessary.</p>
+        </div>
+        <div class="border border-white/10 p-6 bg-[#080808]">
+          <h3 class="text-[#CC0000] text-sm font-bold uppercase mb-2">3. Component Access</h3>
+          <p class="text-gray-500 text-xs">Access the complete catalog of precision engineered parts for your platform.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- YMM CONFIG -->
+  <script type="application/json" id="ymm-config-{{ unique_id }}">
+    {
+      "collectionHandle": {{ collection_handle | json }},
+      "showSubmodel": true,
+      "showEngine": false,
+      "storefrontAccessToken": {{ sf_token | json }},
+      "apiVersion": "2025-01",
+      "rootId": {{ unique_id | json }}
+    }
+  </script>
+</div>
+
+<script>
+  (function() {
+    function forceFullWidthLayout() {
+      const body = document.body;
+      if (body.classList.contains('page-width-narrow') || body.classList.contains('page-width')) {
+        body.classList.remove('page-width-narrow', 'page-width');
+        body.style.maxWidth = '100%';
+        body.style.padding = '0';
+      }
+      
+      const main = document.getElementById('MainContent');
+      if (main) {
+        main.style.cssText = `
+          display: block !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          flex-grow: 1;
+        `;
+        main.classList.remove('pt-[116px]');
+      }
+      
+      const el = document.querySelector('[data-section-id="{{ section.id }}"]');
+      if (el && el.parentElement) {
+        const wrapper = el.parentElement;
+        wrapper.style.cssText = `
+          width: 100% !important;
+          max-width: 100% !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          box-sizing: border-box !important;
+        `;
+      }
+    }
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', forceFullWidthLayout, { once: true });
+    } else {
+      forceFullWidthLayout();
+    }
+    window.addEventListener('load', forceFullWidthLayout, { once: true });
+    window.addEventListener('resize', forceFullWidthLayout);
+  })();
+</script>
+<script src="{{ 'ymm.js' | asset_url }}" defer="defer"></script>
+
+{% schema %}
+{
+  "name": "Fitment Database",
+  "settings": [
+    {
+      "type": "text",
+      "id": "collection_handle",
+      "label": "Destination Collection",
+      "default": "all"
+    },
+    {
+      "type": "text",
+      "id": "storefront_access_token",
+      "label": "Storefront Access Token",
+      "default": "c9e546201d3f991f9c3f576e0d1cf4ee"
+    }
+  ]
+}
+{% endschema %}

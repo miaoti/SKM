@@ -28,6 +28,9 @@
   // State
   let currentProduct = null;
   let selectedOptions = {};
+  const boundInputs = new WeakSet();
+  let formChangeBound = false;
+  let documentEventsBound = false;
 
   /**
    * Initialize the variant media filter
@@ -36,7 +39,7 @@
     // Get product data from the page
     currentProduct = getProductData();
     if (!currentProduct) {
-      console.log('[VariantMediaFilter] No product data found');
+      // console.log('[VariantMediaFilter] No product data found');
       return;
     }
 
@@ -47,7 +50,7 @@
     updateSelectedOptions();
     filterMedia();
     
-    console.log('[VariantMediaFilter] Initialized for product:', currentProduct.title);
+    // console.log('[VariantMediaFilter] Initialized for product:', currentProduct.title);
   }
 
   /**
@@ -73,29 +76,36 @@
 
   /**
    * Bind event listeners for variant changes
+   * Idempotent: each input/form/document-event is bound only once even when this
+   * function is called repeatedly from a MutationObserver.
    */
   function bindVariantChangeEvents() {
-    // Listen for radio button changes (common in Dawn theme)
     document.querySelectorAll('input[type="radio"][name*="option"], input[type="radio"][name*="Option"]').forEach(input => {
+      if (boundInputs.has(input)) return;
+      boundInputs.add(input);
       input.addEventListener('change', handleVariantChange);
     });
 
-    // Listen for select changes
     document.querySelectorAll('select[name*="option"], select[name*="Option"], .product-form__input select').forEach(select => {
+      if (boundInputs.has(select)) return;
+      boundInputs.add(select);
       select.addEventListener('change', handleVariantChange);
     });
 
-    // Listen for custom variant change events (Shopify themes often dispatch these)
-    document.addEventListener('variant:change', handleVariantChange);
-    document.addEventListener('variantChange', handleVariantChange);
-    
-    // Listen for Shopify's native variant change
-    const form = document.querySelector('form[action*="/cart/add"]');
-    if (form) {
-      form.addEventListener('change', handleVariantChange);
+    if (!documentEventsBound) {
+      documentEventsBound = true;
+      document.addEventListener('variant:change', handleVariantChange);
+      document.addEventListener('variantChange', handleVariantChange);
     }
 
-    // MutationObserver for dynamic content
+    if (!formChangeBound) {
+      const form = document.querySelector('form[action*="/cart/add"]');
+      if (form) {
+        formChangeBound = true;
+        form.addEventListener('change', handleVariantChange);
+      }
+    }
+
     observeVariantChanges();
   }
 
@@ -106,7 +116,7 @@
     // If the event has options data, use it directly
     if (event.detail?.options) {
       selectedOptions = { ...event.detail.options };
-      console.log('[VariantMediaFilter] Options from event:', selectedOptions);
+      // console.log('[VariantMediaFilter] Options from event:', selectedOptions);
     } else {
       updateSelectedOptions();
     }
@@ -152,7 +162,7 @@
       }
     });
 
-    console.log('[VariantMediaFilter] Selected options:', selectedOptions);
+    // console.log('[VariantMediaFilter] Selected options:', selectedOptions);
   }
 
   /**
@@ -195,7 +205,7 @@
     const thumbnailContainer = document.querySelector(CONFIG.thumbnailContainer);
     
     if (!galleryContainer) {
-      console.log('[VariantMediaFilter] Gallery container not found');
+      // console.log('[VariantMediaFilter] Gallery container not found');
       return;
     }
 
@@ -212,7 +222,7 @@
       
       if (!isUntagged) taggedCount++;
       
-      console.log(`[VariantMediaFilter] Media ${index}: alt="${alt}", checking against:`, selectedValues);
+      // console.log(`[VariantMediaFilter] Media ${index}: alt="${alt}", checking against:`, selectedValues);
       
       // Check if this media matches any selected option value
       const isMatch = selectedValues.some(val => alt.includes(val));
@@ -239,7 +249,7 @@
 
     // If no tagged images exist at all, show everything
     if (taggedCount === 0) {
-      console.log('[VariantMediaFilter] No tagged media found, showing all');
+      // console.log('[VariantMediaFilter] No tagged media found, showing all');
       showAllMedia();
       return;
     }
@@ -253,7 +263,7 @@
     // NOTE: Removed auto-scroll to first matching image to prevent page jumping
     // when user clicks variant options. The page should stay at current position.
 
-    console.log('[VariantMediaFilter] Filtered media:', matchCount, 'matches out of', taggedCount, 'tagged');
+    // console.log('[VariantMediaFilter] Filtered media:', matchCount, 'matches out of', taggedCount, 'tagged');
   }
 
   /**
@@ -332,7 +342,10 @@
   /**
    * Observe DOM for dynamic variant changes
    */
+  let mutationObserverBound = false;
   function observeVariantChanges() {
+    if (mutationObserverBound) return;
+    mutationObserverBound = true;
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (mutation.type === 'attributes' && mutation.attributeName === 'data-variant-id') {

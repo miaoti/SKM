@@ -21,9 +21,16 @@ class AccountLoginActions extends HTMLElement {
       this.shopLoginButton.setAttribute('flow-version', 'account-actions-popover');
       this.shopLoginButton.setAttribute('return-uri', window.location.href);
 
-      // Reload the page after the login is completed, otherwise the page state is incorrect
+      // Reload after Shop Login completes. A soft update isn't viable here:
+      // headers, cart, and product pricing are rendered server-side from
+      // {% if customer %} branches, so the only way to reflect the new
+      // logged-in state across the whole page is a navigation. We append
+      // ?just_logged_in=true so theme.liquid's cart-persistence logic can
+      // skip the localStorage restore and trust Shopify's session merge.
       this.shopLoginButton.addEventListener('completed', () => {
-        window.location.reload();
+        const u = new URL(window.location.href);
+        u.searchParams.set('just_logged_in', 'true');
+        window.location.replace(u.toString());
       });
     }
   }

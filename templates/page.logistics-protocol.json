@@ -1,0 +1,14 @@
+{
+    "sections": {
+        "main": {
+            "type": "main-page-logistics-protocol",
+            "settings": {
+                "padding_top": 24,
+                "padding_bottom": 24
+            }
+        }
+    },
+    "order": [
+        "main"
+    ]
+}

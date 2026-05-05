@@ -365,7 +365,6 @@ async function handleAddonCheckout() {
       note: "Order with add-on options"
     };
     
-    console.log('[Addon Checkout] Sending payload:', JSON.stringify(payload, null, 2));
     
     const response = await fetch('https://skm-inventory-api.miaotingshuo.workers.dev/checkout/create', {
       method: 'POST',
@@ -373,7 +372,6 @@ async function handleAddonCheckout() {
       body: JSON.stringify(payload)
     });
     
-    console.log('[Addon Checkout] Response status:', response.status);
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -382,7 +380,6 @@ async function handleAddonCheckout() {
     }
     
     const result = await response.json();
-    console.log('[Addon Checkout] Result:', result);
     
     if (result.success && result.data?.checkoutUrl) {
       // Clear cart before redirecting
@@ -391,7 +388,6 @@ async function handleAddonCheckout() {
       // Also clear the localStorage saved cart for this customer
       {% if customer %}
         localStorage.removeItem('skm_customer_cart_{{ customer.id }}');
-        console.log('[Addon Checkout] Cleared saved cart from localStorage');
       {% endif %}
       
       // Set a flag to indicate checkout was initiated
@@ -450,7 +446,6 @@ async function handleDiscountCheckout() {
       payload.customerId = customerId.toString();
     }
 
-    console.log('[Discount Checkout] Sending payload:', JSON.stringify(payload, null, 2));
 
     const response = await fetch('https://skm-inventory-api.miaotingshuo.workers.dev/checkout/create', {
       method: 'POST',
@@ -465,7 +460,6 @@ async function handleDiscountCheckout() {
     }
 
     const result = await response.json();
-    console.log('[Discount Checkout] Result:', result);
 
     if (result.success && result.data?.checkoutUrl) {
       await fetch('/cart/clear.js', { method: 'POST' });
@@ -473,7 +467,6 @@ async function handleDiscountCheckout() {
       // Also clear the localStorage saved cart for this customer
       {% if customer %}
         localStorage.removeItem('skm_customer_cart_{{ customer.id }}');
-        console.log('[Discount Checkout] Cleared saved cart from localStorage');
       {% endif %}
       
       // Set a flag to indicate checkout was initiated
