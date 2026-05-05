@@ -1429,9 +1429,9 @@
                             View in Shopify
                           </button>
                           <div class="border-t border-gray-100 my-1"></div>
-                          <button class="order-action w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2" data-action="refund">
+                          <button id="order-action-refund" class="order-action w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent" data-action="refund">
                             <svg class="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
-                            Refund
+                            <span id="order-action-refund-label">Refund</span>
                           </button>
                           <button class="order-action w-full px-3 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2" data-action="cancel">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>

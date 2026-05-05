@@ -173,6 +173,31 @@
       fulfillmentBadge.textContent = order.displayFulfillmentStatus || 'UNFULFILLED';
       fulfillmentBadge.className = `px-2 py-1 text-xs font-medium rounded ${getFulfillmentStatusClass(order.displayFulfillmentStatus)}`;
 
+      // Disable the Refund action when there's nothing left to refund — both
+      // by amount headroom and by per-line-item refundableQuantity. Avoids
+      // opening a modal with everything disabled and confusing the operator.
+      const refundBtn = $('order-action-refund');
+      const refundLabel = $('order-action-refund-label');
+      if (refundBtn) {
+        const totalPaid = parseFloat(order.totalPrice || order.totalPriceSet?.shopMoney?.amount || 0);
+        const totalRefunded = parseFloat(order.totalRefunded || order.totalRefundedSet?.shopMoney?.amount || 0);
+        const moneyRemaining = totalPaid - totalRefunded;
+        const anyRefundable = (order.lineItems || []).some(li => {
+          const r = li.refundableQuantity != null ? parseInt(li.refundableQuantity) : parseInt(li.quantity);
+          return r > 0;
+        });
+        const fullyRefunded = (order.displayFinancialStatus || '').toUpperCase() === 'REFUNDED'
+          || (moneyRemaining <= 0.001 && !anyRefundable);
+
+        refundBtn.disabled = fullyRefunded;
+        refundBtn.title = fullyRefunded
+          ? 'Order is fully refunded'
+          : '';
+        if (refundLabel) {
+          refundLabel.textContent = fullyRefunded ? 'Fully refunded' : 'Refund';
+        }
+      }
+
       const lineItemsHtml = order.lineItems.map(item => {
         const imgUrl = item.image?.url || item.variant?.image?.url || '';
         const price = item.discountedUnitPriceSet?.shopMoney?.amount || item.originalUnitPriceSet?.shopMoney?.amount || '0';

@@ -88,10 +88,10 @@
             <!-- Restock Type Selector -->
             <div class="space-y-2">
               <label class="text-sm font-medium text-gray-700">Restock type</label>
-              <select id="refund-restock-type" class="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg">
-                <option value="return">Return to inventory (restock items)</option>
-                <option value="no_restock">Don't restock (keep inventory as-is)</option>
-                <option value="cancel">Cancel order (restock and cancel)</option>
+              <select id="refund-restock-type" class="w-full h-9 px-2 text-sm border border-gray-200 rounded-lg truncate">
+                <option value="return">Return to inventory</option>
+                <option value="no_restock">Don't restock</option>
+                <option value="cancel">Cancel &amp; restock</option>
               </select>
               <p id="restock-type-description" class="text-xs text-gray-500">Items will be returned to inventory at the original location.</p>
             </div>
