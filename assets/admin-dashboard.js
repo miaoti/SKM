@@ -28,6 +28,12 @@
       endCursor: null,
       currentQuery: ''
     },
+    // Pagination state for customers
+    customerPagination: {
+      hasNextPage: false,
+      endCursor: null,
+      currentQuery: ''
+    },
     // Lazy loading flags - track if data has been loaded for each tab
     dataLoaded: {
       products: false,
@@ -2737,9 +2743,33 @@
   // ==========================================
   let customerSearchTimeout;
 
-  async function loadCustomers(query = '') {
+  async function loadCustomers(query = '', append = false) {
     try {
-      S.customers = await api.get(`/customers${query ? `?q=${encodeURIComponent(query)}` : ''}`);
+      let url = '/customers?limit=25';
+      if (query) url += `&q=${encodeURIComponent(query)}`;
+      if (append && S.customerPagination.endCursor) {
+        url += `&cursor=${encodeURIComponent(S.customerPagination.endCursor)}`;
+      }
+
+      S.customerPagination.currentQuery = query;
+
+      const result = await api.get(url);
+
+      if (result && Array.isArray(result.data)) {
+        if (append) {
+          S.customers = [...S.customers, ...result.data];
+        } else {
+          S.customers = result.data;
+        }
+        S.customerPagination.hasNextPage = result.pagination?.hasNextPage || false;
+        S.customerPagination.endCursor = result.pagination?.endCursor || null;
+      } else {
+        // Fallback for any older API response shape
+        S.customers = Array.isArray(result) ? result : [];
+        S.customerPagination.hasNextPage = false;
+        S.customerPagination.endCursor = null;
+      }
+
       renderCustomerList();
     } catch (e) {
       if (e.message === 'Unauthorized') showAuth();
@@ -2747,23 +2777,41 @@
     }
   }
 
+  async function loadMoreCustomers() {
+    if (!S.customerPagination.hasNextPage) return;
+    const btn = $('btn-load-more-customers');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+    }
+    await loadCustomers(S.customerPagination.currentQuery, true);
+    // renderCustomerList recreates the button, so re-querying isn't needed.
+  }
+
   function renderCustomerList() {
     const c = $('customer-list');
     const tagFilter = $('cf-tag').value;
 
+    // The tag filter is applied client-side over whatever pages we've loaded.
+    // (Server-side filter would need a Shopify customer query expression and
+    // would interact with cursor pagination — keep it simple for now.)
     let filtered = S.customers;
     if (tagFilter) {
       filtered = S.customers.filter(cust => cust.tags && cust.tags.includes(tagFilter));
     }
 
-    $('customer-count').textContent = `${filtered.length} customers`;
+    const totalLoaded = S.customers.length;
+    const visible = filtered.length;
+    $('customer-count').textContent = tagFilter
+      ? `${visible} of ${totalLoaded} loaded`
+      : `${totalLoaded} loaded${S.customerPagination.hasNextPage ? '+' : ''}`;
 
-    if (!filtered.length) {
+    if (!visible) {
       c.innerHTML = '<div class="p-4 text-center text-sm text-gray-400">No customers found</div>';
       return;
     }
 
-    c.innerHTML = filtered.map(cust => `
+    const itemsHtml = filtered.map(cust => `
       <div class="customer-item p-3 cursor-pointer hover:bg-gray-50 ${S.selectedCustomer?.id === cust.id ? 'bg-red-50' : ''}" data-id="${cust.id}">
         <div class="flex items-center justify-between">
           <div class="flex-1 min-w-0">
@@ -2778,9 +2826,27 @@
       </div>
     `).join('');
 
+    // Hide the "Load More" button when a tag filter is active because the
+    // visible count comes from local filtering, not from the server cursor.
+    const showLoadMore = S.customerPagination.hasNextPage && !tagFilter;
+    const loadMoreHtml = showLoadMore
+      ? `<div class="p-3 border-t border-gray-100">
+           <button id="btn-load-more-customers" class="w-full py-2 px-4 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+             Load More Customers
+           </button>
+         </div>`
+      : '';
+
+    c.innerHTML = itemsHtml + loadMoreHtml;
+
     c.querySelectorAll('.customer-item').forEach(el => {
       el.addEventListener('click', () => selectCustomer(el.dataset.id));
     });
+
+    if (showLoadMore) {
+      const btn = $('btn-load-more-customers');
+      if (btn) btn.addEventListener('click', loadMoreCustomers);
+    }
   }
 
   async function selectCustomer(id) {

@@ -761,10 +761,14 @@ async function updateVehicle(env, vehicleId, data) {
 // CUSTOMER OPERATIONS
 // ============================================
 
-async function listCustomers(env, searchQuery = "") {
+async function listCustomers(env, searchQuery = "", cursor = null, limit = 25) {
   const query = `
-    query ListCustomers($first: Int!, $query: String) {
-      customers(first: $first, query: $query) {
+    query ListCustomers($first: Int!, $query: String, $after: String) {
+      customers(first: $first, query: $query, after: $after) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
         edges {
           node {
             id
@@ -792,8 +796,9 @@ async function listCustomers(env, searchQuery = "") {
   `;
 
   const result = await shopifyGraphQL(env, query, {
-    first: 100,
-    query: searchQuery || null
+    first: parseInt(limit) || 25,
+    query: searchQuery || null,
+    after: cursor || null
   });
 
   const customers = result.customers.edges.map(({ node }) => ({
@@ -812,7 +817,15 @@ async function listCustomers(env, searchQuery = "") {
     address: node.defaultAddress
   }));
 
-  return { success: true, data: customers, count: customers.length };
+  return {
+    success: true,
+    data: customers,
+    count: customers.length,
+    pagination: {
+      hasNextPage: result.customers.pageInfo.hasNextPage,
+      endCursor: result.customers.pageInfo.endCursor
+    }
+  };
 }
 
 async function getCustomer(env, customerId) {
