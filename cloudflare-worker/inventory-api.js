@@ -417,6 +417,16 @@ export default {
           const trackingBody = await request.json();
           return jsonResponse(await updateFulfillmentTracking(env, trackingFulfillmentId, trackingBody));
 
+        // Append a fulfillment status event (admin-only). Used when
+        // Shopify hasn't auto-polled shipment_status (manual draft-order
+        // tracking, off-platform carriers). Shopify updates the
+        // fulfillment's displayStatus / shipment_status from the latest
+        // event so the customer page reflects it next load.
+        case path.match(/^\/fulfillments\/[^/]+\/events$/) && request.method === "POST":
+          const eventFulfillmentId = path.split("/")[2];
+          const eventBody = await request.json();
+          return jsonResponse(await createFulfillmentEvent(env, eventFulfillmentId, eventBody));
+
         // Cancel fulfillment
         case path.match(/^\/fulfillments\/[^/]+\/cancel$/) && request.method === "POST":
           const cancelFulfillmentId = path.split("/")[2];
@@ -6473,6 +6483,70 @@ async function releaseFulfillmentOrderHold(env, fulfillmentOrderId) {
   }
 
   return { success: true, fulfillmentOrder: result.fulfillmentOrderReleaseHold?.fulfillmentOrder };
+}
+
+/**
+ * Create a fulfillment status event.
+ * Shopify only auto-polls shipment_status for shipments through Shopify
+ * Shipping or specific recognized carriers. For manual tracking (draft-
+ * order checkouts or off-platform carriers), shipment_status stays
+ * `null` even after the package is delivered. This endpoint lets the
+ * admin manually attach an event — Shopify uses the latest event's
+ * status as the fulfillment's effective shipment_status, which then
+ * flows through line_item.fulfillment.shipment_status on the
+ * customer-facing order page.
+ *
+ * Allowed status values mirror Shopify's FulfillmentEventStatus enum:
+ * LABEL_PRINTED, LABEL_PURCHASED, ATTEMPTED_DELIVERY, READY_FOR_PICKUP,
+ * CONFIRMED, IN_TRANSIT, OUT_FOR_DELIVERY, DELIVERED, FAILURE.
+ */
+async function createFulfillmentEvent(env, fulfillmentId, data) {
+  const gid = fulfillmentId.startsWith("gid://")
+    ? fulfillmentId
+    : `gid://shopify/Fulfillment/${fulfillmentId}`;
+
+  const allowed = [
+    "LABEL_PRINTED", "LABEL_PURCHASED", "ATTEMPTED_DELIVERY",
+    "READY_FOR_PICKUP", "CONFIRMED", "IN_TRANSIT",
+    "OUT_FOR_DELIVERY", "DELIVERED", "FAILURE"
+  ];
+  const status = String((data && data.status) || "").toUpperCase();
+  if (!allowed.includes(status)) {
+    throw new Error(`status must be one of: ${allowed.join(", ")}`);
+  }
+
+  const happenedAt = (data && data.happenedAt) || new Date().toISOString();
+
+  const mutation = `
+    mutation FulfillmentEventCreate($fulfillmentEvent: FulfillmentEventInput!) {
+      fulfillmentEventCreate(fulfillmentEvent: $fulfillmentEvent) {
+        fulfillmentEvent {
+          id
+          status
+          happenedAt
+        }
+        userErrors { field message }
+      }
+    }
+  `;
+
+  const result = await shopifyGraphQL(env, mutation, {
+    fulfillmentEvent: {
+      fulfillmentId: gid,
+      status: status,
+      happenedAt: happenedAt
+    }
+  });
+
+  if (result.fulfillmentEventCreate?.userErrors?.length) {
+    const msg = result.fulfillmentEventCreate.userErrors.map(e => e.message).join(", ");
+    throw new Error(`Failed to create fulfillment event: ${msg}`);
+  }
+
+  return {
+    success: true,
+    event: result.fulfillmentEventCreate.fulfillmentEvent
+  };
 }
 
 /**
