@@ -1335,30 +1335,31 @@
         const fullyRefunded = refundableQty <= 0;
 
         return `
-          <div class="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-lg ${fullyRefunded ? 'opacity-50' : ''}">
-            <img src="${imageUrl}" alt="" class="w-14 h-14 rounded-lg object-cover flex-shrink-0" onerror="this.src='https://via.placeholder.com/60?text=No+Image'">
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-gray-900 truncate">${item.title || item.name}</p>
-              <p class="text-xs text-gray-500">${item.variantTitle || ''}</p>
+          <div class="grid items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg ${fullyRefunded ? 'opacity-50' : ''}" style="grid-template-columns: 56px minmax(0, 1fr) auto;">
+            <img src="${imageUrl}" alt="" class="w-14 h-14 rounded-lg object-cover" onerror="this.src='https://via.placeholder.com/60?text=No+Image'">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-900 leading-snug" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${item.title || item.name}</p>
+              ${item.variantTitle ? `<p class="text-xs text-gray-500 truncate">${item.variantTitle}</p>` : ''}
               <div class="flex items-center gap-2 mt-1 flex-wrap">
                 ${hasDiscount ? `<span class="text-xs text-gray-400 line-through">$${price.toFixed(2)}</span>` : ''}
                 <span class="text-xs text-gray-700">$${discountedPrice.toFixed(2)} × ${orderedQty}</span>
-                ${alreadyRefunded > 0 ? `<span class="text-[10px] uppercase tracking-wider text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">${alreadyRefunded} already refunded</span>` : ''}
-                ${fullyRefunded && alreadyRefunded > 0 ? `<span class="text-[10px] uppercase tracking-wider text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">fully refunded</span>` : ''}
+                ${alreadyRefunded > 0 && !fullyRefunded ? `<span class="text-[10px] uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">${alreadyRefunded} already refunded</span>` : ''}
+                ${fullyRefunded ? `<span class="text-[10px] uppercase tracking-wider text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">fully refunded</span>` : ''}
               </div>
             </div>
-            <div class="flex items-center gap-2">
-              <input type="number" class="refund-qty-input w-14 h-8 px-2 text-sm text-center border border-gray-200 rounded ${fullyRefunded ? 'cursor-not-allowed bg-gray-50' : ''}"
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <div class="text-right text-xs text-gray-500 leading-tight">
+                <div class="text-[10px] uppercase tracking-wider">QTY</div>
+                <div>of ${refundableQty}</div>
+              </div>
+              <input type="number" class="refund-qty-input w-14 h-9 px-2 text-sm text-center border border-gray-200 rounded ${fullyRefunded ? 'cursor-not-allowed bg-gray-50' : ''}"
                      data-line-item-id="${item.id}"
                      data-max-qty="${refundableQty}"
                      data-ordered-qty="${orderedQty}"
                      data-unit-price="${discountedPrice}"
                      value="0" min="0" max="${refundableQty}"
                      ${fullyRefunded ? 'disabled' : ''}>
-              <span class="text-xs text-gray-500">/ ${refundableQty} eligible</span>
-            </div>
-            <div class="w-16 text-right">
-              <span class="refund-item-total text-sm text-gray-700" data-line-item-id="${item.id}">$0.00</span>
+              <span class="refund-item-total text-sm font-medium text-gray-900 w-16 text-right" data-line-item-id="${item.id}">$0.00</span>
             </div>
           </div>
         `;
@@ -1464,21 +1465,49 @@
         totalAmount += itemTotal;
       });
 
-      // Update summary
-      $('refund-items-selected').textContent = totalItems > 0 ? `${totalItems} item(s) selected` : 'No items selected';
-      $('refund-amount').value = totalAmount.toFixed(2);
+      // Update summary header.
+      $('refund-items-selected').textContent = totalItems > 0
+        ? `${totalItems} item${totalItems === 1 ? '' : 's'} selected`
+        : 'No items selected';
 
-      // Reset calculation when items change
+      // Reset prior calculation; auto-recalc kicks in below.
       refundCalculation = null;
       $('refund-calculation-summary').classList.add('hidden');
-      $('btn-confirm-refund').disabled = true;
-      $('btn-confirm-refund').classList.add('bg-gray-400', 'cursor-not-allowed');
-      $('btn-confirm-refund').classList.remove('bg-red-600', 'hover:bg-red-700');
-      $('refund-btn-text').textContent = 'Refund $0.00';
+
+      // The Refund button reflects either the current calculation (when
+      // available) or a pre-calc estimate (subtotal+shipping). Keeps
+      // the operator oriented while the debounced calculate is in flight.
+      const shippingAmount = parseFloat($('refund-shipping').value) || 0;
+      const estimatedTotal = totalAmount + shippingAmount;
+      const hasSomething = totalAmount > 0 || shippingAmount > 0;
+
+      if (hasSomething) {
+        $('refund-amount').value = estimatedTotal.toFixed(2);
+        $('refund-btn-text').textContent = `Refund $${estimatedTotal.toFixed(2)}`;
+        $('btn-confirm-refund').disabled = false;
+        $('btn-confirm-refund').classList.remove('bg-gray-400', 'cursor-not-allowed');
+        $('btn-confirm-refund').classList.add('bg-red-600', 'hover:bg-red-700');
+        scheduleAutoCalculate();
+      } else {
+        $('refund-amount').value = '0.00';
+        $('refund-btn-text').textContent = 'Refund $0.00';
+        $('btn-confirm-refund').disabled = true;
+        $('btn-confirm-refund').classList.add('bg-gray-400', 'cursor-not-allowed');
+        $('btn-confirm-refund').classList.remove('bg-red-600', 'hover:bg-red-700');
+      }
     }
 
-    // Calculate refund (Stage 1)
-    async function calculateRefund() {
+    // Debounced auto-calculate. Fires when the operator changes a
+    // qty input or the shipping refund amount. Replaces the manual
+    // "Calculate" button — the operator just edits and the summary
+    // updates with Shopify's tax-inclusive total.
+    let autoCalcTimeout = null;
+    function scheduleAutoCalculate() {
+      if (autoCalcTimeout) clearTimeout(autoCalcTimeout);
+      autoCalcTimeout = setTimeout(runAutoCalculate, 400);
+    }
+
+    async function runAutoCalculate() {
       if (!S.selectedOrderFull) return;
 
       const refundLineItems = [];
@@ -1491,18 +1520,20 @@
           });
         }
       });
-
       const shippingAmount = parseFloat($('refund-shipping').value) || 0;
 
+      // Nothing selected — leave the button at the pre-calc estimate
+      // and hide the breakdown.
       if (refundLineItems.length === 0 && shippingAmount === 0) {
-        toast('Please select items to refund or enter a shipping refund amount', 'error');
+        refundCalculation = null;
+        $('refund-calculation-summary').classList.add('hidden');
         return;
       }
 
-      try {
-        $('btn-calculate-refund').disabled = true;
-        $('btn-calculate-refund').textContent = 'Calculating...';
+      const statusEl = $('refund-calc-status');
+      if (statusEl) statusEl.classList.remove('hidden');
 
+      try {
         const numericId = S.selectedOrderFull.id.split('/').pop();
         const response = await fetch(`${API_BASE}/orders/${numericId}/refund/calculate`, {
           method: 'POST',
@@ -1514,50 +1545,56 @@
             currency: 'USD'
           })
         });
-
         const data = await response.json();
         if (!data.success) throw new Error(data.error);
 
         refundCalculation = data.calculation;
+        const subtotalAmt = parseFloat(refundCalculation.subtotal || 0);
+        const taxAmt      = parseFloat(refundCalculation.totalTax || 0);
+        const shippingAmt = parseFloat(refundCalculation.shippingRefund || 0);
+        const totalAmt    = parseFloat(refundCalculation.totalRefund || 0);
 
-        // Defensive coercion — toFixed(2) crashes on undefined.
-        const subtotalAmt   = parseFloat(refundCalculation.subtotal || 0);
-        const taxAmt        = parseFloat(refundCalculation.totalTax || 0);
-        const shippingAmt   = parseFloat(refundCalculation.shippingRefund || 0);
-        const totalAmt      = parseFloat(refundCalculation.totalRefund || 0);
-
-        // Update calculation summary
         $('refund-calc-subtotal').textContent = `$${subtotalAmt.toFixed(2)}`;
         $('refund-calc-tax').textContent      = `$${taxAmt.toFixed(2)}`;
         $('refund-calc-shipping').textContent = `$${shippingAmt.toFixed(2)}`;
         $('refund-calc-total').textContent    = `$${totalAmt.toFixed(2)}`;
-
-        // Sync the editable Refund Amount field with the calculated total
-        // so the operator sees what will actually post (subtotal + tax + shipping).
-        // The user can still override before confirming.
-        $('refund-amount').value = totalAmt.toFixed(2);
-
         $('refund-calculation-summary').classList.remove('hidden');
 
-        // Enable confirm button
+        $('refund-amount').value = totalAmt.toFixed(2);
+        $('refund-btn-text').textContent = `Refund $${totalAmt.toFixed(2)}`;
         $('btn-confirm-refund').disabled = false;
         $('btn-confirm-refund').classList.remove('bg-gray-400', 'cursor-not-allowed');
         $('btn-confirm-refund').classList.add('bg-red-600', 'hover:bg-red-700');
-        $('refund-btn-text').textContent = `Refund $${totalAmt.toFixed(2)}`;
-
-        toast('Refund calculated. Review and confirm.', 'success');
-
       } catch (e) {
-        toast('Failed to calculate refund: ' + e.message, 'error');
+        // Don't toast on every keystroke; a transient calc failure
+        // shouldn't block the operator from clicking Refund — the
+        // editable amount + worker-side calculation cover that case.
+        console.warn('[refund] auto-calc failed:', e.message);
       } finally {
-        $('btn-calculate-refund').disabled = false;
-        $('btn-calculate-refund').textContent = 'Calculate';
+        if (statusEl) statusEl.classList.add('hidden');
       }
     }
 
-    // Execute refund (Stage 2)
+    // Execute refund.
+    // If the auto-calc hasn't fired yet (operator clicked Refund quickly
+    // after editing a quantity), force a synchronous calculation first so
+    // we never send a tax-missing total to Shopify.
     async function executeRefund() {
-      if (!S.selectedOrderFull || !refundCalculation) return;
+      if (!S.selectedOrderFull) return;
+
+      const hasItems = Array.from(document.querySelectorAll('.refund-qty-input'))
+        .some(i => (parseInt(i.value) || 0) > 0);
+      const shippingNow = parseFloat($('refund-shipping').value) || 0;
+      if (!hasItems && shippingNow === 0) return;
+
+      // If a debounced auto-calc is queued, run it now and wait.
+      if (autoCalcTimeout) {
+        clearTimeout(autoCalcTimeout);
+        autoCalcTimeout = null;
+      }
+      if (!refundCalculation) {
+        await runAutoCalculate();
+      }
 
       const refundLineItems = [];
       document.querySelectorAll('.refund-qty-input').forEach(input => {
@@ -1705,12 +1742,18 @@
       $('btn-cancel-refund').addEventListener('click', () => $('refund-modal').classList.add('hidden'));
     }
 
-    if ($('btn-calculate-refund')) {
-      $('btn-calculate-refund').addEventListener('click', calculateRefund);
-    }
-
     if ($('btn-confirm-refund')) {
       $('btn-confirm-refund').addEventListener('click', executeRefund);
+    }
+
+    // Shipping refund changes also need to trigger the auto-calc so the
+    // tax-inclusive total updates. (Qty inputs are bound inline when the
+    // line items render so each new modal session re-binds them; the
+    // shipping input is static, so we bind it once here.)
+    if ($('refund-shipping')) {
+      $('refund-shipping').addEventListener('input', () => {
+        updateRefundItemTotals();
+      });
     }
 
     // Return loadOrders so it can be called from main script
