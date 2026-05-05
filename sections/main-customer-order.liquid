@@ -1,397 +1,750 @@
-<!-- The Verification Protocol - Order Detail (Light Mode) -->
+<!-- The Verification Protocol — Order Detail (Light Mode, redesigned) -->
 <style>
-  /* Typography Imports */
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-  
+
   .order-protocol {
     --racing-red: #CC0000;
+    --racing-red-soft: rgba(204, 0, 0, 0.08);
     --obsidian: #111111;
     --steel-grey: #f8f8f8;
     --card-bg: #ffffff;
-    --border-color: #e5e5e5;
-    --data-grey: #666666;
-    --signal-green: #22c55e;
+    --border-color: #e5e7eb;
+    --border-strong: #d1d5db;
+    --data-grey: #6b7280;
+    --signal-green: #16a34a;
+    --signal-amber: #d97706;
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   }
-  
-  .mono-data {
-    font-family: 'JetBrains Mono', monospace;
+
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .tnums { font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  /* HUD corner brackets */
+  .hud-corner {
+    position: relative;
   }
-  
-  .tabular-nums {
-    font-variant-numeric: tabular-nums;
-    font-family: 'JetBrains Mono', monospace;
+  .hud-corner::before,
+  .hud-corner::after,
+  .hud-corner > .hud-corner__bl,
+  .hud-corner > .hud-corner__br {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    pointer-events: none;
   }
-  
-  /* Signal Pills - Light Mode */
+  .hud-corner::before { top: -1px; left: -1px; border-top: 1.5px solid var(--racing-red); border-left: 1.5px solid var(--racing-red); }
+  .hud-corner::after  { top: -1px; right: -1px; border-top: 1.5px solid var(--racing-red); border-right: 1.5px solid var(--racing-red); }
+  .hud-corner > .hud-corner__bl { bottom: -1px; left: -1px; border-bottom: 1.5px solid var(--racing-red); border-left: 1.5px solid var(--racing-red); }
+  .hud-corner > .hud-corner__br { bottom: -1px; right: -1px; border-bottom: 1.5px solid var(--racing-red); border-right: 1.5px solid var(--racing-red); }
+
+  /* Signal pills */
   .signal-pill {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 12px;
+    padding: 5px 12px;
     border: 1px solid var(--border-color);
     background: var(--card-bg);
     color: var(--obsidian);
     font-size: 10px;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
+    font-weight: 600;
   }
-  
   .signal-pill .glow-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: var(--signal-green);
-    box-shadow: 0 0 4px var(--signal-green);
+    box-shadow: 0 0 6px rgba(22, 163, 74, 0.5);
   }
-  
-  .signal-pill.fulfillment-active {
+  .signal-pill.is-paid     { border-color: var(--signal-green); color: var(--signal-green); }
+  .signal-pill.is-refunded { border-color: var(--racing-red); color: var(--racing-red); }
+  .signal-pill.is-pending  { border-color: var(--signal-amber); color: var(--signal-amber); }
+  .signal-pill.is-fulfilled-emph {
     border-color: var(--racing-red);
     background: var(--racing-red);
     color: white;
   }
-  
-  /* Desaturated Image Filter */
-  .assembly-image {
-    filter: saturate(0.4) contrast(1.05);
+
+  /* Metrics strip */
+  .metric-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 14px 18px;
+    position: relative;
+  }
+  .metric-card .metric-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    color: var(--data-grey);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .metric-card .metric-value {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    color: var(--obsidian);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .metric-card .metric-sub {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    color: var(--data-grey);
+    margin-top: 6px;
+    letter-spacing: 0.05em;
+  }
+  .metric-card .metric-tick {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 2px;
+    width: 28px;
+    background: var(--racing-red);
+  }
+
+  /* Status timeline */
+  .status-timeline {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 22px 24px 18px;
+    position: relative;
+  }
+  .timeline-track {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(var(--steps, 4), 1fr);
+    gap: 0;
+    margin-top: 8px;
+  }
+  .timeline-track::before {
+    content: '';
+    position: absolute;
+    top: 9px;
+    left: calc(100% / (var(--steps) * 2));
+    right: calc(100% / (var(--steps) * 2));
+    height: 1px;
+    background: var(--border-color);
+  }
+  .timeline-step {
+    position: relative;
+    text-align: center;
+    z-index: 1;
+  }
+  .timeline-step .dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid var(--border-strong);
+    background: #fff;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+  .timeline-step.is-done .dot {
+    background: var(--signal-green);
+    border-color: var(--signal-green);
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
+  }
+  .timeline-step.is-current .dot {
+    background: var(--racing-red);
+    border-color: var(--racing-red);
+    box-shadow: 0 0 0 3px rgba(204, 0, 0, 0.18);
+    animation: tlpulse 2s ease-in-out infinite;
+  }
+  .timeline-step.is-error .dot {
+    background: var(--racing-red);
+    border-color: var(--racing-red);
+  }
+  @keyframes tlpulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(204, 0, 0, 0.18); }
+    50%      { box-shadow: 0 0 0 6px rgba(204, 0, 0, 0.08); }
+  }
+  .timeline-step .label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--data-grey);
+    margin-top: 8px;
+    text-transform: uppercase;
+  }
+  .timeline-step.is-done .label,
+  .timeline-step.is-current .label,
+  .timeline-step.is-error .label {
+    color: var(--obsidian);
+  }
+  .timeline-step .ts {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 9px;
+    color: var(--data-grey);
+    margin-top: 2px;
+  }
+
+  /* Section heading */
+  .section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .section-head .label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--racing-red);
+    letter-spacing: 0.18em;
+    font-weight: 700;
+  }
+  .section-head .sub {
+    font-size: 11px;
+    color: var(--data-grey);
+  }
+
+  /* Item card */
+  .item-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 18px;
+    transition: border-color 0.2s ease;
+  }
+  .item-card:hover { border-color: var(--racing-red); }
+
+  .item-image {
+    width: 96px;
+    height: 96px;
+    flex-shrink: 0;
+    background: var(--steel-grey);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    position: relative;
+  }
+  .item-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: saturate(0.6) contrast(1.04);
     transition: filter 0.3s ease;
   }
-  .assembly-image:hover {
-    filter: saturate(0.8) contrast(1.1);
+  .item-card:hover .item-image img { filter: saturate(1) contrast(1.04); }
+  .item-image .id-ref {
+    position: absolute;
+    inset: auto 0 0 0;
+    background: rgba(17, 17, 17, 0.92);
+    color: rgba(255,255,255,0.7);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    padding: 3px 6px;
   }
-  
-  /* Ledger Table - Light Mode */
+
+  /* Address / payment cards */
+  .info-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 18px;
+    height: 100%;
+  }
+  .info-card .info-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    color: var(--racing-red);
+    letter-spacing: 0.18em;
+    margin-bottom: 10px;
+    font-weight: 700;
+  }
+  .info-card .info-body {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    color: #374151;
+    line-height: 1.6;
+  }
+  .info-card .info-body strong { color: var(--obsidian); font-weight: 700; }
+
+  /* Ledger */
   .ledger-row {
     display: flex;
     justify-content: space-between;
-    padding: 8px 0;
+    padding: 9px 0;
     border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
   }
-  .ledger-row:last-child {
+  .ledger-row:last-child { border-bottom: none; }
+  .ledger-row.refund { color: var(--racing-red); }
+  .ledger-row.total {
+    border-top: 1px solid var(--obsidian);
     border-bottom: none;
+    padding-top: 14px;
+    margin-top: 8px;
+    font-size: 16px;
+    font-weight: 700;
   }
-  
-  /* Refund Highlight */
-  .refund-highlight {
-    border-left: 2px solid var(--racing-red);
-    padding-left: 12px;
-    margin-left: -14px;
-  }
-  
-  /* Support Button - Light Mode */
-  .support-init-btn {
-    display: block;
-    width: 100%;
-    padding: 12px;
-    border: 1px solid var(--border-color);
-    background: transparent;
-    color: var(--obsidian);
+  .ledger-section-title {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 10px;
-    letter-spacing: 0.15em;
-    text-align: center;
-    text-transform: uppercase;
-    transition: all 0.2s ease;
-    text-decoration: none;
+    color: var(--racing-red);
+    letter-spacing: 0.18em;
+    margin: 14px 0 4px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border-color);
   }
-  .support-init-btn:hover {
+
+  /* Support row */
+  .support-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: var(--steel-grey);
+    border: 1px solid var(--border-color);
+    padding: 18px 22px;
+  }
+  .support-row .copy {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--obsidian);
+    letter-spacing: 0.04em;
+  }
+  .support-row .copy .copy-sub {
+    color: var(--data-grey);
+    margin-top: 2px;
+    font-size: 11px;
+  }
+  .support-row .actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .support-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: 1px solid var(--obsidian);
+    color: var(--obsidian);
+    background: #fff;
+    text-decoration: none;
+    transition: all 0.15s ease;
+  }
+  .support-btn:hover {
+    background: var(--obsidian);
+    color: #fff;
+  }
+  .support-btn.primary {
     background: var(--racing-red);
     border-color: var(--racing-red);
-    color: white;
+    color: #fff;
   }
-  
-  /* SKM Watermark - Light Mode */
-  .skm-watermark {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    font-size: 48px;
-    font-weight: 900;
-    letter-spacing: 0.2em;
-    color: rgba(0,0,0,0.03);
-    pointer-events: none;
+  .support-btn.primary:hover {
+    background: #aa0000;
+    border-color: #aa0000;
+  }
+
+  /* Layout helpers */
+  .grid-12 {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 18px;
+  }
+  @media (max-width: 900px) {
+    .grid-12 { grid-template-columns: repeat(6, 1fr); }
+  }
+  @media (max-width: 540px) {
+    .grid-12 { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   }
 </style>
 
 <div class="order-protocol bg-white min-h-screen text-[#111111]">
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    
-    <!-- Breadcrumb Navigation: System Path Style -->
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+
+    {%- comment -%} ===== Breadcrumb ===== {%- endcomment -%}
     <nav class="mb-6">
-      <a href="/account" class="mono-data text-xs text-[#666666] hover:text-[#CC0000] transition-colors tracking-widest">
+      <a href="/account" class="mono text-xs text-[#6b7280] hover:text-[#CC0000] transition-colors tracking-widest">
         DIRECTORY // ACCOUNT // ORDER_LOG
       </a>
     </nav>
-    
-    <!-- Global Header: The Verification Protocol -->
-    <header class="mb-12 pb-8 border-b border-gray-200">
-      <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+
+    {%- comment -%} ===== Header ===== {%- endcomment -%}
+    <header class="mb-8 pb-6 border-b border-gray-200">
+      <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
         <div>
-          <h1 class="text-3xl sm:text-4xl font-black uppercase tracking-tight text-[#111111]" style="font-stretch: expanded;">
+          <h1 class="text-3xl sm:text-4xl font-black uppercase tracking-tight text-[#111111]">
             ORDER RECORD: {{ order.name }}
           </h1>
-          <p class="mono-data text-xs text-[#666666] mt-2 tracking-widest">
+          <p class="mono text-xs text-[#6b7280] mt-2 tracking-widest">
             TIMESTAMP: {{ order.created_at | date: "%Y-%m-%d // %H:%M:%S UTC" }}
           </p>
         </div>
-        
-        <!-- Signal Pills -->
-        <div class="flex flex-wrap gap-3">
-          <!-- Payment Signal -->
-          {% assign payment_status = order.financial_status | downcase %}
-          <div class="signal-pill mono-data">
-            {% if payment_status == 'paid' %}
-              <span class="glow-dot"></span>
-            {% endif %}
-            <span>{{ order.financial_status_label | upcase }}</span>
-          </div>
-          
-          <!-- Fulfillment Signal -->
-          {% assign fulfillment_status = order.fulfillment_status | downcase %}
-          <div class="signal-pill mono-data {% if fulfillment_status == 'fulfilled' %}fulfillment-active{% endif %}">
-            <span>{{ order.fulfillment_status_label | default: 'PROCESSING' | upcase }}</span>
-          </div>
+
+        {%- liquid
+          assign payment_status = order.financial_status | downcase
+          assign fulfillment_status_raw = order.fulfillment_status | downcase
+          if fulfillment_status_raw == blank
+            assign fulfillment_status_raw = 'unfulfilled'
+          endif
+        -%}
+        <div class="flex flex-wrap gap-2">
+          <span class="signal-pill mono
+            {% if payment_status == 'paid' %}is-paid
+            {% elsif payment_status == 'refunded' or payment_status == 'partially_refunded' %}is-refunded
+            {% elsif payment_status == 'pending' or payment_status == 'authorized' %}is-pending
+            {% endif %}">
+            {% if payment_status == 'paid' %}<span class="glow-dot"></span>{% endif %}
+            {{ order.financial_status_label | upcase }}
+          </span>
+          <span class="signal-pill mono
+            {% if fulfillment_status_raw == 'fulfilled' %}is-fulfilled-emph{% endif %}">
+            {{ order.fulfillment_status_label | default: 'PROCESSING' | upcase }}
+          </span>
         </div>
       </div>
     </header>
-    
-    <!-- Main Grid: Logistics View + Tactical Sidebar -->
-    <div style="display: flex; flex-wrap: wrap; gap: 3rem;">
-      
-      <!-- Left: Main Logistics View (Line Items) -->
-      <div style="flex: 2; min-width: 320px;">
-        
-        <div class="mb-4">
-          <h2 class="mono-data text-xs text-[#CC0000] tracking-widest mb-1">MANIFEST_CONTENTS</h2>
-          <p class="text-xs text-[#666666]">Major Assembly Components</p>
+
+    {%- comment -%} ===== Top metrics strip ===== {%- endcomment -%}
+    {%- liquid
+      assign item_count = 0
+      for li in order.line_items
+        assign item_count = item_count | plus: li.quantity
+      endfor
+    -%}
+    <div class="grid-12 mb-8">
+      <div class="metric-card hud-corner" style="grid-column: span 3;">
+        <span class="hud-corner__bl"></span><span class="hud-corner__br"></span>
+        <span class="metric-tick"></span>
+        <div class="metric-label">Total</div>
+        <div class="metric-value">{{ order.total_price | money }}</div>
+        <div class="metric-sub">{{ order.currency }}</div>
+      </div>
+      <div class="metric-card" style="grid-column: span 3;">
+        <span class="metric-tick"></span>
+        <div class="metric-label">Components</div>
+        <div class="metric-value">{{ item_count }}</div>
+        <div class="metric-sub">{{ order.line_items.size }} unique sku{% if order.line_items.size != 1 %}s{% endif %}</div>
+      </div>
+      <div class="metric-card" style="grid-column: span 3;">
+        <span class="metric-tick"></span>
+        <div class="metric-label">Shipping</div>
+        <div class="metric-value">
+          {% if order.shipping_price > 0 %}{{ order.shipping_price | money }}{% else %}WAIVED{% endif %}
         </div>
-        
+        <div class="metric-sub">{% if order.shipping_methods.size > 0 %}{{ order.shipping_methods.first.title | upcase }}{% else %}STANDARD{% endif %}</div>
+      </div>
+      <div class="metric-card" style="grid-column: span 3;">
+        <span class="metric-tick"></span>
+        <div class="metric-label">Payment</div>
+        {%- liquid
+          assign gateway_name = ''
+          for transaction in order.transactions
+            if transaction.kind == 'sale' or transaction.kind == 'capture' or transaction.kind == 'authorization'
+              assign gateway_name = transaction.gateway
+              break
+            endif
+          endfor
+        -%}
+        <div class="metric-value" style="font-size: 14px;">
+          {{ gateway_name | default: 'PENDING' | replace: '_', ' ' | replace: 'shopify payments', 'SECURE_CARD' | upcase }}
+        </div>
+        <div class="metric-sub">{{ order.financial_status_label | upcase }}</div>
+      </div>
+    </div>
+
+    {%- comment -%} ===== Status timeline =====
+       Steps: Placed → Paid → Fulfilled → Delivered. If refunded, last
+       step shows refund instead. {%- endcomment -%}
+    {%- liquid
+      assign step_placed = true
+      assign step_paid = false
+      if payment_status == 'paid' or payment_status == 'partially_paid' or payment_status == 'refunded' or payment_status == 'partially_refunded'
+        assign step_paid = true
+      endif
+      assign step_fulfilled = false
+      if fulfillment_status_raw == 'fulfilled' or fulfillment_status_raw == 'partial'
+        assign step_fulfilled = true
+      endif
+      assign step_delivered = false
+      for fulfillment in order.fulfillments
+        if fulfillment.shipment_status == 'delivered'
+          assign step_delivered = true
+        endif
+      endfor
+      assign step_refunded = false
+      if payment_status == 'refunded' or payment_status == 'partially_refunded'
+        assign step_refunded = true
+      endif
+    -%}
+    <div class="status-timeline mb-8">
+      <div class="section-head">
+        <span class="label">// PROGRESS</span>
+        <span class="sub">Order journey</span>
+      </div>
+      <div class="timeline-track" style="--steps: 4;">
+        <div class="timeline-step is-done">
+          <div class="dot"></div>
+          <div class="label">Placed</div>
+          <div class="ts">{{ order.created_at | date: "%b %d" }}</div>
+        </div>
+        <div class="timeline-step {% if step_paid %}is-done{% endif %}">
+          <div class="dot"></div>
+          <div class="label">Paid</div>
+          <div class="ts">{% if step_paid %}{{ order.financial_status_label | upcase }}{% else %}—{% endif %}</div>
+        </div>
+        {% if step_refunded %}
+          <div class="timeline-step is-error">
+            <div class="dot"></div>
+            <div class="label">Refunded</div>
+            <div class="ts">CREDIT ISSUED</div>
+          </div>
+        {% else %}
+          <div class="timeline-step {% if step_fulfilled %}is-done{% elsif step_paid %}is-current{% endif %}">
+            <div class="dot"></div>
+            <div class="label">Fulfilled</div>
+            <div class="ts">{% if step_fulfilled %}SHIPPED{% else %}PENDING{% endif %}</div>
+          </div>
+        {% endif %}
+        <div class="timeline-step {% if step_delivered %}is-done{% elsif step_fulfilled %}is-current{% endif %}">
+          <div class="dot"></div>
+          <div class="label">Delivered</div>
+          <div class="ts">{% if step_delivered %}COMPLETE{% else %}—{% endif %}</div>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} ===== Items + Ledger ===== {%- endcomment -%}
+    <div class="grid-12 mb-8">
+
+      <div style="grid-column: span 8;">
+        <div class="section-head">
+          <span class="label">// MANIFEST_CONTENTS</span>
+          <span class="sub">{{ order.line_items.size }} component{% if order.line_items.size != 1 %}s{% endif %}</span>
+        </div>
+
         <div class="space-y-4">
           {% for line_item in order.line_items %}
-            <div class="bg-[#f8f8f8] border border-gray-200 p-4 sm:p-6 relative overflow-hidden group">
-              
-              <div class="flex gap-4 sm:gap-6">
-                <!-- Assembly Image (Desaturated) -->
-                <div class="relative flex-shrink-0" style="width: 100px; height: 100px;">
+            <div class="item-card hud-corner">
+              <span class="hud-corner__bl"></span><span class="hud-corner__br"></span>
+
+              <div class="flex gap-4 sm:gap-5">
+                <div class="item-image">
                   {% if line_item.image %}
-                    <img 
-                      src="{{ line_item.image | image_url: width: 200 }}" 
-                      alt="{{ line_item.title }}"
-                      class="assembly-image w-full h-full object-cover border border-white/10"
-                      loading="lazy"
-                    >
+                    <img src="{{ line_item.image | image_url: width: 240 }}" alt="{{ line_item.title | escape }}" loading="lazy">
                   {% else %}
-                    <div class="w-full h-full bg-gray-100 border border-gray-200 flex items-center justify-center">
-                      <span class="mono-data text-xs text-gray-400">NO_IMG</span>
-                    </div>
+                    <div class="w-full h-full flex items-center justify-center"><span class="mono text-[10px] text-gray-400">NO_IMG</span></div>
                   {% endif %}
-                  
-                  <!-- SKU Reference Tag -->
                   {% if line_item.sku != blank %}
-                    <div class="absolute bottom-0 left-0 right-0 bg-[#111111] px-2 py-1">
-                      <span class="mono-data text-[8px] text-gray-400 tracking-wider">ID_REF: {{ line_item.sku }}</span>
-                    </div>
+                    <span class="id-ref">SKU: {{ line_item.sku }}</span>
                   {% endif %}
                 </div>
-                
-                <!-- Component Specs -->
+
                 <div class="flex-grow min-w-0">
                   <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                    <div>
-                      <!-- Product Title -->
+                    <div class="min-w-0">
                       {% if line_item.product.url %}
-                        <a href="{{ line_item.product.url }}" class="font-bold text-[#111111] hover:text-[#CC0000] transition-colors block text-sm sm:text-base">
-                          {{ line_item.title | upcase }}
+                        <a href="{{ line_item.product.url }}" class="block font-bold text-[#111111] hover:text-[#CC0000] transition-colors text-sm sm:text-base leading-snug">
+                          {{ line_item.title }}
                         </a>
                       {% else %}
-                        <p class="font-bold text-[#111111] text-sm sm:text-base">{{ line_item.title | upcase }}</p>
+                        <p class="font-bold text-[#111111] text-sm sm:text-base leading-snug">{{ line_item.title }}</p>
                       {% endif %}
-                      
-                      <!-- Variant Spec -->
                       {% if line_item.variant.title != 'Default Title' %}
-                        <p class="mono-data text-xs text-[#666666] mt-1 tracking-wider">
-                          SPEC: {{ line_item.variant.title | upcase | replace: ' ', '_' }}
+                        <p class="mono text-xs text-[#6b7280] mt-1 tracking-wider">
+                          SPEC: {{ line_item.variant.title }}
                         </p>
                       {% endif %}
+                      <p class="mono text-xs text-[#6b7280] mt-2">
+                        QTY {{ line_item.quantity }} <span class="text-gray-300">×</span> {{ line_item.final_price | money }}
+                      </p>
                     </div>
-                    
-                    <!-- Price -->
+
                     <div class="text-left sm:text-right flex-shrink-0">
-                      <p class="tabular-nums font-bold text-[#111111]">{{ line_item.final_line_price | money }}</p>
+                      <p class="tnums font-bold text-[#111111] text-base">{{ line_item.final_line_price | money }}</p>
                       {% if line_item.original_line_price != line_item.final_line_price %}
-                        <p class="tabular-nums text-xs text-gray-400 line-through">{{ line_item.original_line_price | money }}</p>
+                        <p class="tnums text-xs text-gray-400 line-through">{{ line_item.original_line_price | money }}</p>
                       {% endif %}
                     </div>
                   </div>
-                  
-                  <!-- Quantity -->
-                  <p class="mono-data text-xs text-[#666666] mt-2 tracking-wider">
-                    QTY: {{ line_item.quantity }} @ {{ line_item.final_price | money }}/UNIT
-                  </p>
-                  
-                  <!-- Integrated Tracking Intelligence -->
+
+                  {%- comment -%} Tracking strip {%- endcomment -%}
                   {% if line_item.fulfillment %}
-                    <div class="mt-3 pt-3 border-t border-gray-200">
-                      <div class="flex items-center gap-2">
-                        <span class="mono-data text-xs text-[#666666]">TRACKING_ID:</span>
-                        {% if line_item.fulfillment.tracking_url %}
-                          <a href="{{ line_item.fulfillment.tracking_url }}" target="_blank" rel="noopener" 
-                             class="mono-data text-xs text-[#CC0000] hover:underline group/track"
-                             title="LINK_TO_{{ line_item.fulfillment.tracking_company | upcase | default: 'CARRIER' }}">
-                            {{ line_item.fulfillment.tracking_number | default: 'PENDING' }}
-                            <span class="text-[#666666] opacity-0 group-hover/track:opacity-100 transition-opacity ml-1">
-                              [{{ line_item.fulfillment.tracking_company | upcase | default: 'CARRIER' }}]
-                            </span>
-                          </a>
-                        {% elsif line_item.fulfillment.tracking_number %}
-                          <span class="mono-data text-xs text-white">{{ line_item.fulfillment.tracking_number }}</span>
-                        {% else %}
-                          <span class="mono-data text-xs text-[#444444]">LOGISTICS_PROCESSING...</span>
-                        {% endif %}
-                      </div>
+                    <div class="mt-3 pt-3 border-t border-gray-200 flex items-center gap-3">
+                      <span class="mono text-[10px] text-[#6b7280] tracking-widest">TRACKING</span>
+                      {% if line_item.fulfillment.tracking_url %}
+                        <a href="{{ line_item.fulfillment.tracking_url }}" target="_blank" rel="noopener"
+                           class="mono text-xs text-[#CC0000] hover:underline">
+                          {{ line_item.fulfillment.tracking_number | default: 'PENDING' }}
+                          <span class="text-[#9ca3af] ml-1">[{{ line_item.fulfillment.tracking_company | default: 'CARRIER' }}]</span>
+                        </a>
+                      {% elsif line_item.fulfillment.tracking_number %}
+                        <span class="mono text-xs text-[#111111]">{{ line_item.fulfillment.tracking_number }}</span>
+                      {% else %}
+                        <span class="mono text-xs text-[#6b7280]">PROCESSING…</span>
+                      {% endif %}
                     </div>
                   {% else %}
                     <div class="mt-3 pt-3 border-t border-gray-200">
-                      <span class="mono-data text-xs text-[#444444]">STATUS: LOGISTICS_PROCESSING...</span>
+                      <span class="mono text-[10px] text-[#6b7280] tracking-widest">STATUS:</span>
+                      <span class="mono text-xs text-[#6b7280] ml-2">LOGISTICS_PROCESSING…</span>
                     </div>
                   {% endif %}
                 </div>
               </div>
-              
             </div>
           {% endfor %}
         </div>
-        
       </div>
-      
-      <!-- Right: Tactical Intelligence Sidebar -->
-      <div style="flex: 1; min-width: 280px; max-width: 360px;">
-        
-        <!-- Financial Ledger -->
-        <div class="bg-[#f8f8f8] border border-gray-200 p-5 mb-6 relative">
-          <h3 class="mono-data text-xs text-[#CC0000] tracking-widest mb-4">FINANCIAL_LEDGER</h3>
-          
-          <div class="space-y-0">
-            <div class="ledger-row">
-              <span class="text-xs text-[#666666] uppercase tracking-wider">Subtotal</span>
-              <span class="tabular-nums text-sm text-[#111111]">{{ order.line_items_subtotal_price | money }}</span>
-            </div>
-            
-            {% for discount in order.cart_level_discount_applications %}
-              <div class="ledger-row">
-                <span class="text-xs text-green-500 uppercase tracking-wider">Discount ({{ discount.title }})</span>
-                <span class="tabular-nums text-sm text-green-500">-{{ discount.total_allocated_amount | money }}</span>
-              </div>
-            {% endfor %}
-            
-            <div class="ledger-row">
-              <span class="text-xs text-[#666666] uppercase tracking-wider">Shipping</span>
-              {% if order.shipping_price > 0 %}
-                <span class="tabular-nums text-sm text-[#111111]">{{ order.shipping_price | money }}</span>
-              {% else %}
-                <span class="tabular-nums text-sm text-green-600">WAIVED</span>
-              {% endif %}
-            </div>
-            
-            {% if order.tax_price > 0 %}
-              <div class="ledger-row">
-                <span class="text-xs text-[#666666] uppercase tracking-wider">Tax</span>
-                <span class="tabular-nums text-sm text-[#111111]">{{ order.tax_price | money }}</span>
-              </div>
-            {% endif %}
-            
-            <div class="ledger-row pt-3 mt-2 border-t border-gray-300">
-              <span class="text-xs text-[#111111] uppercase tracking-wider font-bold">Total</span>
-              <span class="tabular-nums text-lg text-[#111111] font-bold">{{ order.total_price | money }}</span>
-            </div>
+
+      {%- comment -%} ===== Financial ledger ===== {%- endcomment -%}
+      <div style="grid-column: span 4;">
+        <div class="section-head">
+          <span class="label">// FINANCIAL_LEDGER</span>
+        </div>
+        <div class="info-card hud-corner">
+          <span class="hud-corner__bl"></span><span class="hud-corner__br"></span>
+
+          <div class="ledger-row">
+            <span class="text-xs text-[#6b7280] uppercase tracking-wider">Subtotal</span>
+            <span class="tnums text-[#111111]">{{ order.line_items_subtotal_price | money }}</span>
           </div>
-          
-          <!-- Refund Adjustment -->
-          {% if order.financial_status == 'refunded' or order.financial_status == 'partially_refunded' %}
-            <div class="mt-4 pt-4 border-t border-gray-300">
-              <div class="refund-highlight">
-                <p class="mono-data text-xs text-[#CC0000] tracking-widest mb-2">REFUND_ADJUSTMENT</p>
-                {% for transaction in order.transactions %}
-                  {% if transaction.kind == 'refund' %}
-                    <div class="ledger-row">
-                      <span class="text-xs text-[#666666]">CREDIT_ISSUED</span>
-                      <span class="tabular-nums text-sm text-[#CC0000]">-{{ transaction.amount | money }}</span>
-                    </div>
-                  {% endif %}
-                {% endfor %}
-              </div>
+
+          {% for discount in order.cart_level_discount_applications %}
+            <div class="ledger-row">
+              <span class="text-xs text-green-700 uppercase tracking-wider">Discount · {{ discount.title }}</span>
+              <span class="tnums text-green-700">-{{ discount.total_allocated_amount | money }}</span>
+            </div>
+          {% endfor %}
+
+          <div class="ledger-row">
+            <span class="text-xs text-[#6b7280] uppercase tracking-wider">Shipping</span>
+            {% if order.shipping_price > 0 %}
+              <span class="tnums text-[#111111]">{{ order.shipping_price | money }}</span>
+            {% else %}
+              <span class="tnums text-green-700">WAIVED</span>
+            {% endif %}
+          </div>
+
+          {% if order.tax_price > 0 %}
+            <div class="ledger-row">
+              <span class="text-xs text-[#6b7280] uppercase tracking-wider">Tax</span>
+              <span class="tnums text-[#111111]">{{ order.tax_price | money }}</span>
             </div>
           {% endif %}
-          
-          <!-- SKM Watermark -->
-          <div class="skm-watermark">SKM</div>
+
+          <div class="ledger-row total">
+            <span class="text-xs text-[#111111] uppercase tracking-widest">Total</span>
+            <span class="tnums text-[#111111]">{{ order.total_price | money }}</span>
+          </div>
+
+          {% if step_refunded %}
+            <div class="ledger-section-title">REFUND_ADJUSTMENT</div>
+            {% for transaction in order.transactions %}
+              {% if transaction.kind == 'refund' %}
+                <div class="ledger-row refund">
+                  <span class="text-xs uppercase tracking-wider">Credit issued</span>
+                  <span class="tnums">-{{ transaction.amount | money }}</span>
+                </div>
+              {% endif %}
+            {% endfor %}
+          {% endif %}
         </div>
-        
-        <!-- Shipping Manifest -->
-        <div class="bg-[#f8f8f8] border border-gray-200 p-5 mb-6">
-          <h3 class="mono-data text-[8px] text-[#CC0000] tracking-widest mb-3">SHIP_TO:</h3>
+      </div>
+
+    </div>
+
+    {%- comment -%} ===== Ship_to / Bill_to / Payment 3-column row ===== {%- endcomment -%}
+    <div class="grid-12 mb-8">
+      <div style="grid-column: span 4;">
+        <div class="info-card hud-corner">
+          <span class="hud-corner__bl"></span><span class="hud-corner__br"></span>
+          <div class="info-label">SHIP_TO</div>
           {% if order.shipping_address %}
-            <div class="mono-data text-xs text-[#444444] uppercase tracking-wider leading-relaxed">
-              <p class="font-bold text-[#111111]">{{ order.shipping_address.name }}</p>
-              {% if order.shipping_address.company %}<p>{{ order.shipping_address.company }}</p>{% endif %}
-              <p>{{ order.shipping_address.address1 }}</p>
-              {% if order.shipping_address.address2 %}<p>{{ order.shipping_address.address2 }}</p>{% endif %}
-              <p>{{ order.shipping_address.city }}, {{ order.shipping_address.province_code }} {{ order.shipping_address.zip }}</p>
-              <p>{{ order.shipping_address.country }}</p>
+            <div class="info-body">
+              <strong>{{ order.shipping_address.name }}</strong>
+              {% if order.shipping_address.company %}<br>{{ order.shipping_address.company }}{% endif %}
+              <br>{{ order.shipping_address.address1 }}
+              {% if order.shipping_address.address2 %}<br>{{ order.shipping_address.address2 }}{% endif %}
+              <br>{{ order.shipping_address.city }}, {{ order.shipping_address.province_code }} {{ order.shipping_address.zip }}
+              <br>{{ order.shipping_address.country }}
             </div>
           {% else %}
-            <p class="mono-data text-xs text-gray-400">NO_PHYSICAL_DELIVERY</p>
+            <p class="mono text-xs text-gray-400">NO_PHYSICAL_DELIVERY</p>
           {% endif %}
         </div>
-        
-        <!-- Billing Manifest -->
-        <div class="bg-[#f8f8f8] border border-gray-200 p-5 mb-6">
-          <h3 class="mono-data text-[8px] text-[#CC0000] tracking-widest mb-3">BILL_TO:</h3>
+      </div>
+
+      <div style="grid-column: span 4;">
+        <div class="info-card hud-corner">
+          <span class="hud-corner__bl"></span><span class="hud-corner__br"></span>
+          <div class="info-label">BILL_TO</div>
           {% if order.billing_address %}
-            <div class="mono-data text-xs text-[#444444] uppercase tracking-wider leading-relaxed">
-              <p class="font-bold text-[#111111]">{{ order.billing_address.name }}</p>
-              {% if order.billing_address.company %}<p>{{ order.billing_address.company }}</p>{% endif %}
-              <p>{{ order.billing_address.address1 }}</p>
-              {% if order.billing_address.address2 %}<p>{{ order.billing_address.address2 }}</p>{% endif %}
-              <p>{{ order.billing_address.city }}, {{ order.billing_address.province_code }} {{ order.billing_address.zip }}</p>
-              <p>{{ order.billing_address.country }}</p>
+            <div class="info-body">
+              <strong>{{ order.billing_address.name }}</strong>
+              {% if order.billing_address.company %}<br>{{ order.billing_address.company }}{% endif %}
+              <br>{{ order.billing_address.address1 }}
+              {% if order.billing_address.address2 %}<br>{{ order.billing_address.address2 }}{% endif %}
+              <br>{{ order.billing_address.city }}, {{ order.billing_address.province_code }} {{ order.billing_address.zip }}
+              <br>{{ order.billing_address.country }}
             </div>
           {% else %}
-            <p class="mono-data text-xs text-gray-400">SAME_AS_SHIPPING</p>
+            <p class="mono text-xs text-gray-400">SAME_AS_SHIPPING</p>
           {% endif %}
         </div>
-        
-        <!-- Payment Gateway -->
-        <div class="bg-[#f8f8f8] border border-gray-200 p-5 mb-6">
-          <h3 class="mono-data text-[8px] text-[#CC0000] tracking-widest mb-3">PAYMENT_GATEWAY:</h3>
+      </div>
+
+      <div style="grid-column: span 4;">
+        <div class="info-card hud-corner">
+          <span class="hud-corner__bl"></span><span class="hud-corner__br"></span>
+          <div class="info-label">PAYMENT_GATEWAY</div>
+          {% assign found_tx = false %}
           {% for transaction in order.transactions %}
             {% if transaction.kind == 'sale' or transaction.kind == 'capture' or transaction.kind == 'authorization' %}
-              <div class="flex items-center gap-3">
-                <div class="w-8 h-5 bg-gray-200 border border-gray-300 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3 text-[#666666]">
+              {% assign found_tx = true %}
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-7 bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[#6b7280]">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
                   </svg>
                 </div>
-                <div>
-                  <p class="mono-data text-xs text-[#111111] uppercase tracking-wider">
-                    {{ transaction.gateway | replace: '_', ' ' | replace: 'shopify payments', 'SECURE_CARD' | upcase }}
-                  </p>
-                  <p class="tabular-nums text-xs text-[#666666]">{{ transaction.amount | money }}</p>
+                <div class="info-body">
+                  <strong>{{ transaction.gateway | replace: '_', ' ' | replace: 'shopify payments', 'SECURE_CARD' | upcase }}</strong>
+                  <br><span class="tnums text-[#111111]">{{ transaction.amount | money }}</span>
+                  <br><span class="text-[#6b7280] text-[11px]">{{ transaction.created_at | date: "%Y-%m-%d %H:%M" }}</span>
                 </div>
               </div>
               {% break %}
             {% endif %}
           {% endfor %}
+          {% unless found_tx %}
+            <p class="mono text-xs text-gray-400">NO_TRANSACTION_RECORDED</p>
+          {% endunless %}
         </div>
-        
-        <!-- Support Initialization -->
-        <a href="/pages/contact" class="support-init-btn mono-data">
-          [ INITIALIZE_SUPPORT_INQUIRY ]
-        </a>
-        
       </div>
-      
     </div>
-    
+
+    {%- comment -%} ===== Support row ===== {%- endcomment -%}
+    <div class="support-row">
+      <div class="copy">
+        <div>NEED ASSISTANCE WITH THIS ORDER?</div>
+        <div class="copy-sub">Reference {{ order.name }} when contacting support.</div>
+      </div>
+      <div class="actions">
+        {% if order.order_status_url %}
+          <a href="{{ order.order_status_url }}" class="support-btn">
+            View Order Status
+          </a>
+        {% endif %}
+        <a href="/pages/contact" class="support-btn primary">
+          Initialize Support Inquiry
+        </a>
+      </div>
+    </div>
+
   </div>
 </div>
 
