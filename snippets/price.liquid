@@ -288,34 +288,46 @@
 </script>
 
 
-<div ref="priceContainer" class="price-container">
+<div ref="priceContainer" class="price-container" style="display: block;">
   {% if has_volume_pricing %}
     {%- comment -%} Volume pricing display {%- endcomment -%}
     {% if show_crossed_price %}
       <span role="group">
         <span class="visually-hidden">{{ 'content.price_regular' | t }}&nbsp;</span>
-        <span class="compare-at-price text-gray-500 line-through text-sm">{{- crossed_out_price_formatted -}}</span>
+        <span class="compare-at-price" style="color: #6b7280; text-decoration: line-through; font-size: 0.875rem;">{{- crossed_out_price_formatted -}}</span>
       </span>
     {% endif %}
     <span role="group">
       <span class="visually-hidden">{{ 'content.price_range' | t }}&nbsp;</span>
-      <span class="price price-range price--large">{{ price_min }} - {{ price_max }}</span>
+      <span class="price price-range price--large" style="color: #111111; font-weight: 700; font-size: 1rem;">{{ price_min }} - {{ price_max }}</span>
     </span>
-    
+
   {% elsif show_crossed_price %}
-    {%- comment -%} Special pricing with crossed out price {%- endcomment -%}
-    <div class="flex flex-col items-start gap-1">
+    {%- comment -%}
+      Special pricing with crossed out price.
+      Inline styles are intentional: the previous Tailwind arbitrary-value
+      classes (text-[#CC0000], flex flex-col, etc.) weren't reliably picked
+      up by the CDN JIT scanner so the price rendered with no styling and
+      ended up invisible. Inline styles guarantee the price is shown.
+    {%- endcomment -%}
+    <div class="price-container__sale" style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
       {%- comment -%} Crossed out price {%- endcomment -%}
-      <span class="text-sm text-gray-500 line-through opacity-75">
+      <span class="price-container__compare" style="font-size: 0.875rem; color: #6b7280; text-decoration: line-through; opacity: 0.75;">
         {{ crossed_out_price_formatted }}
       </span>
-      
+
       {%- comment -%} Primary price with badge {%- endcomment -%}
-      <span class="price-item price-item--sale font-bold text-[#CC0000] flex items-center gap-2 flex-wrap">
+      <span class="price-item price-item--sale" style="font-weight: 700; color: #CC0000; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 1rem;">
         {{ primary_price_formatted }}
-        
+
         {% if badge_text != nil %}
-          <span class="badge {{ badge_color }} text-white text-[10px] px-2 py-0.5 uppercase tracking-wider font-bold" style="clip-path: polygon(0 0, 100% 0, 95% 50%, 100% 100%, 0 100%, 5% 50%);">
+          {%- liquid
+            assign badge_bg = '#16a34a'
+            if badge_color contains 'CC0000' or badge_color contains 'red'
+              assign badge_bg = '#CC0000'
+            endif
+          -%}
+          <span class="badge" style="background: {{ badge_bg }}; color: #fff; font-size: 10px; padding: 2px 8px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; clip-path: polygon(0 0, 100% 0, 95% 50%, 100% 100%, 0 100%, 5% 50%);">
             {{ badge_text }}
           </span>
         {% endif %}
@@ -343,7 +355,7 @@
         endif
       endif
     -%}
-    <span class="price">{{ display_price | default: '&nbsp;' }}</span>
+    <span class="price" style="color: #111111; font-weight: 600; font-size: 1rem;">{{ display_price | default: '&nbsp;' }}</span>
   {% endif %}
   
   {%- if selected_variant.unit_price and show_unit_price %}
@@ -361,3 +373,25 @@
 {%- if has_volume_pricing -%}
   <small class="volume-pricing-note">{{ 'content.volume_pricing_available' | t }}</small>
 {%- endif -%}
+
+{%- comment -%}
+  Defensive visibility guard for the price element. Tailwind CDN's JIT
+  scanner doesn't always pick up arbitrary-value classes (text-[#CC0000])
+  reliably, and color-scheme variables can resolve transparent in some
+  themes. Inline styles above already cover the primary case; this rule
+  is the belt-and-braces fallback in case anything overrides them.
+{%- endcomment -%}
+<style>
+  product-price,
+  product-price .price-container {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  product-price .price-container .price-item--sale {
+    color: #CC0000 !important;
+  }
+  product-price .price-container > span.price {
+    color: #111111 !important;
+  }
+</style>
