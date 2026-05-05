@@ -85,8 +85,9 @@ export default {
     const publicPaths = ["/health", "/b2b/checkout", "/b2b/cart-preview", "/checkout/create", "/shop/profile", "/categories", "/dealers", "/apply-dealer", "/my-dealer", "/products/check-vehicle-fit"];
     const isPublicDealerPath = path.startsWith("/dealers/") && request.method === "GET";
     const isCustomerUpdate = path.startsWith("/customers/") && request.method === "PUT";
+    const isOrderRefundRequest = /^\/orders\/[^/]+\/request-refund$/.test(path) && request.method === "POST";
 
-    if (!publicPaths.includes(path) && !isPublicDealerPath && !isCustomerUpdate) {
+    if (!publicPaths.includes(path) && !isPublicDealerPath && !isCustomerUpdate && !isOrderRefundRequest) {
       const clientKey = request.headers.get("X-Admin-Key");
       if (clientKey !== env.ADMIN_SECRET) {
         return errorResponse("Unauthorized", 401);
@@ -446,6 +447,16 @@ export default {
         case path.match(/^\/orders\/[^/]+\/mark-paid$/) && request.method === "POST":
           const markPaidOrderId = path.split("/")[2];
           return jsonResponse(await markOrderAsPaid(env, markPaidOrderId));
+
+        // CUSTOMER-INITIATED refund REQUEST (public, signature-verified)
+        // Does NOT issue a refund — only records a pending request the
+        // admin reviews. The admin then issues via the existing /refund
+        // endpoint below.
+        case path.match(/^\/orders\/[^/]+\/request-refund$/) && request.method === "POST":
+          const refundReqOrderId = path.split("/")[2];
+          const refundReqBody = await request.json();
+          const refundReqSignature = request.headers.get("X-Customer-Signature");
+          return jsonResponse(await requestOrderRefund(env, refundReqOrderId, refundReqBody, refundReqSignature));
 
         // Calculate refund (Stage 1)
         case path.match(/^\/orders\/[^/]+\/refund\/calculate$/) && request.method === "POST":
@@ -7004,6 +7015,178 @@ async function markOrderAsPaid(env, orderId) {
   }
 
   return { success: true, order: result.orderMarkAsPaid.order };
+}
+
+/**
+ * Customer-initiated refund REQUEST.
+ * - Signature-verified (same secret as /customers/:id PUT)
+ * - Verifies the order belongs to the requesting customer
+ * - Does NOT issue a refund. Records a structured pending request as
+ *   an order tag + JSON metafield so the admin sees it in the admin
+ *   dashboard and decides whether to approve via the existing
+ *   /orders/:id/refund endpoint.
+ */
+async function requestOrderRefund(env, orderId, data, signature) {
+  // ---- 1. Validate input ----
+  if (!data || typeof data !== "object") throw new Error("Invalid payload");
+  const customerIdRaw = String(data.customerId || "");
+  if (!customerIdRaw) throw new Error("customerId required");
+
+  const numericCustomerId = customerIdRaw.startsWith("gid://")
+    ? customerIdRaw.split("/").pop()
+    : customerIdRaw;
+
+  // ---- 2. Verify customer signature ----
+  const secret = "skm-customer-update-secret";
+  const expectedSig = await hmacSha256(secret, numericCustomerId);
+  if (!signature || signature !== expectedSig) {
+    throw new Error("Unauthorized: invalid signature");
+  }
+
+  const allowedReasons = ["refund", "exchange", "damaged", "wrong_item", "other"];
+  const reason = String(data.reason || "").trim();
+  if (!allowedReasons.includes(reason)) {
+    throw new Error("Invalid reason");
+  }
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  if (items.length === 0) {
+    throw new Error("At least one item must be selected");
+  }
+  for (const it of items) {
+    if (!it || !it.lineItemId) throw new Error("Each item needs a lineItemId");
+    const qty = parseInt(it.quantity, 10);
+    if (!qty || qty < 1) throw new Error("Each item needs a positive quantity");
+  }
+
+  const notes = String(data.notes || "").slice(0, 1000);
+
+  // ---- 3. Fetch the order, confirm ownership ----
+  const orderGid = orderId.startsWith("gid://")
+    ? orderId
+    : `gid://shopify/Order/${orderId}`;
+
+  const verifyQuery = `
+    query VerifyOrder($id: ID!) {
+      order(id: $id) {
+        id
+        name
+        tags
+        customer { id }
+        metafield(namespace: "custom", key: "refund_request") { value }
+        lineItems(first: 50) {
+          nodes { id quantity }
+        }
+      }
+    }
+  `;
+  const verifyResult = await shopifyGraphQL(env, verifyQuery, { id: orderGid });
+  if (!verifyResult.order) throw new Error("Order not found");
+
+  const orderCustomerGid = verifyResult.order.customer && verifyResult.order.customer.id;
+  const expectedCustomerGid = `gid://shopify/Customer/${numericCustomerId}`;
+  if (!orderCustomerGid || orderCustomerGid !== expectedCustomerGid) {
+    throw new Error("Unauthorized: order does not belong to this customer");
+  }
+
+  // Validate each requested item belongs to the order and quantity <= ordered.
+  const orderLineItemMap = new Map();
+  (verifyResult.order.lineItems.nodes || []).forEach((li) => {
+    orderLineItemMap.set(li.id, li.quantity);
+  });
+  for (const it of items) {
+    const liGid = it.lineItemId.startsWith("gid://")
+      ? it.lineItemId
+      : `gid://shopify/LineItem/${it.lineItemId}`;
+    const orderedQty = orderLineItemMap.get(liGid);
+    if (orderedQty == null) {
+      throw new Error(`Line item ${it.lineItemId} not found on this order`);
+    }
+    if (parseInt(it.quantity, 10) > orderedQty) {
+      throw new Error(`Requested quantity for ${it.lineItemId} exceeds ordered quantity`);
+    }
+  }
+
+  // ---- 4. Read existing requests, prevent duplicates ----
+  let existingRequests = [];
+  if (verifyResult.order.metafield && verifyResult.order.metafield.value) {
+    try {
+      const parsed = JSON.parse(verifyResult.order.metafield.value);
+      if (Array.isArray(parsed)) existingRequests = parsed;
+    } catch (e) { /* corrupt — start fresh */ }
+  }
+  if (existingRequests.some((r) => r && r.status === "pending")) {
+    throw new Error("A refund request is already pending review");
+  }
+
+  // ---- 5. Build the new request ----
+  const newRequest = {
+    id: typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    requestedAt: new Date().toISOString(),
+    reason: reason,
+    items: items.map((it) => ({
+      lineItemId: it.lineItemId.startsWith("gid://")
+        ? it.lineItemId
+        : `gid://shopify/LineItem/${it.lineItemId}`,
+      quantity: parseInt(it.quantity, 10)
+    })),
+    notes: notes,
+    status: "pending"
+  };
+  const allRequests = [newRequest, ...existingRequests];
+
+  // ---- 6. Write tag + metafield via Shopify Admin GraphQL ----
+  const tags = Array.from(
+    new Set([...(verifyResult.order.tags || []), "refund-requested"])
+  );
+
+  const tagMutation = `
+    mutation AddRefundTag($input: OrderInput!) {
+      orderUpdate(input: $input) {
+        order { id tags }
+        userErrors { field message }
+      }
+    }
+  `;
+  const tagRes = await shopifyGraphQL(env, tagMutation, {
+    input: { id: orderGid, tags: tags }
+  });
+  if (tagRes.orderUpdate?.userErrors?.length) {
+    const msg = tagRes.orderUpdate.userErrors.map((e) => e.message).join(", ");
+    throw new Error(`Failed to tag order: ${msg}`);
+  }
+
+  const metafieldMutation = `
+    mutation SetRefundMetafield($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields { id namespace key value }
+        userErrors { field message }
+      }
+    }
+  `;
+  const mfRes = await shopifyGraphQL(env, metafieldMutation, {
+    metafields: [
+      {
+        ownerId: orderGid,
+        namespace: "custom",
+        key: "refund_request",
+        type: "json",
+        value: JSON.stringify(allRequests)
+      }
+    ]
+  });
+  if (mfRes.metafieldsSet?.userErrors?.length) {
+    const msg = mfRes.metafieldsSet.userErrors.map((e) => e.message).join(", ");
+    throw new Error(`Failed to record refund request: ${msg}`);
+  }
+
+  return {
+    success: true,
+    request: newRequest,
+    orderName: verifyResult.order.name
+  };
 }
 
 /**

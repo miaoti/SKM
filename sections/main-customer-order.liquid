@@ -727,7 +727,70 @@
       </div>
     </div>
 
-    {%- comment -%} ===== Support row ===== {%- endcomment -%}
+    {%- comment -%}
+      ===== Refund-request state =====
+      Reads the custom.refund_request metafield set by the worker.
+      Shows banner if there's a pending request; controls the visibility
+      of the "Request Refund" button in the support row below.
+    {%- endcomment -%}
+    {%- liquid
+      assign refund_requests_value = order.metafields.custom.refund_request.value
+      assign pending_refund_request = nil
+      assign last_refund_request = nil
+      if refund_requests_value
+        for req in refund_requests_value
+          if last_refund_request == nil
+            assign last_refund_request = req
+          endif
+          if req.status == 'pending' and pending_refund_request == nil
+            assign pending_refund_request = req
+          endif
+        endfor
+      endif
+
+      assign payment_status_lc = order.financial_status | downcase
+      assign can_request_refund = false
+      if customer
+        if payment_status_lc == 'paid' or payment_status_lc == 'partially_paid' or payment_status_lc == 'partially_refunded'
+          if pending_refund_request == nil
+            assign can_request_refund = true
+          endif
+        endif
+      endif
+    -%}
+
+    {% if pending_refund_request %}
+      <div class="refund-banner refund-banner--pending mb-6">
+        <div class="refund-banner__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l2.5 2.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div class="refund-banner__body">
+          <div class="refund-banner__title mono">REFUND REQUESTED · PENDING REVIEW</div>
+          <div class="refund-banner__sub">
+            Submitted {{ pending_refund_request.requestedAt | date: "%Y-%m-%d %H:%M UTC" }} ·
+            Reason: {{ pending_refund_request.reason | replace: '_', ' ' | upcase }}
+            {% if pending_refund_request.notes != blank %} · "{{ pending_refund_request.notes | truncate: 80 }}"{% endif %}
+          </div>
+          <div class="refund-banner__sub" style="margin-top: 4px;">
+            Our team will review the request and reply by email. You can't submit another while one is pending.
+          </div>
+        </div>
+      </div>
+    {% elsif last_refund_request and last_refund_request.status == 'rejected' %}
+      <div class="refund-banner refund-banner--rejected mb-6">
+        <div class="refund-banner__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+        </div>
+        <div class="refund-banner__body">
+          <div class="refund-banner__title mono">REFUND REQUEST DECLINED</div>
+          <div class="refund-banner__sub">
+            {% if last_refund_request.adminNote != blank %}{{ last_refund_request.adminNote }}{% else %}Please contact support if you need to discuss this decision.{% endif %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    {%- comment -%} ===== Support / actions row ===== {%- endcomment -%}
     <div class="support-row">
       <div class="copy">
         <div>NEED ASSISTANCE WITH THIS ORDER?</div>
@@ -739,14 +802,374 @@
             View Order Status
           </a>
         {% endif %}
-        <a href="/pages/contact" class="support-btn primary">
-          Initialize Support Inquiry
+        {% if can_request_refund %}
+          <button type="button" id="btn-open-refund-modal" class="support-btn primary">
+            Request Refund
+          </button>
+        {% endif %}
+        <a href="/pages/contact" class="support-btn">
+          Contact Support
         </a>
       </div>
     </div>
 
+    {%- comment -%} ===== Refund modal ===== {%- endcomment -%}
+    {% if can_request_refund %}
+      {%- assign refund_signature = customer.id | hmac_sha256: "skm-customer-update-secret" -%}
+      <dialog id="refund-modal" class="refund-modal">
+        <div class="refund-modal__panel hud-corner">
+          <span class="hud-corner__bl"></span><span class="hud-corner__br"></span>
+
+          <div class="refund-modal__header">
+            <div>
+              <div class="mono refund-modal__eyebrow">// REQUEST_REFUND</div>
+              <h3 class="refund-modal__title">Order {{ order.name }}</h3>
+            </div>
+            <button type="button" class="refund-modal__close" aria-label="Close" data-refund-close>
+              <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <form id="refund-form" class="refund-modal__body">
+            <div class="refund-field">
+              <label class="refund-field__label mono">REASON</label>
+              <select id="refund-reason" class="refund-field__input" required>
+                <option value="">Select a reason</option>
+                <option value="refund">General refund</option>
+                <option value="exchange">Exchange / wrong size or fitment</option>
+                <option value="damaged">Item arrived damaged</option>
+                <option value="wrong_item">Received wrong item</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div class="refund-field">
+              <label class="refund-field__label mono">ITEMS · select what you'd like refunded</label>
+              <div class="refund-items">
+                {% for line_item in order.line_items %}
+                  {%- assign refundable_qty = line_item.quantity | minus: line_item.refunded_quantity -%}
+                  <label class="refund-item" data-line-id="{{ line_item.id }}" {% if refundable_qty == 0 %}data-disabled="true"{% endif %}>
+                    <input type="checkbox" class="refund-item__check"
+                      data-line-id="{{ line_item.id }}"
+                      data-max-qty="{{ refundable_qty }}"
+                      {% if refundable_qty == 0 %}disabled{% endif %}>
+                    <div class="refund-item__main">
+                      <div class="refund-item__title">{{ line_item.title }}</div>
+                      <div class="refund-item__meta mono">
+                        {% if line_item.variant.title != 'Default Title' %}{{ line_item.variant.title }} · {% endif %}
+                        {{ line_item.final_price | money }} each ·
+                        {% if refundable_qty == 0 %}
+                          <span style="color: var(--data-grey);">already refunded</span>
+                        {% else %}
+                          {{ refundable_qty }} of {{ line_item.quantity }} eligible
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div class="refund-item__qty">
+                      <span class="mono refund-item__qty-label">QTY</span>
+                      <input type="number" min="1" max="{{ refundable_qty }}" value="{{ refundable_qty }}"
+                        class="refund-item__qty-input"
+                        {% if refundable_qty == 0 %}disabled{% endif %}>
+                    </div>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="refund-field">
+              <label class="refund-field__label mono">NOTES <span style="color: var(--data-grey); font-weight: 400;">(optional · 1000 max)</span></label>
+              <textarea id="refund-notes" class="refund-field__input refund-field__textarea" rows="3" maxlength="1000" placeholder="Briefly describe what happened, photos can be sent via email reply afterward."></textarea>
+            </div>
+
+            <div id="refund-error" class="refund-error" hidden></div>
+
+            <div class="refund-modal__footer">
+              <button type="button" class="support-btn" data-refund-close>Cancel</button>
+              <button type="submit" id="refund-submit" class="support-btn primary">Submit Request</button>
+            </div>
+          </form>
+
+          <div id="refund-success" class="refund-success" hidden>
+            <div class="refund-success__icon">
+              <svg width="34" height="34" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div class="refund-success__title mono">REQUEST RECEIVED</div>
+            <p class="refund-success__sub">We'll review and reply by email. Refresh this page to see the pending status.</p>
+            <button type="button" class="support-btn primary" onclick="window.location.reload()">Reload</button>
+          </div>
+        </div>
+      </dialog>
+
+      <script>
+        (function () {
+          var modal = document.getElementById('refund-modal');
+          var openBtn = document.getElementById('btn-open-refund-modal');
+          var form = document.getElementById('refund-form');
+          var errorBox = document.getElementById('refund-error');
+          var success = document.getElementById('refund-success');
+          var submitBtn = document.getElementById('refund-submit');
+          var customerId = {{ customer.id | json }};
+          var customerSig = {{ refund_signature | json }};
+          var orderId = {{ order.id | json }};
+          var workerBase = 'https://skm-inventory-api.miaotingshuo.workers.dev';
+
+          if (!modal || !openBtn) return;
+
+          openBtn.addEventListener('click', function () {
+            errorBox.hidden = true; errorBox.textContent = '';
+            modal.showModal();
+          });
+
+          modal.querySelectorAll('[data-refund-close]').forEach(function (b) {
+            b.addEventListener('click', function () { modal.close(); });
+          });
+          modal.addEventListener('click', function (e) {
+            if (e.target === modal) modal.close();
+          });
+
+          // Toggle qty input enable/disable based on checkbox.
+          modal.querySelectorAll('.refund-item__check').forEach(function (cb) {
+            var row = cb.closest('.refund-item');
+            var qtyInput = row.querySelector('.refund-item__qty-input');
+            cb.addEventListener('change', function () {
+              if (cb.checked) {
+                qtyInput.disabled = false;
+              } else {
+                qtyInput.disabled = true;
+              }
+            });
+          });
+
+          form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            errorBox.hidden = true;
+
+            var reason = document.getElementById('refund-reason').value;
+            if (!reason) { errorBox.textContent = 'Please select a reason.'; errorBox.hidden = false; return; }
+
+            var items = [];
+            modal.querySelectorAll('.refund-item__check:checked').forEach(function (cb) {
+              var row = cb.closest('.refund-item');
+              var qty = parseInt(row.querySelector('.refund-item__qty-input').value, 10) || 0;
+              if (qty > 0) {
+                items.push({ lineItemId: cb.dataset.lineId, quantity: qty });
+              }
+            });
+            if (items.length === 0) {
+              errorBox.textContent = 'Select at least one item.';
+              errorBox.hidden = false;
+              return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting…';
+
+            try {
+              var numericOrder = String(orderId).split('/').pop();
+              var res = await fetch(workerBase + '/orders/' + numericOrder + '/request-refund', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Customer-Signature': customerSig
+                },
+                body: JSON.stringify({
+                  customerId: customerId,
+                  reason: reason,
+                  items: items,
+                  notes: document.getElementById('refund-notes').value
+                })
+              });
+              var json = await res.json();
+              if (!res.ok || !json.success) {
+                throw new Error(json.error || json.message || ('HTTP ' + res.status));
+              }
+              form.hidden = true;
+              success.hidden = false;
+            } catch (err) {
+              errorBox.textContent = err.message || 'Failed to submit refund request.';
+              errorBox.hidden = false;
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Submit Request';
+            }
+          });
+        })();
+      </script>
+    {% endif %}
+
   </div>
 </div>
+
+<style>
+  /* Refund banner */
+  .refund-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 18px;
+    border: 1px solid var(--border-color);
+    border-left-width: 3px;
+    background: #fff;
+  }
+  .refund-banner--pending  { border-left-color: var(--signal-amber); background: #fffbeb; }
+  .refund-banner--rejected { border-left-color: var(--racing-red); background: #fef2f2; }
+  .refund-banner__icon { flex-shrink: 0; color: var(--signal-amber); padding-top: 1px; }
+  .refund-banner--rejected .refund-banner__icon { color: var(--racing-red); }
+  .refund-banner__title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: #92400e;
+  }
+  .refund-banner--rejected .refund-banner__title { color: #991b1b; }
+  .refund-banner__sub {
+    font-size: 12px;
+    color: #4b5563;
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  /* Refund modal */
+  .refund-modal {
+    border: none;
+    padding: 0;
+    background: transparent;
+    max-width: none;
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+  .refund-modal::backdrop { background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); }
+  .refund-modal[open] {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: clamp(20px, 6vh, 80px) 16px 16px;
+  }
+  .refund-modal__panel {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    width: 100%;
+    max-width: 640px;
+    max-height: 88dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: rmIn 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @keyframes rmIn {
+    from { opacity: 0; transform: translateY(-12px) scale(0.985); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .refund-modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .refund-modal__eyebrow {
+    font-size: 10px;
+    color: var(--racing-red);
+    letter-spacing: 0.2em;
+    font-weight: 700;
+  }
+  .refund-modal__title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+  .refund-modal__close {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--data-grey);
+    padding: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .refund-modal__close:hover { color: var(--racing-red); border-color: var(--racing-red); }
+
+  .refund-modal__body {
+    padding: 18px 22px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .refund-field { display: flex; flex-direction: column; gap: 6px; }
+  .refund-field__label {
+    font-size: 10px;
+    color: var(--racing-red);
+    letter-spacing: 0.16em;
+    font-weight: 700;
+  }
+  .refund-field__input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border-color);
+    background: #fff;
+    color: var(--obsidian);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px;
+    transition: border-color 0.15s ease;
+  }
+  .refund-field__input:focus { border-color: var(--racing-red); outline: none; }
+  .refund-field__textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
+
+  .refund-items { display: flex; flex-direction: column; gap: 8px; }
+  .refund-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    background: #fff;
+  }
+  .refund-item:hover { border-color: var(--racing-red); }
+  .refund-item[data-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+  .refund-item__check { accent-color: var(--racing-red); width: 16px; height: 16px; flex-shrink: 0; }
+  .refund-item__main { flex: 1; min-width: 0; }
+  .refund-item__title { font-size: 13px; font-weight: 600; color: var(--obsidian); line-height: 1.3; }
+  .refund-item__meta { font-size: 11px; color: var(--data-grey); margin-top: 3px; letter-spacing: 0.02em; }
+  .refund-item__qty { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+  .refund-item__qty-label { font-size: 9px; color: var(--data-grey); letter-spacing: 0.14em; }
+  .refund-item__qty-input {
+    width: 60px;
+    padding: 5px 8px;
+    border: 1px solid var(--border-color);
+    text-align: center;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px;
+    background: #fff;
+  }
+  .refund-item__qty-input:disabled { opacity: 0.4; }
+
+  .refund-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  .refund-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 4px;
+  }
+
+  .refund-success {
+    padding: 36px 24px 28px;
+    text-align: center;
+  }
+  .refund-success__icon { color: var(--signal-green); margin-bottom: 14px; display: flex; justify-content: center; }
+  .refund-success__title { font-size: 14px; font-weight: 700; letter-spacing: 0.16em; }
+  .refund-success__sub { font-size: 13px; color: var(--data-grey); margin: 8px 0 18px; line-height: 1.5; }
+</style>
 
 {% schema %}
 {
