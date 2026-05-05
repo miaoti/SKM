@@ -46,9 +46,16 @@
         return;
       }
 
-      // Count pending refund requests so we can surface a header badge later.
+      // Count pending refund requests so we can surface a header badge
+      // and decide whether to show the "inbox" banner.
       let pendingRefundReqCount = 0;
-      list.innerHTML = S.orders.map(order => {
+      const onlyShowRefundRequests = S.refundInboxFilter === true;
+      let visibleOrders = S.orders;
+      if (onlyShowRefundRequests) {
+        visibleOrders = S.orders.filter(o => (o.tags || []).includes('refund-requested'));
+      }
+
+      list.innerHTML = visibleOrders.map(order => {
         const financialClass = getFinancialStatusClass(order.financialStatus);
         const fulfillmentClass = getFulfillmentStatusClass(order.fulfillmentStatus);
         const isSelected = S.selectedOrder?.id === order.id;
@@ -76,12 +83,36 @@
         `;
       }).join('');
 
-      // Surface the count in the orders header so admin sees there's stuff to triage.
+      // Need to count pending refund requests across ALL orders, not
+      // just visible ones, so the badge stays accurate when filter is on.
+      pendingRefundReqCount = S.orders.filter(o => (o.tags || []).includes('refund-requested')).length;
+
       const countEl = $('orders-count');
       if (countEl) {
-        countEl.innerHTML = pendingRefundReqCount > 0
-          ? `${S.orders.length} orders <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded bg-orange-100 text-orange-700 align-middle">${pendingRefundReqCount} REFUND REQUEST${pendingRefundReqCount === 1 ? '' : 'S'}</span>`
+        const visLabel = onlyShowRefundRequests
+          ? `${visibleOrders.length} of ${S.orders.length} orders`
           : `${S.orders.length} orders`;
+        countEl.innerHTML = pendingRefundReqCount > 0
+          ? `${visLabel} <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded bg-orange-100 text-orange-700 align-middle">${pendingRefundReqCount} REFUND REQUEST${pendingRefundReqCount === 1 ? '' : 'S'}</span>`
+          : visLabel;
+      }
+
+      // Refund-request inbox banner above the list.
+      const banner = $('refund-inbox-banner');
+      const headline = $('refund-inbox-headline');
+      const toggleBtn = $('refund-inbox-toggle');
+      if (banner && headline && toggleBtn) {
+        if (pendingRefundReqCount > 0) {
+          banner.classList.remove('hidden');
+          headline.textContent = `${pendingRefundReqCount} customer refund request${pendingRefundReqCount === 1 ? '' : 's'} pending review`;
+          toggleBtn.textContent = onlyShowRefundRequests ? 'Show all' : 'Filter';
+        } else {
+          banner.classList.add('hidden');
+          // Reset filter if there's nothing to filter to.
+          if (S.refundInboxFilter) {
+            S.refundInboxFilter = false;
+          }
+        }
       }
 
       list.querySelectorAll('.order-item').forEach(item => {
@@ -494,6 +525,14 @@
       $('order-filter-financial').addEventListener('change', (e) => {
         S.orderFilters.financial = e.target.value;
         loadOrders();
+      });
+    }
+
+    // Refund-request inbox: one-click filter to pending refund requests.
+    if ($('refund-inbox-toggle')) {
+      $('refund-inbox-toggle').addEventListener('click', () => {
+        S.refundInboxFilter = !S.refundInboxFilter;
+        renderOrdersList();
       });
     }
 

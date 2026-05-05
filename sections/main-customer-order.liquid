@@ -1065,7 +1065,8 @@
     -%}
 
     {% if pending_refund_request %}
-      <div class="refund-banner refund-banner--pending mb-6">
+      {%- assign refund_signature = customer.id | hmac_sha256: "skm-customer-update-secret" -%}
+      <div class="refund-banner refund-banner--pending mb-6" data-pending-id="{{ pending_refund_request.id }}">
         <div class="refund-banner__icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l2.5 2.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
@@ -1077,10 +1078,59 @@
             {% if pending_refund_request.notes != blank %} · "{{ pending_refund_request.notes | truncate: 80 }}"{% endif %}
           </div>
           <div class="refund-banner__sub" style="margin-top: 4px;">
-            Our team will review the request and reply by email. You can't submit another while one is pending.
+            Our team will review the request and reply by email. You can cancel and re-submit at any time before we process it.
+          </div>
+          <div class="refund-banner__actions" style="margin-top: 12px;">
+            <button type="button" id="btn-cancel-refund-request" class="refund-banner__cancel-btn">
+              Cancel request
+            </button>
+            <span id="refund-cancel-error" class="refund-banner__sub" style="color: #991b1b; margin-left: 12px;" hidden></span>
           </div>
         </div>
       </div>
+      <script>
+        (function () {
+          var btn = document.getElementById('btn-cancel-refund-request');
+          if (!btn) return;
+          var errEl = document.getElementById('refund-cancel-error');
+          var customerId = {{ customer.id | json }};
+          var customerSig = {{ refund_signature | json }};
+          var requestId = {{ pending_refund_request.id | json }};
+          var orderId = {{ order.id | json }};
+          var workerBase = 'https://skm-inventory-api.miaotingshuo.workers.dev';
+
+          btn.addEventListener('click', async function () {
+            var ok = window.confirm('Cancel this refund request? You can submit a new one afterward.');
+            if (!ok) return;
+            errEl.hidden = true; errEl.textContent = '';
+            btn.disabled = true; btn.textContent = 'Cancelling…';
+            try {
+              var numericOrder = String(orderId).split('/').pop();
+              var res = await fetch(
+                workerBase + '/orders/' + numericOrder + '/refund-requests/' + encodeURIComponent(requestId),
+                {
+                  method: 'DELETE',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Customer-Signature': customerSig
+                  },
+                  body: JSON.stringify({ customerId: customerId })
+                }
+              );
+              var json = await res.json();
+              if (!res.ok || !json.success) {
+                throw new Error(json.error || ('HTTP ' + res.status));
+              }
+              window.location.reload();
+            } catch (err) {
+              errEl.textContent = err.message || 'Failed to cancel.';
+              errEl.hidden = false;
+              btn.disabled = false;
+              btn.textContent = 'Cancel request';
+            }
+          });
+        })();
+      </script>
     {% elsif last_refund_request and last_refund_request.status == 'rejected' %}
       <div class="refund-banner refund-banner--rejected mb-6">
         <div class="refund-banner__icon">
@@ -1331,6 +1381,34 @@
     color: #4b5563;
     margin-top: 4px;
     line-height: 1.5;
+  }
+  .refund-banner__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .refund-banner__cancel-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    background: #fff;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .refund-banner__cancel-btn:hover {
+    background: #fffbeb;
+    border-color: #f59e0b;
+  }
+  .refund-banner__cancel-btn:disabled {
+    opacity: 0.6; cursor: not-allowed;
   }
 
   /* Refund modal */

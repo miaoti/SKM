@@ -1325,6 +1325,19 @@
               
               <!-- Orders List -->
               <div class="lg:col-span-1 bg-white rounded-xl border border-gray-200 flex flex-col" style="max-height: calc(100vh - 280px);">
+                <!-- Refund-request inbox banner. Shows whenever any
+                     loaded order has the refund-requested tag; lets
+                     admin one-click filter the list. -->
+                <div id="refund-inbox-banner" class="hidden flex items-start gap-2 px-3 py-2.5 border-b border-orange-200 bg-orange-50 text-orange-900">
+                  <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5.062 19h13.876c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                  <div class="flex-1 min-w-0 text-xs">
+                    <div class="font-semibold leading-snug" id="refund-inbox-headline">No pending refund requests</div>
+                    <div class="text-[11px] text-orange-700 mt-0.5">Customers can submit and cancel refund requests on their order page.</div>
+                  </div>
+                  <button id="refund-inbox-toggle" class="text-[10px] font-bold uppercase tracking-wider text-white bg-orange-600 hover:bg-orange-700 px-2.5 py-1 rounded whitespace-nowrap">
+                    Filter
+                  </button>
+                </div>
                 <div class="p-3 border-b border-gray-100 flex items-center justify-between">
                   <span id="orders-count" class="text-xs text-gray-500">0 orders</span>
                   <div class="flex items-center gap-1">

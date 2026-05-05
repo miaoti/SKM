@@ -86,8 +86,9 @@ export default {
     const isPublicDealerPath = path.startsWith("/dealers/") && request.method === "GET";
     const isCustomerUpdate = path.startsWith("/customers/") && request.method === "PUT";
     const isOrderRefundRequest = /^\/orders\/[^/]+\/request-refund$/.test(path) && request.method === "POST";
+    const isOrderRefundRequestCancel = /^\/orders\/[^/]+\/refund-requests\/[^/]+$/.test(path) && request.method === "DELETE";
 
-    if (!publicPaths.includes(path) && !isPublicDealerPath && !isCustomerUpdate && !isOrderRefundRequest) {
+    if (!publicPaths.includes(path) && !isPublicDealerPath && !isCustomerUpdate && !isOrderRefundRequest && !isOrderRefundRequestCancel) {
       const clientKey = request.headers.get("X-Admin-Key");
       if (clientKey !== env.ADMIN_SECRET) {
         return errorResponse("Unauthorized", 401);
@@ -467,6 +468,15 @@ export default {
           const refReqId = decodeURIComponent(path.split("/")[4]);
           const refReqBody = await request.json();
           return jsonResponse(await updateRefundRequestStatus(env, refReqOrderId, refReqId, refReqBody));
+
+        // Customer-initiated cancellation of their OWN pending request.
+        // Public, signature-verified — same auth as POST /request-refund.
+        case path.match(/^\/orders\/[^/]+\/refund-requests\/[^/]+$/) && request.method === "DELETE":
+          const cancelReqOrderId = path.split("/")[2];
+          const cancelReqId = decodeURIComponent(path.split("/")[4]);
+          const cancelReqBody = await request.json().catch(() => ({}));
+          const cancelReqSig = request.headers.get("X-Customer-Signature");
+          return jsonResponse(await cancelRefundRequest(env, cancelReqOrderId, cancelReqId, cancelReqBody, cancelReqSig));
 
         // Calculate refund (Stage 1)
         case path.match(/^\/orders\/[^/]+\/refund\/calculate$/) && request.method === "POST":
@@ -7084,7 +7094,7 @@ async function requestOrderRefund(env, orderId, data, signature) {
         name
         tags
         note
-        customer { id }
+        customer { id displayName email }
         metafield(namespace: "custom", key: "refund_request") { value }
         lineItems(first: 50) {
           nodes { id quantity title }
@@ -7229,6 +7239,26 @@ async function requestOrderRefund(env, orderId, data, signature) {
     throw new Error(`Failed to record refund request: ${msg}`);
   }
 
+  // Best-effort: email the shop owner. Run after the metafield is
+  // committed so the request is durable even if email delivery fails.
+  // Decorate items with their resolved titles so the email can render
+  // them readably.
+  try {
+    const decoratedItems = newRequest.items.map((it) => ({
+      ...it,
+      _title: titleByLineId.get(it.lineItemId) || "(item)"
+    }));
+    await notifyShopOwnerOfRefundRequest(
+      env,
+      { id: orderGid, name: verifyResult.order.name },
+      { ...newRequest, items: decoratedItems },
+      verifyResult.order.customer
+    );
+  } catch (e) {
+    // Email failure must not surface to the customer.
+    console.warn("[refund-request] Email notify error:", e.message);
+  }
+
   return {
     success: true,
     request: newRequest,
@@ -7342,6 +7372,215 @@ async function updateRefundRequestStatus(env, orderId, requestId, data) {
     request: requests[idx],
     pendingRemaining: stillPending
   };
+}
+
+/**
+ * Customer-initiated cancellation of a pending refund request.
+ * Same auth flow as the request submission. Refuses to cancel a
+ * request that has already been approved/rejected/completed by an
+ * admin — the customer can only retract while it's still pending.
+ */
+async function cancelRefundRequest(env, orderId, requestId, data, signature) {
+  const customerIdRaw = String(data && data.customerId || "");
+  if (!customerIdRaw) throw new Error("customerId required");
+  const numericCustomerId = customerIdRaw.startsWith("gid://")
+    ? customerIdRaw.split("/").pop()
+    : customerIdRaw;
+
+  const secret = "skm-customer-update-secret";
+  const expectedSig = await hmacSha256(secret, numericCustomerId);
+  if (!signature || signature !== expectedSig) {
+    throw new Error("Unauthorized: invalid signature");
+  }
+
+  const orderGid = orderId.startsWith("gid://")
+    ? orderId
+    : `gid://shopify/Order/${orderId}`;
+
+  // Fetch current state — also verify the customer owns the order so a
+  // valid signature for customer A can't cancel customer B's request.
+  const fetchQuery = `
+    query GetRefundReqForCancel($id: ID!) {
+      order(id: $id) {
+        id
+        tags
+        customer { id }
+        metafield(namespace: "custom", key: "refund_request") { value }
+      }
+    }
+  `;
+  const fetched = await shopifyGraphQL(env, fetchQuery, { id: orderGid });
+  if (!fetched.order) throw new Error("Order not found");
+
+  const expectedCustomerGid = `gid://shopify/Customer/${numericCustomerId}`;
+  if (!fetched.order.customer || fetched.order.customer.id !== expectedCustomerGid) {
+    throw new Error("Unauthorized: order does not belong to this customer");
+  }
+
+  let requests = [];
+  if (fetched.order.metafield && fetched.order.metafield.value) {
+    try {
+      const parsed = JSON.parse(fetched.order.metafield.value);
+      if (Array.isArray(parsed)) requests = parsed;
+    } catch (e) { /* corrupt — start over */ }
+  }
+
+  const idx = requests.findIndex((r) => r && r.id === requestId);
+  if (idx === -1) throw new Error("Refund request not found");
+
+  if (requests[idx].status !== "pending") {
+    throw new Error("This request can no longer be cancelled — it has already been " + requests[idx].status);
+  }
+
+  requests[idx] = {
+    ...requests[idx],
+    status: "cancelled",
+    cancelledAt: new Date().toISOString()
+  };
+
+  // Drop the tag if no other pending requests remain.
+  const stillPending = requests.some((r) => r && r.status === "pending");
+  let nextTags = fetched.order.tags || [];
+  if (!stillPending) {
+    nextTags = nextTags.filter((t) => t !== "refund-requested");
+  }
+
+  const tagMutation = `
+    mutation UpdateOrderTagsAfterCancel($input: OrderInput!) {
+      orderUpdate(input: $input) {
+        order { id tags }
+        userErrors { field message }
+      }
+    }
+  `;
+  await shopifyGraphQL(env, tagMutation, {
+    input: { id: orderGid, tags: nextTags }
+  });
+
+  const mfMutation = `
+    mutation SetRefundReqMetafieldAfterCancel($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields { id }
+        userErrors { field message }
+      }
+    }
+  `;
+  const mfRes = await shopifyGraphQL(env, mfMutation, {
+    metafields: [
+      {
+        ownerId: orderGid,
+        namespace: "custom",
+        key: "refund_request",
+        type: "json",
+        value: JSON.stringify(requests)
+      }
+    ]
+  });
+  if (mfRes.metafieldsSet?.userErrors?.length) {
+    const msg = mfRes.metafieldsSet.userErrors.map((e) => e.message).join(", ");
+    throw new Error(`Failed to cancel request: ${msg}`);
+  }
+
+  return { success: true, request: requests[idx], pendingRemaining: stillPending };
+}
+
+/**
+ * Best-effort: notify the shop owner over email when a customer
+ * submits a refund request. Fails silently if Resend isn't configured
+ * or the shop's notification address is missing — we never want a
+ * customer-facing API call to fail because email delivery hiccupped.
+ *
+ * Recipient resolution order:
+ *   1. env.SHOP_OWNER_EMAIL (matches the dealer-applications notifier)
+ *   2. shop.email (via getShopProfile() — the email shown in the
+ *      admin Profile tab)
+ */
+async function notifyShopOwnerOfRefundRequest(env, order, request, customerInfo) {
+  if (!env.RESEND_API_KEY) return;
+
+  let recipient = env.SHOP_OWNER_EMAIL;
+  if (!recipient) {
+    try {
+      const profile = await getShopProfile(env);
+      recipient = profile && profile.email;
+    } catch (e) { /* fall through */ }
+  }
+  if (!recipient) return;
+
+  const reasonLabels = {
+    refund: "General refund",
+    exchange: "Exchange / wrong size or fitment",
+    damaged: "Item arrived damaged",
+    wrong_item: "Received wrong item",
+    other: "Other"
+  };
+  const reasonText = reasonLabels[request.reason] || request.reason;
+  const itemRows = (request.items || []).map((it) => {
+    const title = it._title || "(item)";
+    return `${it.quantity}× ${title}`;
+  }).join("<br>");
+  const itemRowsText = (request.items || []).map((it) => {
+    const title = it._title || "(item)";
+    return `  - ${it.quantity}× ${title}`;
+  }).join("\n");
+
+  const orderName = order.name || `#${order.id}`;
+  const customerName = customerInfo && (customerInfo.displayName || customerInfo.email) || "A customer";
+  const adminLink = `https://skm-ex.myshopify.com/pages/admin-dashboard?tab=orders&order=${(order.id || "").split("/").pop()}`;
+
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${env.RESEND_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: "SKM Refund Requests <onboarding@resend.dev>",
+        to: recipient,
+        subject: `Refund requested · Order ${orderName}`,
+        text: `${customerName} requested a refund on order ${orderName}.
+
+Reason: ${reasonText}
+Items:
+${itemRowsText || "  (none specified)"}
+
+${request.notes ? "Customer notes: " + request.notes : ""}
+
+Review in admin: ${adminLink}`,
+        html: `<!doctype html>
+<html><body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f4f4f5">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.06)">
+        <tr><td style="background:#dc2626;padding:24px 32px;color:#fff">
+          <div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;opacity:0.85">REFUND REQUEST</div>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700">Order ${orderName}</h1>
+        </td></tr>
+        <tr><td style="padding:28px 32px;color:#111">
+          <p style="margin:0 0 16px;font-size:15px"><strong>${customerName}</strong> just requested a refund.</p>
+          <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:18px;font-size:14px">
+            <tr><td style="padding:8px 0;color:#6b7280;width:120px">Reason</td><td style="padding:8px 0">${reasonText}</td></tr>
+            <tr><td style="padding:8px 0;color:#6b7280;vertical-align:top">Items</td><td style="padding:8px 0">${itemRows || "(none)"}</td></tr>
+            ${request.notes ? `<tr><td style="padding:8px 0;color:#6b7280;vertical-align:top">Notes</td><td style="padding:8px 0;font-style:italic">${request.notes}</td></tr>` : ""}
+            <tr><td style="padding:8px 0;color:#6b7280">Submitted</td><td style="padding:8px 0">${request.requestedAt}</td></tr>
+          </table>
+          <p style="margin:24px 0 0">
+            <a href="${adminLink}" style="display:inline-block;background:#dc2626;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">Review request</a>
+          </p>
+        </td></tr>
+        <tr><td style="padding:14px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:11px;color:#6b7280">
+          The customer can cancel this request from their account page until you process or decline it.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+      })
+    });
+  } catch (e) {
+    console.warn("[refund-request] Email notify failed:", e.message);
+  }
 }
 
 /**
