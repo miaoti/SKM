@@ -19,7 +19,8 @@
     filters: { year: '', make: '', model: '', submodel: '' },
     vFilters: { year: '', make: '', model: '' }, // Vehicle list filters
     productYmmFilter: { year: '', make: '', model: '' }, // Product sidebar YMM filter
-    orderFilters: { status: '', fulfillment: '', financial: '', query: '' },
+    orderFilters: { status: '', fulfillment: '', financial: '', query: '', quick: '' },
+    orderPagination: { hasNextPage: false, endCursor: null },
     create: { year: '', make: '', model: '', submodel: '' },
     pendingMedia: [],
     // Pagination state for products

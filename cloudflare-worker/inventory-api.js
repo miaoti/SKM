@@ -372,7 +372,8 @@ export default {
           const orderFinancial = url.searchParams.get("financial") || "";
           const orderQuery = url.searchParams.get("q") || "";
           const orderLimit = parseInt(url.searchParams.get("limit")) || 50;
-          return jsonResponse(await listOrders(env, { status: orderStatus, fulfillment: orderFulfillment, financial: orderFinancial, query: orderQuery, limit: orderLimit }));
+          const orderCursor = url.searchParams.get("cursor") || null;
+          return jsonResponse(await listOrders(env, { status: orderStatus, fulfillment: orderFulfillment, financial: orderFinancial, query: orderQuery, limit: orderLimit, cursor: orderCursor }));
 
         // Get single order with full details
         case path.match(/^\/orders\/[^/]+$/) && request.method === "GET":
@@ -5402,7 +5403,7 @@ async function updateProductShipping(env, productId, data) {
  * List orders with filtering options
  */
 async function listOrders(env, filters = {}) {
-  const { status, fulfillment, financial, query: searchQuery, limit } = filters;
+  const { status, fulfillment, financial, query: searchQuery, limit, cursor } = filters;
 
   // Build query filter string
   let queryFilter = "";
@@ -5418,8 +5419,9 @@ async function listOrders(env, filters = {}) {
   }
 
   const gqlQuery = `
-    query ListOrders($first: Int!, $query: String) {
-      orders(first: $first, query: $query, sortKey: CREATED_AT, reverse: true) {
+    query ListOrders($first: Int!, $query: String, $after: String) {
+      orders(first: $first, query: $query, after: $after, sortKey: CREATED_AT, reverse: true) {
+        pageInfo { hasNextPage endCursor }
         edges {
           node {
             id
@@ -5555,8 +5557,9 @@ async function listOrders(env, filters = {}) {
   `;
 
   const result = await shopifyGraphQL(env, gqlQuery, {
-    first: limit || 50,
-    query: queryFilter || null
+    first: parseInt(limit) || 50,
+    query: queryFilter || null,
+    after: cursor || null
   });
 
   const orders = result.orders.edges.map(edge => {
@@ -5595,7 +5598,11 @@ async function listOrders(env, filters = {}) {
   return {
     success: true,
     orders,
-    pageInfo: result.orders.pageInfo
+    pageInfo: result.orders.pageInfo,
+    pagination: {
+      hasNextPage: result.orders.pageInfo.hasNextPage,
+      endCursor: result.orders.pageInfo.endCursor
+    }
   };
 }
 

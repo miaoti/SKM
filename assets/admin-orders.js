@@ -9,58 +9,103 @@
   // Wait for main admin script to initialize
   function initOrderManagement(API_BASE, api, S, $, toast, showAuth) {
 
-    async function loadOrders() {
+    // Quick-filter chips translate to Shopify search-query strings.
+    // The user's intuition is correct: a refunded or cancelled order
+    // shouldn't count as "needs fulfillment" — the negation in the
+    // first chip's query enforces that.
+    const QUICK_FILTER_QUERIES = {
+      '':              '', // "All"
+      'needsFulfill':  '(fulfillment_status:unfulfilled OR fulfillment_status:partial) -financial_status:refunded -financial_status:partially_refunded -status:cancelled',
+      'refundReq':     'tag:refund-requested',
+      'refunded':      'financial_status:refunded OR financial_status:partially_refunded',
+      'cancelled':     'status:cancelled'
+    };
+
+    async function loadOrders(opts) {
+      opts = opts || {};
+      const append = !!opts.append;
       const list = $('orders-list');
-      list.innerHTML = '<div class="p-8 text-center"><div class="w-5 h-5 border-2 border-gray-200 border-t-red-600 rounded-full spinner mx-auto"></div><p class="text-sm text-gray-400 mt-2">Loading orders...</p></div>';
+
+      if (!append) {
+        list.innerHTML = '<div class="p-8 text-center"><div class="w-5 h-5 border-2 border-gray-200 border-t-red-600 rounded-full spinner mx-auto"></div><p class="text-sm text-gray-400 mt-2">Loading orders...</p></div>';
+      }
 
       try {
         const params = new URLSearchParams();
         if (S.orderFilters.status) params.set('status', S.orderFilters.status);
         if (S.orderFilters.fulfillment) params.set('fulfillment', S.orderFilters.fulfillment);
         if (S.orderFilters.financial) params.set('financial', S.orderFilters.financial);
-        if (S.orderFilters.query) params.set('q', S.orderFilters.query);
+
+        // Compose the Shopify search query from the quick chip + any
+        // free-text typed into the search box.
+        const quickQ = QUICK_FILTER_QUERIES[S.orderFilters.quick || ''] || '';
+        const textQ = S.orderFilters.query || '';
+        const composed = [quickQ, textQ].filter(Boolean).join(' ').trim();
+        if (composed) params.set('q', composed);
+
         params.set('limit', '50');
+        if (append && S.orderPagination.endCursor) {
+          params.set('cursor', S.orderPagination.endCursor);
+        }
 
         const response = await fetch(`${API_BASE}/orders?${params.toString()}`, { headers: api.headers() });
         const data = await response.json();
 
         if (!data.success) throw new Error(data.error);
 
-        S.orders = data.orders || [];
+        const incoming = data.orders || [];
+        if (append) {
+          // Avoid duplicates if a re-fetch happens before the cursor refreshed.
+          const seen = new Set(S.orders.map(o => o.id));
+          incoming.forEach(o => { if (!seen.has(o.id)) S.orders.push(o); });
+        } else {
+          S.orders = incoming;
+        }
+
+        S.orderPagination.hasNextPage = data.pagination?.hasNextPage || false;
+        S.orderPagination.endCursor   = data.pagination?.endCursor || null;
+
         renderOrdersList();
       } catch (e) {
         if (e.message === 'Unauthorized') showAuth();
         else {
-          list.innerHTML = `<div class="p-8 text-center text-sm text-red-500">${e.message}</div>`;
+          if (!append) list.innerHTML = `<div class="p-8 text-center text-sm text-red-500">${e.message}</div>`;
           toast(e.message, 'error');
         }
       }
     }
 
+    async function loadMoreOrders() {
+      if (!S.orderPagination.hasNextPage) return;
+      const btn = $('btn-load-more-orders');
+      if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+      await loadOrders({ append: true });
+      if (btn) { btn.disabled = false; btn.textContent = 'Load More Orders'; }
+    }
+
     function renderOrdersList() {
       const list = $('orders-list');
+      renderOrdersQuickChips();
+
+      // Locally compute the refund-request count over the loaded set so
+      // the chip badge has a sensible number even before the user clicks
+      // it (for global accuracy across pages, the chip uses a server
+      // query when activated).
+      const pendingRefundReqCount = S.orders.filter(o =>
+        (o.tags || []).includes('refund-requested')
+      ).length;
 
       if (S.orders.length === 0) {
-        list.innerHTML = '<div class="p-8 text-center text-sm text-gray-400">No orders found</div>';
+        list.innerHTML = '<div class="p-8 text-center text-sm text-gray-400">No orders match this filter</div>';
         $('orders-count').textContent = '0 orders';
         return;
       }
 
-      // Count pending refund requests so we can surface a header badge
-      // and decide whether to show the "inbox" banner.
-      let pendingRefundReqCount = 0;
-      const onlyShowRefundRequests = S.refundInboxFilter === true;
-      let visibleOrders = S.orders;
-      if (onlyShowRefundRequests) {
-        visibleOrders = S.orders.filter(o => (o.tags || []).includes('refund-requested'));
-      }
-
-      list.innerHTML = visibleOrders.map(order => {
+      const ordersHtml = S.orders.map(order => {
         const financialClass = getFinancialStatusClass(order.financialStatus);
         const fulfillmentClass = getFulfillmentStatusClass(order.fulfillmentStatus);
         const isSelected = S.selectedOrder?.id === order.id;
         const hasRefundRequest = (order.tags || []).includes('refund-requested');
-        if (hasRefundRequest) pendingRefundReqCount++;
 
         return `
           <div class="order-item p-3 cursor-pointer hover:bg-gray-50 ${isSelected ? 'bg-red-50 border-l-2 border-red-600' : ''} ${hasRefundRequest && !isSelected ? 'border-l-2 border-orange-500' : ''}" data-order-id="${order.id}">
@@ -83,49 +128,109 @@
         `;
       }).join('');
 
-      // Need to count pending refund requests across ALL orders, not
-      // just visible ones, so the badge stays accurate when filter is on.
-      pendingRefundReqCount = S.orders.filter(o => (o.tags || []).includes('refund-requested')).length;
+      // Append a Load More row when the worker says there are more
+      // pages on the server. Hidden when the current view is exhausted.
+      const loadMoreHtml = S.orderPagination.hasNextPage
+        ? `<div class="p-3 border-t border-gray-100">
+             <button id="btn-load-more-orders" class="w-full py-2 px-4 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+               Load More Orders
+             </button>
+           </div>`
+        : '';
+      list.innerHTML = ordersHtml + loadMoreHtml;
 
-      // Reset the filter automatically if there's nothing left to filter to.
-      if (pendingRefundReqCount === 0 && S.refundInboxFilter) {
-        S.refundInboxFilter = false;
-      }
-
+      // Header count: "N orders" or "N of M loaded" when there's more on the server.
       const countEl = $('orders-count');
       if (countEl) {
-        const visLabel = onlyShowRefundRequests
-          ? `${visibleOrders.length} of ${S.orders.length} orders`
-          : `${S.orders.length} orders`;
-
-        // The pill is the filter toggle. When active it inverts to
-        // a darker fill so the on/off state is obvious; click anywhere
-        // on the pill to toggle (handler bound below to #orders-count).
-        const pill = pendingRefundReqCount > 0
-          ? `<button type="button" id="refund-filter-pill"
-                aria-pressed="${onlyShowRefundRequests}"
-                title="${onlyShowRefundRequests ? 'Showing only refund requests — click to clear' : 'Click to filter to refund requests only'}"
-                class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider align-middle transition-colors
-                  ${onlyShowRefundRequests
-                    ? 'bg-orange-600 text-white hover:bg-orange-700'
-                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}">
-                <span class="w-1.5 h-1.5 rounded-full ${onlyShowRefundRequests ? 'bg-white' : 'bg-orange-500'}"></span>
-                ${pendingRefundReqCount} REFUND REQUEST${pendingRefundReqCount === 1 ? '' : 'S'}
-              </button>`
-          : '';
-        countEl.innerHTML = `${visLabel}${pill}`;
-
-        const filterPill = $('refund-filter-pill');
-        if (filterPill) {
-          filterPill.addEventListener('click', () => {
-            S.refundInboxFilter = !S.refundInboxFilter;
-            renderOrdersList();
-          });
-        }
+        const baseLabel = S.orderPagination.hasNextPage
+          ? `${S.orders.length} loaded — more on server`
+          : `${S.orders.length} order${S.orders.length === 1 ? '' : 's'}`;
+        countEl.textContent = baseLabel;
       }
 
       list.querySelectorAll('.order-item').forEach(item => {
         item.addEventListener('click', () => selectOrder(item.dataset.orderId));
+      });
+
+      const loadMoreBtn = $('btn-load-more-orders');
+      if (loadMoreBtn) loadMoreBtn.addEventListener('click', loadMoreOrders);
+    }
+
+    // Quick filter chip row above the orders list. Clicking a chip flips
+    // S.orderFilters.quick and re-fetches with the corresponding Shopify
+    // search query (server-side, accurate across all pages).
+    function renderOrdersQuickChips() {
+      const chipsEl = $('orders-quick-chips');
+      if (!chipsEl) return;
+
+      // Counts derived from currently loaded orders. Annotated "+" when
+      // there are more pages on the server so the operator knows the
+      // shown count is a floor, not a total.
+      const loaded = S.orders || [];
+      const moreOnServer = S.orderPagination.hasNextPage;
+      const cap = (n) => moreOnServer && S.orderFilters.quick === '' ? `${n}+` : `${n}`;
+
+      const countAll          = loaded.length;
+      const countNeedsFulfill = loaded.filter(o => {
+        const fs = (o.fulfillmentStatus || '').toUpperCase();
+        const finS = (o.financialStatus || '').toUpperCase();
+        const isUnfulfilled = fs === 'UNFULFILLED' || fs === 'PARTIALLY_FULFILLED';
+        const isRefunded    = finS === 'REFUNDED' || finS === 'PARTIALLY_REFUNDED';
+        const isCancelled   = !!o.cancelledAt;
+        return isUnfulfilled && !isRefunded && !isCancelled;
+      }).length;
+      const countRefundReq    = loaded.filter(o => (o.tags || []).includes('refund-requested')).length;
+      const countRefunded     = loaded.filter(o => {
+        const finS = (o.financialStatus || '').toUpperCase();
+        return finS === 'REFUNDED' || finS === 'PARTIALLY_REFUNDED';
+      }).length;
+      const countCancelled    = loaded.filter(o => !!o.cancelledAt).length;
+
+      const active = S.orderFilters.quick || '';
+
+      const chips = [
+        { key: '',             label: 'All',               count: cap(countAll),          color: 'gray' },
+        { key: 'needsFulfill', label: 'Needs Fulfillment', count: cap(countNeedsFulfill), color: 'amber' },
+        { key: 'refundReq',    label: 'Refund Requests',   count: cap(countRefundReq),    color: 'orange', hideIfZero: true },
+        { key: 'refunded',     label: 'Refunded',          count: cap(countRefunded),     color: 'red',    hideIfZero: true },
+        { key: 'cancelled',    label: 'Cancelled',         count: cap(countCancelled),    color: 'gray',   hideIfZero: true }
+      ];
+
+      const colorClasses = (color, isActive) => {
+        if (isActive) {
+          if (color === 'amber')  return 'bg-amber-600 text-white border-amber-600';
+          if (color === 'orange') return 'bg-orange-600 text-white border-orange-600';
+          if (color === 'red')    return 'bg-red-600 text-white border-red-600';
+          return 'bg-gray-700 text-white border-gray-700';
+        }
+        if (color === 'amber')  return 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100';
+        if (color === 'orange') return 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100';
+        if (color === 'red')    return 'bg-red-50 text-red-800 border-red-200 hover:bg-red-100';
+        return 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50';
+      };
+
+      chipsEl.innerHTML = chips
+        .filter(c => !c.hideIfZero || (parseInt(c.count) > 0 || c.key === active))
+        .map(c => {
+          const isActive = c.key === active;
+          return `<button type="button" data-quick-key="${c.key}"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-colors ${colorClasses(c.color, isActive)}"
+            aria-pressed="${isActive}">
+            <span>${c.label}</span>
+            <span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isActive ? 'bg-white/25' : 'bg-white/70'}">${c.count}</span>
+          </button>`;
+        }).join('');
+
+      chipsEl.querySelectorAll('[data-quick-key]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.dataset.quickKey;
+          if (S.orderFilters.quick === key) return; // no-op
+          S.orderFilters.quick = key;
+          // Reset pagination cursor since the query changed.
+          S.orderPagination.endCursor = null;
+          S.orderPagination.hasNextPage = false;
+          loadOrders();
+        });
       });
     }
 
