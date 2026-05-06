@@ -1,3 +1,29 @@
+<style>
+  [data-customer-addresses] .address-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
+  @media (min-width: 1024px) {
+    [data-customer-addresses] .address-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  [data-customer-addresses] .address-card {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  [data-customer-addresses] .address-card__content {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    white-space: normal;
+    column-count: 1;
+  }
+</style>
+
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16" data-customer-addresses>
   
   <!-- Header: Logistics Command Center Style -->
@@ -29,11 +55,11 @@
   {% paginate customer.addresses by 6 %}
     
     <!-- Address Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      
+    <div class="address-grid">
+
       {% for address in customer.addresses %}
-        <div class="relative bg-white border border-gray-200 p-8 shadow-sm hover:shadow-md transition-shadow group">
-          
+        <div class="address-card relative bg-white border border-gray-200 p-8 shadow-sm hover:shadow-md transition-shadow group">
+
           <!-- Default Badge -->
           {% if address == customer.default_address %}
             <span class="absolute top-0 right-0 bg-[#CC0000] text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1">
@@ -42,7 +68,7 @@
           {% endif %}
 
           <!-- Address Content (Monospaced for label look) -->
-          <div class="font-mono text-sm text-gray-800 leading-relaxed mb-8">
+          <div class="address-card__content font-mono text-sm text-gray-800 leading-relaxed mb-8">
             {{ address | format_address }}
           </div>
 
